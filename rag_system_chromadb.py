@@ -458,11 +458,12 @@ class ConversationRAGSystem:
                                 "processing_method": "chromadb_rag",
                                 "is_processed": True
                             }
-                            run_async(document_service.save_document_metadata(
+                            from services.document_service import save_document_metadata_sync
+                            save_document_metadata_sync(
                                 user_uuid=user_data['id'],
                                 conversation_id=actual_conversation_id,
                                 doc_data=doc_data
-                            ))
+                            )
                         else:
                             st.warning(f"Could not find conversation {self.conversation_id} in database")
                 except Exception as e:
@@ -556,11 +557,12 @@ class ConversationRAGSystem:
                                 "processing_method": "ocr_chromadb_rag",
                                 "is_processed": True
                             }
-                            run_async(document_service.save_document_metadata(
+                            from services.document_service import save_document_metadata_sync
+                            save_document_metadata_sync(
                                 user_uuid=user_data['id'],
                                 conversation_id=actual_conversation_id,
                                 doc_data=doc_data
-                            ))
+                            )
                         else:
                             st.warning(f"Could not find conversation {self.conversation_id} in database")
                 except Exception as e:

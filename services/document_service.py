@@ -482,6 +482,73 @@ class DocumentService:
 # Global document service instance
 document_service = DocumentService()
 
+# Sync wrapper methods for Streamlit compatibility
+def save_document_metadata_sync(user_uuid: str, conversation_id: str, doc_data: Dict) -> bool:
+    """Save document metadata (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(document_service.save_document_metadata(user_uuid, conversation_id, doc_data))
+
+def get_conversation_documents_sync(user_uuid: str, conversation_id: str) -> List[Dict]:
+    """Get conversation documents (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(document_service.get_conversation_documents(user_uuid, conversation_id))
+
+def delete_document_sync(user_uuid: str, document_hash: str) -> bool:
+    """Delete document (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(document_service.delete_document(user_uuid, document_hash))
+
+def search_documents_sync(user_uuid: str, query: str, conversation_id: str = None, limit: int = 20) -> List[Dict]:
+    """Search documents (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(document_service.search_documents(user_uuid, query, conversation_id, limit))
+
+def get_conversation_document_count_sync(user_uuid: str, conversation_id: str) -> int:
+    """Get conversation document count (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(document_service.get_conversation_document_count(user_uuid, conversation_id))
+
+def get_user_documents_sync(user_uuid: str, limit: int = 100) -> List[Dict]:
+    """Get user documents (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(document_service.get_user_documents(user_uuid, limit))
+
 # Convenience functions for backward compatibility
 async def save_document_metadata(user_uuid: str, conversation_id: str, doc_data: Dict) -> bool:
     """Save document metadata."""

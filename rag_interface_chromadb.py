@@ -47,10 +47,11 @@ def display_rag_sidebar(conversation_id: str):
             return
         
         # Get documents from Supabase
-        documents = run_async(document_service.get_conversation_documents(
+        from services.document_service import get_conversation_documents_sync
+        documents = get_conversation_documents_sync(
             user_data['id'], 
             conversation_id
-        ))
+        )
         
         if documents:
             st.sidebar.markdown(f"**{len(documents)} document(s) in this conversation:**")
@@ -69,10 +70,11 @@ def display_rag_sidebar(conversation_id: str):
                     
                     # Delete button
                     if st.button(f"🗑️ Delete", key=f"delete_{doc['document_hash']}", help="Delete this document"):
-                        success = run_async(document_service.delete_document(
+                        from services.document_service import delete_document_sync
+                        success = delete_document_sync(
                             user_data['id'], 
                             doc['document_hash']
-                        ))
+                        )
                         if success:
                             # Also delete from ChromaDB
                             rag_system = initialize_rag_system(conversation_id)
@@ -90,11 +92,12 @@ def display_rag_sidebar(conversation_id: str):
             
             if search_query and st.sidebar.button("Search", key=f"search_btn_{conversation_id}"):
                 # Search in Supabase metadata
-                search_results = run_async(document_service.search_documents(
+                from services.document_service import search_documents_sync
+                search_results = search_documents_sync(
                     user_data['id'], 
                     search_query, 
                     conversation_id
-                ))
+                )
                 
                 if search_results:
                     st.sidebar.markdown("**Search Results:**")
@@ -161,10 +164,11 @@ def get_conversation_document_count(conversation_id: str = None) -> int:
             return 0
         
         # Get document count from Supabase
-        count = run_async(document_service.get_conversation_document_count(
+        from services.document_service import get_conversation_document_count_sync
+        count = get_conversation_document_count_sync(
             user_data['id'], 
             conversation_id
-        ))
+        )
         return count
     except Exception:
         return 0
@@ -181,7 +185,8 @@ def get_all_user_documents_count() -> int:
             return 0
         
         # Get all user documents from Supabase
-        documents = run_async(document_service.get_user_documents(user_data['id']))
+        from services.document_service import get_user_documents_sync
+        documents = get_user_documents_sync(user_data['id'])
         return len(documents)
     except Exception:
         return 0
