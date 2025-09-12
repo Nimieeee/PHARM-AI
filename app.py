@@ -26,6 +26,18 @@ st.set_page_config(
 
 def main():
     """Main application entry point."""
+    # Check for setup page via query params
+    query_params = st.query_params
+    if query_params.get("page") == "setup":
+        # Import and run setup page
+        try:
+            import streamlit_cloud_setup
+            streamlit_cloud_setup.main()
+            return
+        except ImportError:
+            st.error("Setup page not available")
+            return
+    
     # Initialize session state
     initialize_session_state()
     
