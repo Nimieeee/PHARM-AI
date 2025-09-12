@@ -41,58 +41,43 @@ class ConversationService:
         Returns:
             str: Conversation ID
         """
+        # Immediately use the simple method to avoid trigger issues
+        logger.info("Using simple conversation creation to avoid trigger issues")
         try:
-            conversation_id = self._generate_conversation_id()
+            return await self.create_conversation_simple(user_uuid, title, model)
+        except Exception as simple_error:
+            logger.error(f"Simple conversation creation failed: {str(simple_error)}")
             
-            # Try creating without messages field first to avoid trigger issues
-            conversation_data = {
-                'conversation_id': conversation_id,
-                'user_id': user_uuid,
-                'title': title,
-                'model': model or 'meta-llama/llama-4-maverick-17b-128e-instruct',
-                'created_at': datetime.now().isoformat(),
-                'is_archived': False,
-                'message_count': 0
-                # Don't include messages initially to avoid trigger issues
-            }
-            
-            result = self.connection_manager.execute_query(
-                table='conversations',
-                operation='insert',
-                data=conversation_data
-            )
-            
-            if result.data:
-                # Now safely add the messages field after creation
-                try:
-                    update_result = self.connection_manager.execute_query(
-                        table='conversations',
-                        operation='update',
-                        data={'messages': json.dumps([])},
-                        eq={
-                            'conversation_id': conversation_id,
-                            'user_id': user_uuid
-                        }
-                    )
-                    logger.info(f"Conversation created with messages: {conversation_id}")
-                except Exception as update_error:
-                    logger.warning(f"Conversation created but messages update failed: {update_error}")
+            # If simple method fails, try the original approach as fallback
+            try:
+                logger.info("Trying original conversation creation as fallback...")
+                conversation_id = self._generate_conversation_id()
                 
-                return conversation_id
-            else:
-                logger.error(f"Failed to create conversation for user: {user_uuid}")
-                raise SupabaseError("Failed to create conversation")
+                conversation_data = {
+                    'conversation_id': conversation_id,
+                    'user_id': user_uuid,
+                    'title': title,
+                    'model': model or 'meta-llama/llama-4-maverick-17b-128e-instruct',
+                    'created_at': datetime.now().isoformat(),
+                    'is_archived': False,
+                    'message_count': 0
+                }
                 
-        except Exception as e:
-            logger.error(f"Error creating conversation for user {user_uuid}: {str(e)}")
-            # Try fallback method if main creation fails
-            if "cannot get array length of a scalar" in str(e):
-                logger.info("Attempting fallback conversation creation...")
-                try:
-                    return await self.create_conversation_simple(user_uuid, title, model)
-                except Exception as fallback_error:
-                    logger.error(f"Fallback creation also failed: {str(fallback_error)}")
-            raise SupabaseError(f"Conversation creation failed: {str(e)}")
+                result = self.connection_manager.execute_query(
+                    table='conversations',
+                    operation='insert',
+                    data=conversation_data
+                )
+                
+                if result.data:
+                    logger.info(f"Fallback conversation created: {conversation_id}")
+                    return conversation_id
+                else:
+                    raise SupabaseError("Failed to create conversation")
+                    
+            except Exception as fallback_error:
+                logger.error(f"All conversation creation methods failed: {str(fallback_error)}")
+                raise SupabaseError(f"Conversation creation failed: {str(fallback_error)}")
     
     async def get_user_conversations(self, user_uuid: str, include_archived: bool = False, limit: int = 100) -> Dict:
         """
@@ -510,40 +495,63 @@ class ConversationService:
 
     async def create_conversation_simple(self, user_uuid: str, title: str, model: str = None) -> str:
         """
-        Simple conversation creation without relying on database triggers.
+        Simple conversation creation using raw SQL to bypass triggers.
         Fallback method for when the main creation fails.
         """
         try:
             conversation_id = self._generate_conversation_id()
+            model = model or 'meta-llama/llama-4-maverick-17b-128e-instruct'
             
-            # Use minimal data to avoid trigger issues
-            conversation_data = {
-                'conversation_id': conversation_id,
-                'user_id': user_uuid,
-                'title': title,
-                'model': model or 'meta-llama/llama-4-maverick-17b-128e-instruct',
-                'created_at': datetime.now().isoformat(),
-                'is_archived': False
-                # Don't include messages or message_count to avoid trigger
-            }
+            # Use raw SQL to bypass all triggers
+            client = self.connection_manager.get_client()
+            if not client:
+                raise SupabaseError("No Supabase client available")
             
-            result = self.connection_manager.execute_query(
-                table='conversations',
-                operation='insert',
-                data=conversation_data
+            # Raw SQL insert that bypasses triggers
+            sql = """
+            INSERT INTO conversations (
+                conversation_id, user_id, title, model, 
+                created_at, is_archived, messages, message_count
+            ) VALUES (
+                %s, %s, %s, %s, 
+                NOW(), false, '[]'::jsonb, 0
             )
+            """
             
-            if result.data:
-                # Manually add empty messages array after creation
-                await self.update_conversation(
-                    user_uuid,
-                    conversation_id,
-                    {'messages': [], 'message_count': 0}
-                )
-                logger.info(f"Conversation created (simple): {conversation_id}")
+            try:
+                # Try using rpc to execute raw SQL
+                result = client.rpc('exec_sql', {
+                    'sql': sql,
+                    'params': [conversation_id, user_uuid, title, model]
+                }).execute()
+                
+                logger.info(f"Conversation created via raw SQL: {conversation_id}")
                 return conversation_id
-            else:
-                raise SupabaseError("Failed to create conversation")
+                
+            except Exception as rpc_error:
+                logger.warning(f"Raw SQL failed: {rpc_error}")
+                
+                # Fallback to minimal insert without messages field
+                minimal_data = {
+                    'conversation_id': conversation_id,
+                    'user_id': user_uuid,
+                    'title': title,
+                    'model': model,
+                    'created_at': datetime.now().isoformat(),
+                    'is_archived': False
+                }
+                
+                result = self.connection_manager.execute_query(
+                    table='conversations',
+                    operation='insert',
+                    data=minimal_data
+                )
+                
+                if result.data:
+                    logger.info(f"Conversation created (minimal): {conversation_id}")
+                    return conversation_id
+                else:
+                    raise SupabaseError("Failed to create minimal conversation")
                 
         except Exception as e:
             logger.error(f"Error creating simple conversation: {str(e)}")
