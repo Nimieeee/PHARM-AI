@@ -257,6 +257,29 @@ class ConversationRAGSystem:
         except Exception as e:
             st.error(f"Error saving metadata: {e}")
     
+    def _get_conversation_db_id(self, user_uuid: str, conversation_id: str) -> Optional[str]:
+        """Get the actual database ID for a conversation from its conversation_id field."""
+        try:
+            if SUPABASE_AVAILABLE:
+                from supabase_manager import get_supabase_client
+                supabase = get_supabase_client()
+                
+                # Query conversations table to find the actual ID
+                result = supabase.table('conversations').select('id').eq('user_uuid', user_uuid).eq('conversation_id', conversation_id).execute()
+                
+                if result.data and len(result.data) > 0:
+                    return result.data[0]['id']
+                else:
+                    # Fallback: maybe the conversation_id is already the database ID
+                    result = supabase.table('conversations').select('id').eq('user_uuid', user_uuid).eq('id', conversation_id).execute()
+                    if result.data and len(result.data) > 0:
+                        return result.data[0]['id']
+            
+            return None
+        except Exception as e:
+            st.warning(f"Error looking up conversation ID: {e}")
+            return None
+    
     def _generate_document_hash(self, content: str, filename: str) -> str:
         """Generate unique hash for document content in this conversation."""
         # Include conversation ID in hash to ensure conversation-specific uniqueness
@@ -421,22 +444,27 @@ class ConversationRAGSystem:
                     # Get user UUID from legacy user_id
                     user_data = user_service.get_user_by_id(self.user_id)
                     if user_data:
-                        # Save document to Supabase
-                        doc_data = {
-                            "document_hash": doc_hash,
-                            "filename": filename,
-                            "file_type": file_type,
-                            "file_size": len(file_content),
-                            "content": text[:10000],  # Store first 10k chars as preview
-                            "chunk_count": len(chunks),
-                            "processing_method": "chromadb_rag",
-                            "is_processed": True
-                        }
-                        run_async(document_service.save_document_metadata(
-                            user_uuid=user_data['id'],
-                            conversation_id=self.conversation_id,
-                            doc_data=doc_data
-                        ))
+                        # Get the actual conversation database ID from conversation_id
+                        actual_conversation_id = self._get_conversation_db_id(user_data['id'], self.conversation_id)
+                        if actual_conversation_id:
+                            # Save document to Supabase
+                            doc_data = {
+                                "document_hash": doc_hash,
+                                "filename": filename,
+                                "file_type": file_type,
+                                "file_size": len(file_content),
+                                "content": text[:10000],  # Store first 10k chars as preview
+                                "chunk_count": len(chunks),
+                                "processing_method": "chromadb_rag",
+                                "is_processed": True
+                            }
+                            run_async(document_service.save_document_metadata(
+                                user_uuid=user_data['id'],
+                                conversation_id=actual_conversation_id,
+                                doc_data=doc_data
+                            ))
+                        else:
+                            st.warning(f"Could not find conversation {self.conversation_id} in database")
                 except Exception as e:
                     st.warning(f"Document saved locally but failed to sync with database: {e}")
             
@@ -514,22 +542,27 @@ class ConversationRAGSystem:
                     # Get user UUID from legacy user_id
                     user_data = user_service.get_user_by_id(self.user_id)
                     if user_data:
-                        # Save document to Supabase
-                        doc_data = {
-                            "document_hash": doc_hash,
-                            "filename": filename,
-                            "file_type": "image/ocr",
-                            "file_size": 0,  # Image size not available here
-                            "content": text[:10000],  # Store first 10k chars as preview
-                            "chunk_count": len(chunks),
-                            "processing_method": "ocr_chromadb_rag",
-                            "is_processed": True
-                        }
-                        run_async(document_service.save_document_metadata(
-                            user_uuid=user_data['id'],
-                            conversation_id=self.conversation_id,
-                            doc_data=doc_data
-                        ))
+                        # Get the actual conversation database ID from conversation_id
+                        actual_conversation_id = self._get_conversation_db_id(user_data['id'], self.conversation_id)
+                        if actual_conversation_id:
+                            # Save document to Supabase
+                            doc_data = {
+                                "document_hash": doc_hash,
+                                "filename": filename,
+                                "file_type": "image/ocr",
+                                "file_size": 0,  # Image size not available here
+                                "content": text[:10000],  # Store first 10k chars as preview
+                                "chunk_count": len(chunks),
+                                "processing_method": "ocr_chromadb_rag",
+                                "is_processed": True
+                            }
+                            run_async(document_service.save_document_metadata(
+                                user_uuid=user_data['id'],
+                                conversation_id=actual_conversation_id,
+                                doc_data=doc_data
+                            ))
+                        else:
+                            st.warning(f"Could not find conversation {self.conversation_id} in database")
                 except Exception as e:
                     st.warning(f"Image saved locally but failed to sync with database: {e}")
             
