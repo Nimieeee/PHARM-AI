@@ -78,8 +78,10 @@ class SupabaseConnectionManager:
     
     def _initialize_client(self) -> bool:
         """Initialize Supabase client with error handling."""
+        logger.info("🚀 SUPABASE._INITIALIZE_CLIENT called")
+        
         if not SUPABASE_AVAILABLE:
-            logger.error("Supabase library not available")
+            logger.error("❌ Supabase library not available")
             return False
         
         try:
@@ -88,52 +90,61 @@ class SupabaseConnectionManager:
             supabase_key = st.secrets.get("SUPABASE_ANON_KEY")
             
             if not supabase_url or not supabase_key:
-                logger.error("Supabase credentials not found in secrets")
+                logger.error("❌ Supabase credentials not found in secrets")
                 st.error("❌ Supabase credentials not configured. Please add SUPABASE_URL and SUPABASE_ANON_KEY to your Streamlit secrets.")
                 return False
             
             # Create client with connection pooling
+            logger.info("🔧 Creating Supabase client")
             self._client = create_client(supabase_url, supabase_key)
             
             # Test connection
+            logger.info("🧪 Testing connection during initialization")
             if self.test_connection():
-                logger.info("Supabase client initialized successfully")
+                logger.info("✅ Supabase client initialized successfully")
                 return True
             else:
-                logger.error("Supabase connection test failed")
+                logger.error("❌ Supabase connection test failed")
                 return False
                 
         except Exception as e:
-            logger.error(f"Failed to initialize Supabase client: {e}")
+            logger.error(f"💥 Failed to initialize Supabase client: {e}")
             st.error(f"❌ Failed to connect to Supabase: {str(e)}")
             return False
     
     def get_client(self) -> Optional[Client]:
         """Get Supabase client instance."""
+        logger.info(f"🔍 SUPABASE.GET_CLIENT called - client exists: {self._client is not None}")
+        
         if self._client is None:
+            logger.info("🚀 Client is None, initializing...")
             self._initialize_client()
         return self._client
     
     def test_connection(self) -> bool:
         """Test database connection health."""
+        logger.info("🧪 SUPABASE.TEST_CONNECTION called")
+        
         if not self._client:
+            logger.warning("❌ No client available for connection test")
             return False
         
         try:
             start_time = time.time()
             
             # Simple query to test connection
+            logger.info("📊 Executing connection test query")
             result = self._client.table('users').select('count').limit(1).execute()
             
             response_time = time.time() - start_time
             self._connection_stats['last_connection_test'] = datetime.now()
             self._connection_stats['avg_response_time'] = response_time
             
-            logger.info(f"Connection test successful ({response_time:.3f}s)")
+            logger.info(f"✅ Connection test successful ({response_time:.3f}s)")
             return True
             
         except Exception as e:
-            logger.error(f"Connection test failed: {e}")
+            logger.error(f"❌ Connection test failed: {e}")
             self._connection_stats['connection_errors'].append({
                 'timestamp': datetime.now(),
                 'error': str(e)

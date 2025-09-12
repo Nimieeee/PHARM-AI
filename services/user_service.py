@@ -108,17 +108,23 @@ class UserService:
         Returns:
             Tuple of (success: bool, message: str, user_data: Optional[Dict])
         """
+        logger.info(f"🔐 USER_SERVICE.AUTHENTICATE_USER called for user: {username}")
+        
         try:
             if not self.supabase:
+                logger.error("❌ No Supabase client available")
                 return False, "Database connection not available", None
                 
             # Get user by username
+            logger.info(f"👤 Fetching user data for: {username}")
             user = self.get_user_by_username(username)
             if not user:
+                logger.warning(f"👤 User not found: {username}")
                 return False, "Username not found", None
             
             # Check if user is active
             if not user.get('is_active', True):
+                logger.warning(f"🚫 User account disabled: {username}")
                 return False, "Account is disabled", None
             
             # Verify password
@@ -126,32 +132,38 @@ class UserService:
             
             if password_hash == user['password_hash']:
                 # Update last login
+                logger.info(f"🔄 Updating last login for: {username}")
                 self.update_last_login(user['id'])
                 
-                logger.info(f"User authenticated successfully: {username}")
+                logger.info(f"✅ User authenticated successfully: {username}")
                 return True, "Authentication successful", user
             else:
-                logger.warning(f"Invalid password for user: {username}")
+                logger.warning(f"❌ Invalid password for user: {username}")
                 return False, "Invalid password", None
                 
         except Exception as e:
-            logger.error(f"Error authenticating user {username}: {str(e)}")
+            logger.error(f"💥 Error authenticating user {username}: {str(e)}")
             return False, f"Authentication error: {str(e)}", None
     
     def get_user_by_username(self, username: str) -> Optional[Dict]:
         """Get user by username."""
+        logger.info(f"🔍 GET_USER_BY_USERNAME called for: {username}")
+        
         try:
             if not self.supabase:
+                logger.error("❌ No Supabase client available")
                 return None
                 
             result = self.supabase.table('users').select('*').eq('username', username).execute()
             
             if result.data:
+                logger.info(f"✅ User found: {username}")
                 return result.data[0]
+            logger.info(f"❌ User not found: {username}")
             return None
             
         except Exception as e:
-            logger.error(f"Error getting user by username {username}: {str(e)}")
+            logger.error(f"💥 Error getting user by username {username}: {str(e)}")
             return None
     
     def get_user_by_id(self, user_id: str) -> Optional[Dict]:

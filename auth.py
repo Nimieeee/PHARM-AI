@@ -57,12 +57,19 @@ def create_session(username: str) -> str:
 
 def validate_session(session_id: str) -> Optional[str]:
     """Validate session and return username if valid using Supabase."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔍 VALIDATE_SESSION called for session_id: {session_id}")
+    
     try:
         session_data = run_async(session_service.validate_session(session_id))
         if session_data:
+            logger.info(f"✅ Session validation SUCCESS for user: {session_data['username']}")
             return session_data['username']
+        logger.warning(f"❌ Session validation FAILED for session_id: {session_id}")
         return None
     except Exception as e:
+        logger.error(f"💥 Error validating session {session_id}: {str(e)}")
         st.error(f"Error validating session: {str(e)}")
         return None
 
@@ -86,12 +93,18 @@ def get_user_id(username: str) -> Optional[str]:
 
 def initialize_auth_session():
     """Initialize authentication session state."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔐 INITIALIZE_AUTH_SESSION called - session_id: {st.session_state.get('session_id', 'None')}, authenticated: {st.session_state.get('authenticated', False)}")
+    
     # Check for existing session
     if "session_id" not in st.session_state:
         st.session_state.session_id = None
+        logger.info("🆕 Initializing new session_id as None")
     
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
+        logger.info("🆕 Initializing authenticated as False")
     
     if "username" not in st.session_state:
         st.session_state.username = None
@@ -101,17 +114,22 @@ def initialize_auth_session():
     
     # Validate existing session
     if st.session_state.session_id:
+        logger.info(f"🔍 Validating existing session: {st.session_state.session_id}")
         username = validate_session(st.session_state.session_id)
         if username:
+            logger.info(f"✅ Session valid for user: {username}")
             st.session_state.authenticated = True
             st.session_state.username = username
             st.session_state.user_id = get_user_id(username)
         else:
+            logger.warning("❌ Session invalid, clearing state")
             # Invalid session, clear state
             st.session_state.session_id = None
             st.session_state.authenticated = False
             st.session_state.username = None
             st.session_state.user_id = None
+    else:
+        logger.info("ℹ️  No session_id to validate")
 
 def login_user(username: str, password: str) -> bool:
     """Login user and create session."""

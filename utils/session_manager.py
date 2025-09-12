@@ -19,6 +19,10 @@ def run_async(coro):
 
 def initialize_session_state():
     """Initialize session state variables with Supabase optimizations."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🔄 INITIALIZE_SESSION_STATE called - authenticated: {st.session_state.get('authenticated', False)}, session_id: {st.session_state.get('session_id', 'None')}")
+    
     # Initialize authentication with persistent session support
     from auth import initialize_auth_session
     initialize_auth_session()
