@@ -23,6 +23,29 @@ except ImportError:
     SUPABASE_AVAILABLE = False
     logger.error("Supabase not available. Install with: pip install supabase")
 
+
+def validate_order_clause(order_clause: str) -> str:
+    """Validate and fix order clause format."""
+    if not order_clause:
+        return 'created_at.desc'
+    
+    # Remove any duplicate direction specifiers
+    if '.desc.asc' in order_clause:
+        order_clause = order_clause.replace('.desc.asc', '.desc')
+    elif '.asc.desc' in order_clause:
+        order_clause = order_clause.replace('.asc.desc', '.asc')
+    elif '.desc.desc' in order_clause:
+        order_clause = order_clause.replace('.desc.desc', '.desc')
+    elif '.asc.asc' in order_clause:
+        order_clause = order_clause.replace('.asc.asc', '.asc')
+    
+    # Ensure proper format
+    if '.' not in order_clause:
+        order_clause = f"{order_clause}.desc"
+    
+    return order_clause
+
+
 class SupabaseConnectionManager:
     """Manages Supabase database connections with pooling and error handling."""
     
@@ -137,7 +160,8 @@ class SupabaseConnectionManager:
                     result = result.limit(kwargs['limit'])
                 
                 if 'order' in kwargs:
-                    result = result.order(kwargs['order'])
+                    validated_order = validate_order_clause(kwargs['order'])
+                    result = result.order(validated_order)
                 
                 return result.execute()
             

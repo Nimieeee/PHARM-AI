@@ -48,11 +48,11 @@ class ConversationService:
                 'conversation_id': conversation_id,
                 'user_id': user_uuid,
                 'title': title,
-                'messages': json.dumps([]),  # Empty message array
+                'messages': [],  # Empty message array - will be handled as JSONB by Supabase
                 'model': model or 'meta-llama/llama-4-maverick-17b-128e-instruct',
                 'created_at': datetime.now().isoformat(),
-                'message_count': 0,
                 'is_archived': False
+                # message_count will be set automatically by trigger
             }
             
             result = self.connection_manager.execute_query(
@@ -101,8 +101,8 @@ class ConversationService:
             conversations = {}
             if result.data:
                 for conv in result.data:
-                    # Parse messages JSON
-                    messages = json.loads(conv['messages']) if conv['messages'] else []
+                    # Handle messages as array or JSON string
+                    messages = conv['messages'] if isinstance(conv['messages'], list) else (json.loads(conv['messages']) if conv['messages'] else [])
                     
                     conversations[conv['conversation_id']] = {
                         'title': conv['title'],
@@ -144,7 +144,7 @@ class ConversationService:
             
             if result.data:
                 conv = result.data[0]
-                messages = json.loads(conv['messages']) if conv['messages'] else []
+                messages = conv['messages'] if isinstance(conv['messages'], list) else (json.loads(conv['messages']) if conv['messages'] else [])
                 
                 return {
                     'conversation_id': conv['conversation_id'],
@@ -183,10 +183,8 @@ class ConversationService:
             if not safe_data:
                 return False
             
-            # Handle messages update
-            if 'messages' in safe_data:
-                safe_data['messages'] = json.dumps(safe_data['messages'])
-                safe_data['message_count'] = len(data['messages'])
+            # Handle messages update - message_count will be updated by trigger
+            # No need to manually set message_count as it's handled by the database trigger
             
             safe_data['updated_at'] = datetime.now().isoformat()
             
