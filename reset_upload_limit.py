@@ -83,7 +83,7 @@ def show_upload_status():
 
 def main():
     """Main function."""
-    print("🔧 PharmBot Upload Limit Reset Tool")
+    print("🔧 PharmGPT Upload Limit Reset Tool")
     print("=" * 40)
     
     while True:

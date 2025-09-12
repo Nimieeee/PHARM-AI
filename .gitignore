@@ -1,3 +1,20 @@
+# API Keys and Secrets
+.env
+.env.local
+.env.production
+.env.staging
+*.env
+
+# Streamlit secrets
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# User data and databases
+user_data/
+*.db
+*.sqlite
+*.sqlite3
+
 # Python
 __pycache__/
 *.py[cod]
@@ -16,23 +33,21 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 MANIFEST
 
-# Virtual Environment
-venv/
-env/
-ENV/
-.venv/
-.env/
-
-# Environment Variables
+# Virtual environments
 .env
-.env.local
-.env.production
-.env.staging
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
 # IDE
 .vscode/
@@ -50,9 +65,6 @@ ENV/
 ehthumbs.db
 Thumbs.db
 
-# Streamlit
-.streamlit/
-
 # Logs
 *.log
 logs/
@@ -60,17 +72,26 @@ logs/
 # Temporary files
 *.tmp
 *.temp
+temp/
+tmp/
 
-# User data (private)
-user_data/
-*.db
-*.sqlite
+# Backup files
+*.bak
+*.backup
+*~
 
-# RAG system data
+# ChromaDB
 chroma_db/
-embeddings/
-*.faiss
-*.pkl
+*.chroma
 
-# Temporary files for document processing
-temp_*
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# pytest
+.pytest_cache/
+.coverage
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json

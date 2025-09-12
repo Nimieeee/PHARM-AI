@@ -29,7 +29,7 @@ def render_chatbot_page():
 
 def render_welcome_screen():
     """Render welcome screen when no conversation is active."""
-    st.markdown("# 💊 PharmBot")
+    st.markdown("# 💊 PharmGPT")
     st.markdown("### Your AI Pharmacology Expert")
     st.markdown("Ready to help you learn and understand pharmacology concepts.")
     st.markdown("---")

@@ -260,7 +260,7 @@ def cleanup_orphaned_data():
 
 def main():
     """Main function."""
-    print("🔒 PharmBot Privacy Verification Tool")
+    print("🔒 PharmGPT Privacy Verification Tool")
     print("=" * 40)
     
     if not os.path.exists(USER_DATA_DIR):

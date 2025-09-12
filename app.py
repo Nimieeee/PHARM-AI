@@ -1,6 +1,10 @@
 """
-PharmBot - AI Pharmacology Assistant
+PharmGPT - AI Pharmacology Assistant
 Main Streamlit Application
+
+For Streamlit Cloud deployment, make sure to:
+1. Add your API keys to Streamlit Cloud secrets
+2. Use app.py as the main file
 """
 
 import streamlit as st

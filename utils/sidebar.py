@@ -113,13 +113,6 @@ def render_sidebar():
         from auth import get_user_upload_count
         upload_count = get_user_upload_count(st.session_state.user_id)
         st.info(f"📤 Uploads: {upload_count} today (unlimited)")
-        
-        st.markdown("---")
-        
-        # Theme toggle
-        st.markdown("### 🎨 Appearance")
-        from utils.theme import render_theme_toggle
-        render_theme_toggle()
 
 def search_conversations(query: str):
     """Search conversations by title and content."""

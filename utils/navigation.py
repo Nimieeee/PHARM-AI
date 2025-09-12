@@ -17,16 +17,11 @@ def render_navigation():
 def render_public_navigation():
     """Render navigation for unauthenticated users."""
     with st.sidebar:
-        st.markdown("# 💊 PharmBot")
-        
-        # Theme toggle
-        st.markdown("### 🎨 Appearance")
-        from utils.theme import render_theme_toggle
-        render_theme_toggle()
+        st.markdown("# 💊 PharmGPT")
         
         st.markdown("---")
         st.markdown("### About")
-        st.info("PharmBot is your AI-powered pharmacology learning assistant. Sign in to start chatting!")
+        st.info("PharmGPT is your AI-powered pharmacology learning assistant. Sign in to start chatting!")
 
 def render_authenticated_navigation():
     """Render navigation for authenticated users."""

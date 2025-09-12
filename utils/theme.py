@@ -1,239 +1,300 @@
 """
-Theme Management System
+Clean Light Theme System
 """
 
 import streamlit as st
 
-def get_theme_css():
-    """Get CSS for the current theme."""
-    theme = st.session_state.get("theme_mode", "light")
-    
-    if theme == "dark":
-        return """
-        <style>
-            /* Dark theme styles */
+def get_light_theme_css():
+    """Get clean light theme CSS for maximum readability."""
+    return """
+    <style>
+        /* Force light mode for everything */
+        .stApp {
+            background-color: #ffffff !important;
+            color: #1a202c !important;
+            color-scheme: light !important;
+        }
+        
+        .stSidebar {
+            background-color: #f8fafc !important;
+            border-right: 1px solid #e2e8f0 !important;
+        }
+        
+        .stSidebar .stMarkdown {
+            color: #2d3748 !important;
+        }
+        
+        /* Clean button styling */
+        .stButton > button {
+            background-color: #ffffff !important;
+            color: #2d3748 !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .stButton > button:hover {
+            background-color: #f9fafb !important;
+            border-color: #667eea !important;
+            color: #1a202c !important;
+        }
+        
+        .stButton > button[kind="primary"] {
+            background-color: #667eea !important;
+            color: #ffffff !important;
+            border: 1px solid #667eea !important;
+            font-weight: 600 !important;
+        }
+        
+        .stButton > button[kind="primary"]:hover {
+            background-color: #5a67d8 !important;
+            border-color: #5a67d8 !important;
+        }
+        
+        .stButton > button[kind="secondary"] {
+            background-color: #f8fafc !important;
+            color: #374151 !important;
+            border: 1px solid #d1d5db !important;
+        }
+        
+        .stButton > button[kind="secondary"]:hover {
+            background-color: #f1f5f9 !important;
+            border-color: #9ca3af !important;
+        }
+        
+        /* Form elements */
+        .stTextInput > div > div > input {
+            background-color: #ffffff !important;
+            color: #1a202c !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            font-size: 14px !important;
+        }
+        
+        .stTextInput > div > div > input:focus {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1) !important;
+        }
+        
+        .stTextArea > div > div > textarea {
+            background-color: #ffffff !important;
+            color: #1a202c !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            font-size: 14px !important;
+        }
+        
+        .stTextArea > div > div > textarea:focus {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1) !important;
+        }
+        
+        .stSelectbox > div > div {
+            background-color: #ffffff !important;
+            color: #1a202c !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+        }
+        
+        /* File uploader */
+        .stFileUploader > div {
+            background-color: #f8fafc !important;
+            border: 2px dashed #9ca3af !important;
+            border-radius: 8px !important;
+            color: #374151 !important;
+        }
+        
+        .stFileUploader > div:hover {
+            border-color: #667eea !important;
+            background-color: #f1f5f9 !important;
+        }
+        
+        /* Alert boxes */
+        .stSuccess {
+            background-color: #f0fdf4 !important;
+            border: 1px solid #22c55e !important;
+            border-radius: 8px !important;
+            color: #15803d !important;
+        }
+        
+        .stError {
+            background-color: #fef2f2 !important;
+            border: 1px solid #ef4444 !important;
+            border-radius: 8px !important;
+            color: #dc2626 !important;
+        }
+        
+        .stInfo {
+            background-color: #eff6ff !important;
+            border: 1px solid #3b82f6 !important;
+            border-radius: 8px !important;
+            color: #1d4ed8 !important;
+        }
+        
+        .stWarning {
+            background-color: #fffbeb !important;
+            border: 1px solid #f59e0b !important;
+            border-radius: 8px !important;
+            color: #d97706 !important;
+        }
+        
+        /* Chat messages */
+        .stChatMessage {
+            background-color: #f8fafc !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 12px !important;
+            color: #1a202c !important;
+            margin: 8px 0 !important;
+            padding: 12px !important;
+        }
+        
+        .stChatMessage[data-testid="chat-message-user"] {
+            background-color: #eff6ff !important;
+            border-color: #bfdbfe !important;
+        }
+        
+        .stChatMessage[data-testid="chat-message-assistant"] {
+            background-color: #f0fdf4 !important;
+            border-color: #bbf7d0 !important;
+        }
+        
+        /* Toggle switches */
+        .stToggle > div > div > div > div {
+            background-color: #d1d5db !important;
+        }
+        
+        .stToggle > div > div > div > div[data-checked="true"] {
+            background-color: #667eea !important;
+        }
+        
+        .stToggle > div > label {
+            color: #374151 !important;
+            font-weight: 500 !important;
+        }
+        
+        /* Typography */
+        .stMarkdown {
+            color: #374151 !important;
+        }
+        
+        .stMarkdown p {
+            color: #374151 !important;
+            line-height: 1.6 !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            color: #1a202c !important;
+            font-weight: 600 !important;
+            line-height: 1.3 !important;
+        }
+        
+        /* Code blocks */
+        .stCode {
+            background-color: #f8fafc !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+            color: #1a202c !important;
+        }
+        
+        /* Expanders */
+        .streamlit-expanderHeader {
+            background-color: #f8fafc !important;
+            color: #374151 !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+            font-weight: 500 !important;
+        }
+        
+        .streamlit-expanderContent {
+            background-color: #ffffff !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 0 0 8px 8px !important;
+            color: #374151 !important;
+        }
+        
+        /* Sidebar elements */
+        .stSidebar .stButton > button {
+            background-color: #ffffff !important;
+            color: #374151 !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 6px !important;
+        }
+        
+        .stSidebar .stButton > button:hover {
+            background-color: #f1f5f9 !important;
+            border-color: #9ca3af !important;
+        }
+        
+        /* Forms */
+        .stForm {
+            background-color: #f8fafc !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 12px !important;
+        }
+        
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            background-color: #f8fafc !important;
+            border-radius: 8px !important;
+        }
+        
+        .stTabs [data-baseweb="tab"] {
+            color: #6b7280 !important;
+            background-color: transparent !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+        }
+        
+        .stTabs [aria-selected="true"] {
+            background-color: #667eea !important;
+            color: #ffffff !important;
+            font-weight: 600 !important;
+        }
+        
+        /* Metrics */
+        .stMetric {
+            background-color: #f8fafc !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+            color: #1a202c !important;
+        }
+        
+        /* DataFrames */
+        .stDataFrame {
+            background-color: #ffffff !important;
+            color: #1a202c !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 8px !important;
+        }
+        
+        /* Ensure all text is readable */
+        * {
+            color-scheme: light !important;
+        }
+        
+        /* Override any dark mode preferences */
+        @media (prefers-color-scheme: dark) {
             .stApp {
-                background-color: #0e1117;
-                color: #fafafa;
+                background-color: #ffffff !important;
+                color: #1a202c !important;
             }
             
             .stSidebar {
-                background-color: #262730;
+                background-color: #f8fafc !important;
             }
             
-            .stButton > button {
-                background-color: #262730;
-                color: #fafafa;
-                border: 1px solid #4a4a4a;
-            }
-            
-            .stButton > button:hover {
-                background-color: #3a3a3a;
-                border-color: #667eea;
-            }
-            
-            .stSelectbox > div > div {
-                background-color: #262730;
-                color: #fafafa;
-            }
-            
-            .stTextInput > div > div > input {
-                background-color: #262730;
-                color: #fafafa;
-                border: 1px solid #4a4a4a;
-            }
-            
-            .stTextArea > div > div > textarea {
-                background-color: #262730;
-                color: #fafafa;
-                border: 1px solid #4a4a4a;
-            }
-            
-            .stFileUploader > div {
-                background-color: #262730;
-                border: 2px dashed #4a4a4a;
-            }
-            
-            .stFileUploader > div:hover {
-                border-color: #667eea;
-            }
-            
-            .stAlert {
-                background-color: #262730;
-                border: 1px solid #4a4a4a;
-            }
-            
-            .stSuccess {
-                background-color: #1e3a1e;
-                border: 1px solid #4caf50;
-            }
-            
-            .stError {
-                background-color: #3a1e1e;
-                border: 1px solid #f44336;
-            }
-            
-            .stInfo {
-                background-color: #1e2a3a;
-                border: 1px solid #2196f3;
-            }
-            
-            .stWarning {
-                background-color: #3a2e1e;
-                border: 1px solid #ff9800;
-            }
-            
-            /* Chat message styling */
-            .stChatMessage {
-                background-color: #262730;
-                border: 1px solid #4a4a4a;
-            }
-            
-            /* Feature cards for dark mode */
-            .feature-card {
-                background: #262730 !important;
-                border-color: #4a4a4a !important;
-                color: #fafafa !important;
-            }
-            
-            /* Toggle switch styling for dark mode */
-            .stToggle > div > div > div > div {
-                background-color: #4a4a4a !important;
-            }
-            
-            .stToggle > div > div > div > div[data-checked="true"] {
-                background-color: #667eea !important;
-            }
-            
-            /* Radio button styling for dark mode */
-            .stRadio > div {
-                background-color: transparent;
-            }
-            
-            .stRadio > div > label {
-                color: #fafafa;
-            }
-            
-            /* Markdown text */
             .stMarkdown {
-                color: #fafafa;
+                color: #374151 !important;
             }
             
-            /* Headers */
             h1, h2, h3, h4, h5, h6 {
-                color: #fafafa !important;
+                color: #1a202c !important;
             }
-            
-            /* Code blocks */
-            .stCode {
-                background-color: #1e1e1e;
-                border: 1px solid #4a4a4a;
-            }
-            
-            /* Expander */
-            .streamlit-expanderHeader {
-                background-color: #262730;
-                color: #fafafa;
-            }
-            
-            .streamlit-expanderContent {
-                background-color: #262730;
-                border: 1px solid #4a4a4a;
-            }
-        </style>
-        """
-    else:
-        return """
-        <style>
-            /* Light theme styles (default) */
-            .stApp {
-                background-color: #ffffff;
-                color: #262730;
-            }
-            
-            .stSidebar {
-                background-color: #f0f2f6;
-            }
-            
-            .stButton > button {
-                background-color: #ffffff;
-                color: #262730;
-                border: 1px solid #d0d0d0;
-            }
-            
-            .stButton > button:hover {
-                background-color: #f0f2f6;
-                border-color: #667eea;
-            }
-            
-            .stSelectbox > div > div {
-                background-color: #ffffff;
-                color: #262730;
-            }
-            
-            .stTextInput > div > div > input {
-                background-color: #ffffff;
-                color: #262730;
-                border: 1px solid #d0d0d0;
-            }
-            
-            .stTextArea > div > div > textarea {
-                background-color: #ffffff;
-                color: #262730;
-                border: 1px solid #d0d0d0;
-            }
-            
-            .stFileUploader > div {
-                background-color: #ffffff;
-                border: 2px dashed #d0d0d0;
-            }
-            
-            .stFileUploader > div:hover {
-                border-color: #667eea;
-            }
-            
-            /* Feature cards for light mode */
-            .feature-card {
-                background: #ffffff !important;
-                border-color: #e0e0e0 !important;
-                color: #262730 !important;
-            }
-            
-            /* Toggle switch styling for light mode */
-            .stToggle > div > div > div > div {
-                background-color: #d0d0d0 !important;
-            }
-            
-            .stToggle > div > div > div > div[data-checked="true"] {
-                background-color: #667eea !important;
-            }
-            
-            /* Headers */
-            h1, h2, h3, h4, h5, h6 {
-                color: #262730 !important;
-            }
-        </style>
-        """
-
-def render_theme_toggle():
-    """Render the theme toggle switch."""
-    current_theme = st.session_state.get("theme_mode", "light")
-    is_dark = current_theme == "dark"
-    
-    # Theme toggle
-    dark_mode = st.toggle(
-        "🌙 Dark Mode", 
-        value=is_dark,
-        help="Switch between light and dark themes",
-        key="theme_toggle"
-    )
-    
-    # Update theme if changed
-    new_theme = "dark" if dark_mode else "light"
-    if new_theme != current_theme:
-        st.session_state.theme_mode = new_theme
-        st.rerun()
+        }
+    </style>
+    """
 
 def apply_theme():
-    """Apply the current theme CSS."""
-    st.markdown(get_theme_css(), unsafe_allow_html=True)
+    """Apply the clean light theme CSS."""
+    st.markdown(get_light_theme_css(), unsafe_allow_html=True)

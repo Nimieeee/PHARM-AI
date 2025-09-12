@@ -1,16 +1,18 @@
 """
-Configuration settings for PharmBot
+Configuration settings for PharmGPT
 """
 
-import os
-from dotenv import load_dotenv
+import streamlit as st
 
-# Load environment variables
-load_dotenv()
-
-# API Configuration
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+# API Configuration - Only use Streamlit secrets (secure for both local and cloud)
+try:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
+except KeyError as e:
+    st.error(f"Missing API key in Streamlit secrets: {e}")
+    st.info("Please add your API keys to Streamlit secrets or .streamlit/secrets.toml file")
+    GROQ_API_KEY = None
+    OPENROUTER_API_KEY = None
 
 # Model configurations
 MODEL_CONFIGS = {
@@ -29,7 +31,7 @@ MODEL_CONFIGS = {
 }
 
 # Application settings
-APP_TITLE = "PharmBot - AI Pharmacology Assistant"
+APP_TITLE = "PharmGPT - AI Pharmacology Assistant"
 APP_ICON = "💊"
 
 # File upload settings

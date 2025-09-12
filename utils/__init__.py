@@ -1,1 +1,1 @@
-# Utils package for PharmBot
+# Utils package for PharmGPT

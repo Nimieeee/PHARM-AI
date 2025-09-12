@@ -7,7 +7,7 @@ from auth import authenticate_user, create_user, get_user_id
 
 def render_signin_page():
     """Render the sign in page."""
-    st.markdown("# 💊 PharmBot")
+    st.markdown("# 💊 PharmGPT")
     st.markdown("### Sign In to Your Account")
     st.markdown("---")
     
@@ -54,7 +54,7 @@ def render_signin_form():
         st.info("""
         **For testing purposes, you can use:**
         - Username: `admin` / Password: `admin123`
-        - Username: `tolu` / Password: `password123`
+        - Username: `demo` / Password: `demo123`
         
         Or create your own account using the Sign Up tab.
         """)
@@ -62,7 +62,7 @@ def render_signin_form():
 def render_signup_form():
     """Render the sign up form."""
     st.markdown("### Create Your Account")
-    st.markdown("Join PharmBot to start your personalized learning experience.")
+    st.markdown("Join PharmGPT to start your personalized learning experience.")
     
     with st.form("signup_form"):
         username = st.text_input("Username", placeholder="Choose a username")

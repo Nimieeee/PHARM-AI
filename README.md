@@ -1,8 +1,8 @@
-# PharmBot - AI Pharmacology Assistant 💊
+# PharmGPT - AI Pharmacology Assistant 💊
 
 A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provides educational information about drugs, mechanisms of action, interactions, and clinical pharmacology concepts.
 
-![PharmBot](https://img.shields.io/badge/PharmBot-AI%20Pharmacology%20Assistant-blue)
+![PharmGPT](https://img.shields.io/badge/PharmGPT-AI%20Pharmacology%20Assistant-blue)
 ![Python](https://img.shields.io/badge/Python-3.8+-green)
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
@@ -27,13 +27,14 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 ### Prerequisites
 - Python 3.8 or higher
 - Groq API key ([Get one here](https://console.groq.com/keys))
+- OpenRouter API key ([Get one here](https://openrouter.ai/keys))
 
-### Installation
+### Local Development
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/pharmbot.git
-   cd pharmbot
+   git clone https://github.com/yourusername/pharmgpt.git
+   cd pharmgpt
    ```
 
 2. **Install dependencies**:
@@ -41,27 +42,49 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
    pip install -r requirements.txt
    ```
 
-3. **Set up environment variables**:
+3. **Set up Streamlit secrets**:
    ```bash
-   cp .env.example .env
-   # Edit .env and add your Groq API key
+   mkdir -p .streamlit
+   cp .streamlit/secrets.toml.example .streamlit/secrets.toml
+   # Edit .streamlit/secrets.toml and add your actual API keys
    ```
 
 4. **Run the application**:
    ```bash
-   streamlit run streamlit_app.py
+   streamlit run app.py
    ```
 
-5. **Set up RAG system (optional)**:
-   ```bash
-   python setup_rag.py
-   ```
-
-6. **Create your account**:
+5. **Create your account**:
    - Open the app in your browser
    - Click "Sign Up" to create a new account
    - Sign in and start chatting!
    - Upload documents to enhance your conversations
+
+### 🌐 Streamlit Cloud Deployment
+
+1. **Fork this repository** to your GitHub account
+
+2. **Deploy to Streamlit Cloud**:
+   - Go to [share.streamlit.io](https://share.streamlit.io)
+   - Connect your GitHub account
+   - Select your forked repository
+   - Choose `app.py` as the main file
+
+3. **Add secrets in Streamlit Cloud**:
+   - In your Streamlit Cloud dashboard, go to your app settings
+   - Click on "Secrets" in the left sidebar
+   - Add your API keys:
+     ```toml
+     GROQ_API_KEY = "your_groq_api_key_here"
+     OPENROUTER_API_KEY = "your_openrouter_api_key_here"
+     ```
+
+4. **Deploy**: Your app will automatically deploy and be available at your Streamlit Cloud URL
+
+### 🔐 Security Notes
+- **Never commit API keys** to GitHub
+- **Use Streamlit secrets** for both local development and cloud deployment
+- **The .streamlit/secrets.toml file is automatically ignored** by Git
 
 ## 🔐 Authentication System
 
@@ -135,7 +158,7 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 ## 🏗️ Project Structure
 
 ```
-pharmbot/
+pharmgpt/
 ├── streamlit_app.py              # Main Streamlit application
 ├── rag_system_chromadb.py        # ChromaDB-based RAG system
 ├── rag_interface_chromadb.py     # RAG interface layer
@@ -214,7 +237,7 @@ We welcome contributions! Here's how you can help:
 
 ## ⚠️ Important Disclaimer
 
-**Educational Use Only**: PharmBot is designed for educational purposes only. The information provided should not replace professional medical advice, diagnosis, or treatment. Always consult qualified healthcare professionals for clinical decisions and patient care.
+**Educational Use Only**: PharmGPT is designed for educational purposes only. The information provided should not replace professional medical advice, diagnosis, or treatment. Always consult qualified healthcare professionals for clinical decisions and patient care.
 
 ## 📄 License
 

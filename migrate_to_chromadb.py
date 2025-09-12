@@ -174,9 +174,9 @@ def verify_migration():
 
 def main():
     """Main migration function."""
-    print("🚀 PharmBot ChromaDB Migration Tool")
+    print("🚀 PharmGPT ChromaDB Migration Tool")
     print("=" * 40)
-    print("This tool migrates your PharmBot data to use ChromaDB")
+    print("This tool migrates your PharmGPT data to use ChromaDB")
     print("instead of Pinecone for better reliability and performance.")
     print()
     
@@ -225,7 +225,7 @@ def main():
     if success:
         print("🎉 MIGRATION COMPLETED SUCCESSFULLY!")
         print(f"   Backup saved to: {backup_dir}")
-        print("   Your PharmBot is now using ChromaDB for better performance!")
+        print("   Your PharmGPT is now using ChromaDB for better performance!")
         print("\nNext steps:")
         print("1. Install ChromaDB dependencies: pip install chromadb")
         print("2. Test your application to ensure everything works")

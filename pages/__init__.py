@@ -1,1 +1,1 @@
-# Pages package for PharmBot
+# Pages package for PharmGPT
