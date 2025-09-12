@@ -44,15 +44,16 @@ class ConversationService:
         try:
             conversation_id = self._generate_conversation_id()
             
+            # Try creating without messages field first to avoid trigger issues
             conversation_data = {
                 'conversation_id': conversation_id,
                 'user_id': user_uuid,
                 'title': title,
-                'messages': json.dumps([]),  # Ensure JSONB format for Supabase
                 'model': model or 'meta-llama/llama-4-maverick-17b-128e-instruct',
                 'created_at': datetime.now().isoformat(),
                 'is_archived': False,
-                'message_count': 0  # Explicitly set to avoid trigger issues
+                'message_count': 0
+                # Don't include messages initially to avoid trigger issues
             }
             
             result = self.connection_manager.execute_query(
@@ -62,7 +63,21 @@ class ConversationService:
             )
             
             if result.data:
-                logger.info(f"Conversation created: {conversation_id}")
+                # Now safely add the messages field after creation
+                try:
+                    update_result = self.connection_manager.execute_query(
+                        table='conversations',
+                        operation='update',
+                        data={'messages': json.dumps([])},
+                        eq={
+                            'conversation_id': conversation_id,
+                            'user_id': user_uuid
+                        }
+                    )
+                    logger.info(f"Conversation created with messages: {conversation_id}")
+                except Exception as update_error:
+                    logger.warning(f"Conversation created but messages update failed: {update_error}")
+                
                 return conversation_id
             else:
                 logger.error(f"Failed to create conversation for user: {user_uuid}")
