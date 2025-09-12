@@ -70,6 +70,13 @@ class ConversationService:
                 
         except Exception as e:
             logger.error(f"Error creating conversation for user {user_uuid}: {str(e)}")
+            # Try fallback method if main creation fails
+            if "cannot get array length of a scalar" in str(e):
+                logger.info("Attempting fallback conversation creation...")
+                try:
+                    return await self.create_conversation_simple(user_uuid, title, model)
+                except Exception as fallback_error:
+                    logger.error(f"Fallback creation also failed: {str(fallback_error)}")
             raise SupabaseError(f"Conversation creation failed: {str(e)}")
     
     async def get_user_conversations(self, user_uuid: str, include_archived: bool = False, limit: int = 100) -> Dict:
