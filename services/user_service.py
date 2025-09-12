@@ -18,6 +18,10 @@ def get_supabase_client():
     from supabase_manager import get_supabase_client as _get_client
     return _get_client()
 
+# User data cache to prevent duplicate database calls
+_user_cache = {}
+_user_cache_timeout = 60  # Cache user data for 60 seconds
+
 class UserService:
     """Service class for user account management operations."""
     
@@ -146,8 +150,23 @@ class UserService:
             return False, f"Authentication error: {str(e)}", None
     
     def get_user_by_username(self, username: str) -> Optional[Dict]:
-        """Get user by username."""
+        """Get user by username with caching."""
+        import time
+        
         logger.info(f"🔍 GET_USER_BY_USERNAME called for: {username}")
+        
+        # Check cache first
+        cache_key = f"user_{username}"
+        current_time = time.time()
+        
+        if cache_key in _user_cache:
+            user_data, timestamp = _user_cache[cache_key]
+            if current_time - timestamp < _user_cache_timeout:
+                logger.info(f"💾 Using cached user data for: {username}")
+                return user_data
+            else:
+                logger.info("⏰ User cache expired, fetching fresh...")
+                del _user_cache[cache_key]
         
         try:
             if not self.supabase:
@@ -157,8 +176,11 @@ class UserService:
             result = self.supabase.table('users').select('*').eq('username', username).execute()
             
             if result.data:
-                logger.info(f"✅ User found: {username}")
-                return result.data[0]
+                user_data = result.data[0]
+                # Cache the user data
+                _user_cache[cache_key] = (user_data, current_time)
+                logger.info(f"✅ User found and cached: {username}")
+                return user_data
             logger.info(f"❌ User not found: {username}")
             return None
             

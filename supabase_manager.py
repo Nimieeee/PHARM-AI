@@ -57,6 +57,8 @@ class SupabaseConnectionManager:
     
     _instance = None
     _client: Optional[Client] = None
+    _initialization_attempted = False
+    _initialization_successful = False
     _connection_stats = {
         'total_queries': 0,
         'successful_queries': 0,
@@ -74,7 +76,7 @@ class SupabaseConnectionManager:
     def __init__(self):
         if not hasattr(self, 'initialized'):
             self.initialized = True
-            self._initialize_client()
+            # Don't initialize client here - do it lazily
     
     def _initialize_client(self) -> bool:
         """Initialize Supabase client with error handling."""
@@ -113,12 +115,18 @@ class SupabaseConnectionManager:
             return False
     
     def get_client(self) -> Optional[Client]:
-        """Get Supabase client instance."""
-        logger.info(f"🔍 SUPABASE.GET_CLIENT called - client exists: {self._client is not None}")
+        """Get Supabase client instance with smart caching."""
+        logger.info(f"🔍 SUPABASE.GET_CLIENT called - client exists: {self._client is not None}, init_attempted: {self._initialization_attempted}")
         
-        if self._client is None:
-            logger.info("🚀 Client is None, initializing...")
-            self._initialize_client()
+        # Only initialize once per session
+        if self._client is None and not self._initialization_attempted:
+            logger.info("🚀 First initialization attempt...")
+            self._initialization_attempted = True
+            success = self._initialize_client()
+            self._initialization_successful = success
+        elif self._client is None and self._initialization_attempted:
+            logger.info("⚠️ Skipping duplicate initialization attempt")
+        
         return self._client
     
     def test_connection(self) -> bool:

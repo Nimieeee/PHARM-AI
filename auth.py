@@ -25,6 +25,11 @@ def run_async(coro):
     
     return loop.run_until_complete(coro)
 
+# Session validation cache to prevent duplicate validation
+_session_cache = {}
+_cache_timeout_seconds = 30  # Cache session validation for 30 seconds
+
+
 def create_user(username: str, password: str) -> Tuple[bool, str]:
     """Create a new user account using Supabase."""
     try:
@@ -56,16 +61,34 @@ def create_session(username: str) -> str:
         return ""
 
 def validate_session(session_id: str) -> Optional[str]:
-    """Validate session and return username if valid using Supabase."""
+    """Validate session and return username if valid using Supabase with caching."""
     import logging
+    import time
+    
     logger = logging.getLogger(__name__)
     logger.info(f"🔍 VALIDATE_SESSION called for session_id: {session_id}")
+    
+    # Check cache first
+    cache_key = f"session_{session_id}"
+    current_time = time.time()
+    
+    if cache_key in _session_cache:
+        cached_data, timestamp = _session_cache[cache_key]
+        if current_time - timestamp < _cache_timeout_seconds:
+            logger.info(f"💾 Using cached session validation for user: {cached_data}")
+            return cached_data
+        else:
+            logger.info("⏰ Session cache expired, validating fresh...")
+            del _session_cache[cache_key]
     
     try:
         session_data = run_async(session_service.validate_session(session_id))
         if session_data:
-            logger.info(f"✅ Session validation SUCCESS for user: {session_data['username']}")
-            return session_data['username']
+            username = session_data['username']
+            # Cache successful validation
+            _session_cache[cache_key] = (username, current_time)
+            logger.info(f"✅ Session validation SUCCESS for user: {username} (cached)")
+            return username
         logger.warning(f"❌ Session validation FAILED for session_id: {session_id}")
         return None
     except Exception as e:
@@ -145,6 +168,11 @@ def login_user(username: str, password: str) -> bool:
 def logout_current_user():
     """Logout current user."""
     if st.session_state.session_id:
+        # Clear from cache when logging out
+        cache_key = f"session_{st.session_state.session_id}"
+        if cache_key in _session_cache:
+            del _session_cache[cache_key]
+        
         logout_user(st.session_state.session_id)
     
     # Clear session state

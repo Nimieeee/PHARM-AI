@@ -20,12 +20,26 @@ def run_async(coro):
 def initialize_session_state():
     """Initialize session state variables with Supabase optimizations."""
     import logging
+    import time
+    
     logger = logging.getLogger(__name__)
     logger.info(f"🔄 INITIALIZE_SESSION_STATE called - authenticated: {st.session_state.get('authenticated', False)}, session_id: {st.session_state.get('session_id', 'None')}")
     
-    # Initialize authentication with persistent session support
-    from auth import initialize_auth_session
-    initialize_auth_session()
+    # Smart caching - avoid repeated initialization within same session
+    cache_key = "last_auth_init_time"
+    current_time = time.time()
+    
+    # Only re-initialize auth if it's been more than 10 seconds or not initialized
+    if (cache_key not in st.session_state or
+        current_time - st.session_state[cache_key] > 10.0 or
+        not st.session_state.get('authenticated', False)):
+        
+        logger.info("🆕 Running auth initialization (cache miss or timeout)")
+        from auth import initialize_auth_session
+        initialize_auth_session()
+        st.session_state[cache_key] = current_time
+    else:
+        logger.info("💾 Skipping auth initialization (cached)")
     
     # Initialize theme
     if "theme_mode" not in st.session_state:
