@@ -9,11 +9,14 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 
 ## ✨ Features
 
+- **🔐 User Authentication**: Secure sign-in/sign-up with private, separated conversations
 - **🤖 AI-Powered**: Uses Groq API with Llama 4 Maverick model for fast, expert pharmacology responses
 - **💬 ChatGPT-Style Interface**: Modern conversation management with search and organization
 - **🎨 Beautiful UI**: System-aware design that adapts to light/dark mode preferences
 - **📚 Educational Focus**: Specialized for pharmacology learning and research
 - **🔍 Smart Conversations**: Persistent chat history with context awareness
+- **👥 Multi-User Support**: Each user has completely private and separated conversations
+- **💾 Persistent Storage**: Conversations are saved locally and restored on login
 - **📱 Responsive Design**: Works perfectly on desktop and mobile devices
 
 ## 🚀 Quick Start
@@ -45,6 +48,30 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
    ```bash
    streamlit run streamlit_app.py
    ```
+
+5. **Create your account**:
+   - Open the app in your browser
+   - Click "Sign Up" to create a new account
+   - Sign in and start chatting!
+
+## 🔐 Authentication System
+
+### User Accounts
+- **Secure Registration**: Create accounts with username and password
+- **Password Security**: Passwords are hashed and salted for maximum security
+- **Private Data**: Each user's conversations are completely separated and private
+- **Persistent Storage**: Conversations are saved locally and restored on login
+
+### Privacy & Security
+- **Local Storage**: All user data is stored locally on your server
+- **No Data Sharing**: User conversations are never shared between accounts
+- **Secure Hashing**: Passwords use SHA-256 with random salts
+- **Session Management**: Secure session handling with timeout protection
+
+### Multi-User Support
+- **Separated Conversations**: Each user sees only their own conversations
+- **Individual Settings**: Personal preferences and conversation history
+- **Account Management**: Easy sign-in/sign-out functionality
 
 ## 🎯 Usage Examples
 

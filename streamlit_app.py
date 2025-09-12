@@ -2,6 +2,10 @@ import streamlit as st
 from openai_client import chat_completion, chat_completion_stream
 from prompts import pharmacology_system_prompt
 from drug_database import get_drug_info, get_drug_categories, COMMON_DRUGS
+from auth import (
+    initialize_auth_session, render_auth_page, logout_user,
+    load_user_conversations, save_user_conversations
+)
 import json
 import uuid
 from datetime import datetime
@@ -157,16 +161,22 @@ st.markdown("""
 
 def initialize_session_state():
     """Initialize session state variables."""
-    if "conversations" not in st.session_state:
-        st.session_state.conversations = {}
-    if "current_conversation_id" not in st.session_state:
-        st.session_state.current_conversation_id = None
-    if "selected_model" not in st.session_state:
-        st.session_state.selected_model = FIXED_MODEL
-    if "conversation_counter" not in st.session_state:
-        st.session_state.conversation_counter = 0
-    if "search_query" not in st.session_state:
-        st.session_state.search_query = ""
+    # Initialize authentication first
+    initialize_auth_session()
+    
+    # Only initialize conversation data if user is authenticated
+    if st.session_state.authenticated:
+        if "conversations" not in st.session_state:
+            # Load user's conversations from file
+            st.session_state.conversations = load_user_conversations(st.session_state.user_id)
+        if "current_conversation_id" not in st.session_state:
+            st.session_state.current_conversation_id = None
+        if "selected_model" not in st.session_state:
+            st.session_state.selected_model = FIXED_MODEL
+        if "conversation_counter" not in st.session_state:
+            st.session_state.conversation_counter = len(st.session_state.conversations)
+        if "search_query" not in st.session_state:
+            st.session_state.search_query = ""
 
 
 def create_new_conversation():
@@ -180,6 +190,10 @@ def create_new_conversation():
         "model": FIXED_MODEL
     }
     st.session_state.current_conversation_id = conversation_id
+    
+    # Save conversations to file
+    save_user_conversations(st.session_state.user_id, st.session_state.conversations)
+    
     return conversation_id
 
 def get_current_messages():
@@ -209,6 +223,9 @@ def add_message_to_current_conversation(role: str, content: str):
     if role == "user" and len(st.session_state.conversations[st.session_state.current_conversation_id]["messages"]) == 1:
         title = content[:50] + "..." if len(content) > 50 else content
         st.session_state.conversations[st.session_state.current_conversation_id]["title"] = title
+    
+    # Save conversations to file
+    save_user_conversations(st.session_state.user_id, st.session_state.conversations)
 
 def delete_conversation(conversation_id: str):
     """Delete a conversation."""
@@ -220,6 +237,9 @@ def delete_conversation(conversation_id: str):
                 st.session_state.current_conversation_id = list(st.session_state.conversations.keys())[0]
             else:
                 st.session_state.current_conversation_id = None
+        
+        # Save conversations to file
+        save_user_conversations(st.session_state.user_id, st.session_state.conversations)
 
 def search_conversations(query: str):
     """Search conversations by title and content."""
@@ -261,12 +281,18 @@ def duplicate_conversation(conversation_id: str):
         "model": original_conv.get("model", FIXED_MODEL)
     }
     
+    # Save conversations to file
+    save_user_conversations(st.session_state.user_id, st.session_state.conversations)
+    
     return new_conversation_id
 
 def rename_conversation(conversation_id: str, new_title: str):
     """Rename a conversation."""
     if conversation_id in st.session_state.conversations and new_title.strip():
         st.session_state.conversations[conversation_id]["title"] = new_title.strip()
+        
+        # Save conversations to file
+        save_user_conversations(st.session_state.user_id, st.session_state.conversations)
 
 def display_chat_messages():
     """Display chat messages from current conversation."""
@@ -316,6 +342,13 @@ def get_bot_response_stream(user_input: str, model: str):
 def render_sidebar():
     """Render the sidebar with conversations and settings."""
     with st.sidebar:
+        # User info and logout
+        st.markdown(f"### 👋 Welcome, {st.session_state.username}!")
+        if st.button("🚪 Sign Out", use_container_width=True):
+            logout_user()
+            st.rerun()
+        
+        st.markdown("---")
         # New Chat Button
         if st.button("➕ New Chat", key="new_chat", use_container_width=True):
             create_new_conversation()
@@ -423,7 +456,12 @@ def render_sidebar():
 def main():
     initialize_session_state()
     
-    # Render sidebar
+    # Check if user is authenticated
+    if not st.session_state.authenticated:
+        render_auth_page()
+        return
+    
+    # Render sidebar for authenticated users
     render_sidebar()
     
     # Simple Homepage
