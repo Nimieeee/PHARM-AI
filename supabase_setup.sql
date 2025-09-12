@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_uuid UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- Legacy compatibility
     session_id VARCHAR(255) UNIQUE NOT NULL,
     session_data JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -34,11 +35,16 @@ CREATE TABLE IF NOT EXISTS sessions (
 CREATE TABLE IF NOT EXISTS conversations (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_uuid UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- Legacy compatibility
     conversation_id VARCHAR(255) UNIQUE NOT NULL,
     title VARCHAR(500),
+    model VARCHAR(255) DEFAULT 'meta-llama/llama-4-maverick-17b-128e-instruct',
+    messages JSONB DEFAULT '[]',
+    message_count INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    is_active BOOLEAN DEFAULT TRUE
+    is_active BOOLEAN DEFAULT TRUE,
+    is_archived BOOLEAN DEFAULT FALSE
 );
 
 -- Messages table
@@ -56,14 +62,18 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE TABLE IF NOT EXISTS documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_uuid UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- Legacy compatibility
     document_id VARCHAR(255) UNIQUE NOT NULL,
+    document_hash VARCHAR(255),
     filename VARCHAR(500) NOT NULL,
     file_type VARCHAR(50),
     file_size INTEGER,
     content TEXT,
+    chunk_count INTEGER DEFAULT 0,
     metadata JSONB DEFAULT '{}',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    added_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(), -- For compatibility
     is_processed BOOLEAN DEFAULT FALSE
 );
 
@@ -131,3 +141,33 @@ CREATE TRIGGER update_conversations_updated_at BEFORE UPDATE ON conversations
 
 CREATE TRIGGER update_documents_updated_at BEFORE UPDATE ON documents
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Triggers to keep legacy columns in sync
+CREATE OR REPLACE FUNCTION sync_legacy_user_id()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.user_id = NEW.user_uuid;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER sync_conversations_user_id BEFORE INSERT OR UPDATE ON conversations
+    FOR EACH ROW EXECUTE FUNCTION sync_legacy_user_id();
+
+CREATE TRIGGER sync_sessions_user_id BEFORE INSERT OR UPDATE ON sessions
+    FOR EACH ROW EXECUTE FUNCTION sync_legacy_user_id();
+
+CREATE TRIGGER sync_documents_user_id BEFORE INSERT OR UPDATE ON documents
+    FOR EACH ROW EXECUTE FUNCTION sync_legacy_user_id();
+
+-- Trigger to sync added_at with created_at for documents
+CREATE OR REPLACE FUNCTION sync_added_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.added_at = NEW.created_at;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER sync_documents_added_at BEFORE INSERT OR UPDATE ON documents
+    FOR EACH ROW EXECUTE FUNCTION sync_added_at();
