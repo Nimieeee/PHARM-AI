@@ -25,7 +25,12 @@ st.set_page_config(
 )
 
 def main():
-    """Main application entry point."""
+    """Main application entry point with performance optimizations."""
+    # Apply performance optimizations first
+    from performance_config import apply_performance_optimizations, increment_metric
+    apply_performance_optimizations()
+    increment_metric('page_loads')
+    
     # Initialize session state
     initialize_session_state()
     
@@ -35,21 +40,25 @@ def main():
     # Render navigation
     render_navigation()
     
-    # Route to appropriate page
-    if st.session_state.current_page == "homepage":
+    # Route to appropriate page with optimized logic
+    current_page = st.session_state.current_page
+    authenticated = st.session_state.authenticated
+    
+    if current_page == "homepage":
         render_homepage()
-    elif st.session_state.current_page == "signin":
+    elif current_page == "signin":
         render_signin_page()
-    elif st.session_state.current_page == "chatbot":
-        if st.session_state.authenticated:
+    elif current_page == "chatbot":
+        if authenticated:
             render_chatbot_page()
         else:
+            # Avoid unnecessary rerun by setting state directly
             st.session_state.current_page = "homepage"
-            st.rerun()
+            render_homepage()
     else:
-        # Default to homepage
+        # Default to homepage without rerun
         st.session_state.current_page = "homepage"
-        st.rerun()
+        render_homepage()
 
 if __name__ == "__main__":
     main()

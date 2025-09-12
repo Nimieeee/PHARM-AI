@@ -38,8 +38,20 @@ APP_ICON = "💊"
 MAX_FILE_SIZE_MB = 10
 ALLOWED_FILE_TYPES = ['pdf', 'txt', 'csv', 'docx', 'doc', 'png', 'jpg', 'jpeg']
 
-# User data settings
-USER_DATA_DIR = "user_data"
+# Database settings - Supabase only
+USE_SUPABASE = True  # Always use Supabase (file-based storage removed)
+
+# Supabase configuration (loaded from secrets)
+try:
+    SUPABASE_URL = st.secrets["SUPABASE_URL"]
+    SUPABASE_ANON_KEY = st.secrets["SUPABASE_ANON_KEY"]
+except KeyError as e:
+    st.error(f"Missing Supabase configuration in Streamlit secrets: {e}")
+    st.info("Please add SUPABASE_URL and SUPABASE_ANON_KEY to your Streamlit secrets")
+    SUPABASE_URL = None
+    SUPABASE_ANON_KEY = None
+
+# Upload settings
 UPLOAD_LIMIT_PER_DAY = -1  # -1 means unlimited uploads
 
 # RAG settings

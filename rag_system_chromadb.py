@@ -18,21 +18,72 @@ try:
 except ImportError:
     pass
 
-# Document processing imports
-try:
-    import chromadb
-    from chromadb.config import Settings
-    import PyPDF2
-    import docx
-    import pandas as pd
-    from PIL import Image
-    import pytesseract
-    from sentence_transformers import SentenceTransformer
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
-    DEPENDENCIES_AVAILABLE = True
-except ImportError as e:
-    DEPENDENCIES_AVAILABLE = False
-    st.error(f"RAG dependencies not available: {e}")
+# Lazy import flag - dependencies loaded only when needed
+DEPENDENCIES_AVAILABLE = None
+
+def _check_dependencies():
+    """Check if RAG dependencies are available (lazy loading)."""
+    global DEPENDENCIES_AVAILABLE
+    if DEPENDENCIES_AVAILABLE is None:
+        try:
+            import chromadb
+            from chromadb.config import Settings
+            import PyPDF2
+            import docx
+            import pandas as pd
+            from PIL import Image
+            from sentence_transformers import SentenceTransformer
+            DEPENDENCIES_AVAILABLE = True
+        except ImportError as e:
+            DEPENDENCIES_AVAILABLE = False
+            st.warning(f"RAG system unavailable: {e}")
+    return DEPENDENCIES_AVAILABLE
+
+# Simple text splitter class to avoid heavy dependencies
+class RecursiveCharacterTextSplitter:
+    """Simple text splitter for chunking documents."""
+    
+    def __init__(self, chunk_size: int = 1000, chunk_overlap: int = 200, 
+                 length_function=len, separators=None):
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.length_function = length_function
+        self.separators = separators or ["\n\n", "\n", " ", ""]
+    
+    def split_text(self, text: str) -> List[str]:
+        """Split text into chunks."""
+        if not text:
+            return []
+            
+        chunks = []
+        current_chunk = ""
+        
+        # Split by separators in order of preference
+        for separator in self.separators:
+            if separator in text:
+                parts = text.split(separator)
+                for part in parts:
+                    if self.length_function(current_chunk + separator + part) <= self.chunk_size:
+                        current_chunk += separator + part if current_chunk else part
+                    else:
+                        if current_chunk:
+                            chunks.append(current_chunk)
+                        current_chunk = part
+                        
+                        # Handle oversized parts
+                        while self.length_function(current_chunk) > self.chunk_size:
+                            chunks.append(current_chunk[:self.chunk_size])
+                            current_chunk = current_chunk[self.chunk_size - self.chunk_overlap:]
+                
+                if current_chunk:
+                    chunks.append(current_chunk)
+                return chunks
+        
+        # Fallback: split by character count
+        for i in range(0, len(text), self.chunk_size - self.chunk_overlap):
+            chunks.append(text[i:i + self.chunk_size])
+        
+        return chunks
 
 from config import USER_DATA_DIR, CHUNK_SIZE, CHUNK_OVERLAP, MAX_SEARCH_RESULTS
 
@@ -50,17 +101,31 @@ class ConversationRAGSystem:
         os.makedirs(self.rag_dir, exist_ok=True)
         os.makedirs(self.chroma_dir, exist_ok=True)
         
-        # Initialize components
+        # Initialize components lazily
         self.client = None
         self.collection = None
         self.embeddings_model = None
         self.text_splitter = None
+        self._initialized = False
         
-        if DEPENDENCIES_AVAILABLE:
-            self._initialize_components()
+        # Cache key for session state
+        self._cache_key = f"rag_system_{user_id}_{conversation_id}"
     
     def _initialize_components(self):
-        """Initialize ChromaDB and other components."""
+        """Initialize ChromaDB and other components lazily."""
+        if self._initialized:
+            return True
+            
+        # Check if already cached in session state
+        if self._cache_key in st.session_state:
+            cached = st.session_state[self._cache_key]
+            self.client = cached.get('client')
+            self.collection = cached.get('collection')
+            self.embeddings_model = cached.get('embeddings_model')
+            self.text_splitter = cached.get('text_splitter')
+            self._initialized = True
+            return True
+            
         try:
             # Initialize ChromaDB client
             self.client = chromadb.PersistentClient(
@@ -78,10 +143,12 @@ class ConversationRAGSystem:
             except:
                 self.collection = self.client.create_collection(collection_name)
             
-            # Initialize embeddings model
-            self.embeddings_model = SentenceTransformer('all-MiniLM-L6-v2')
+            # Initialize embeddings model (cached globally)
+            if 'global_embeddings_model' not in st.session_state:
+                st.session_state.global_embeddings_model = SentenceTransformer('all-MiniLM-L6-v2')
+            self.embeddings_model = st.session_state.global_embeddings_model
             
-            # Initialize text splitter
+            # Initialize text splitter (lightweight, can be recreated)
             self.text_splitter = RecursiveCharacterTextSplitter(
                 chunk_size=CHUNK_SIZE,
                 chunk_overlap=CHUNK_OVERLAP,
@@ -89,10 +156,22 @@ class ConversationRAGSystem:
                 separators=["\n\n", "\n", " ", ""]
             )
             
+            # Cache in session state
+            st.session_state[self._cache_key] = {
+                'client': self.client,
+                'collection': self.collection,
+                'embeddings_model': self.embeddings_model,
+                'text_splitter': self.text_splitter
+            }
+            
+            self._initialized = True
+            return True
+            
         except Exception as e:
             st.error(f"Error initializing RAG system: {e}")
             self.client = None
             self.collection = None
+            return False
     
     def _load_metadata(self) -> Dict:
         """Load document metadata."""
@@ -180,7 +259,10 @@ class ConversationRAGSystem:
     
     def add_document(self, file_content: bytes, filename: str, file_type: str) -> bool:
         """Add document to the RAG system."""
-        if not DEPENDENCIES_AVAILABLE or not self.collection:
+        if not DEPENDENCIES_AVAILABLE:
+            return False
+            
+        if not self._initialize_components():
             return False
         
         try:
@@ -327,7 +409,10 @@ class ConversationRAGSystem:
     
     def search_documents(self, query: str, max_results: int = MAX_SEARCH_RESULTS) -> List[Dict]:
         """Search documents for relevant content."""
-        if not DEPENDENCIES_AVAILABLE or not self.collection:
+        if not DEPENDENCIES_AVAILABLE:
+            return []
+            
+        if not self._initialize_components():
             return []
         
         try:

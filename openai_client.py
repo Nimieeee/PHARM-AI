@@ -1,12 +1,14 @@
 """
 OpenAI-compatible API client for chat completions
-Supports both Groq and OpenRouter APIs
+Supports both Groq and OpenRouter APIs with performance optimizations
 """
 
 import openai
 from typing import Iterator, Dict, List
 import streamlit as st
 from config import MODEL_CONFIGS
+import hashlib
+import json
 
 def get_available_model_modes() -> Dict:
     """Get available model modes based on API key availability."""
@@ -18,8 +20,9 @@ def get_available_model_modes() -> Dict:
     
     return available_modes
 
+@st.cache_resource
 def get_client_for_model(model: str) -> openai.OpenAI:
-    """Get OpenAI client for specific model."""
+    """Get OpenAI client for specific model - cached for performance."""
     # Find which config this model belongs to
     for mode, config in MODEL_CONFIGS.items():
         if config["model"] == model:
@@ -32,6 +35,30 @@ def get_client_for_model(model: str) -> openai.OpenAI:
             )
     
     raise ValueError(f"Unknown model: {model}")
+
+def _get_messages_hash(messages: List[Dict]) -> str:
+    """Generate hash for message list to enable caching."""
+    # Create a stable hash of the messages
+    messages_str = json.dumps(messages, sort_keys=True)
+    return hashlib.md5(messages_str.encode()).hexdigest()
+
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def _cached_chat_completion(model: str, messages_hash: str, messages: List[Dict]) -> str:
+    """Cached chat completion for identical requests."""
+    try:
+        client = get_client_for_model(model)
+        
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        return f"Error: {str(e)}"
 
 def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
     """
@@ -65,7 +92,7 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
 
 def chat_completion(model: str, messages: List[Dict]) -> str:
     """
-    Generate non-streaming chat completion.
+    Generate non-streaming chat completion with caching.
     
     Args:
         model: Model name to use
@@ -74,20 +101,9 @@ def chat_completion(model: str, messages: List[Dict]) -> str:
     Returns:
         str: Complete response
     """
-    try:
-        client = get_client_for_model(model)
-        
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=2000
-        )
-        
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
+    # Use cached version for identical requests
+    messages_hash = _get_messages_hash(messages)
+    return _cached_chat_completion(model, messages_hash, messages)
 
 def test_api_connection(model: str) -> bool:
     """Test API connection for a specific model."""
