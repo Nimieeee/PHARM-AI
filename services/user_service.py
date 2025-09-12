@@ -69,10 +69,13 @@ class UserService:
                 'password_hash': password_hash,
                 'salt': salt,
                 'user_id': user_id,
-                'email': email,
                 'created_at': datetime.now().isoformat(),
                 'is_active': True
             }
+            
+            # Only add email if provided (optional field)
+            if email:
+                user_data['email'] = email
             
             result = self.connection_manager.execute_query(
                 table='users',
