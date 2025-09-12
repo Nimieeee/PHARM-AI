@@ -259,7 +259,7 @@ def get_user_upload_count(user_id: str) -> int:
     """Get the number of uploads for a user in the last 24 hours using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(user_id))
+        user_data = user_service.get_user_by_id(user_id)
         if not user_data:
             return 0
         
