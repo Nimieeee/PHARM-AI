@@ -44,19 +44,21 @@ class DocumentService:
                 logger.error(f"Missing required fields in document data: {doc_data}")
                 return False
             
+            # Create document metadata with only confirmed schema fields
             document_metadata = {
-                'document_hash': doc_data['document_hash'],
-                'user_uuid': user_uuid,  # Primary field
-                'user_id': user_uuid,    # Legacy compatibility
+                'user_uuid': user_uuid,
                 'conversation_id': conversation_id,
+                'document_id': doc_data['document_hash'],  # Use existing document_id field
                 'filename': doc_data['filename'],
                 'file_type': doc_data['file_type'],
                 'file_size': doc_data['file_size'],
-                'chunk_count': doc_data['chunk_count'],
-                'added_at': datetime.now().isoformat(),
-                'metadata': json.dumps(doc_data.get('metadata', {})),
-                'is_processed': doc_data.get('is_processed', True),
-                'processing_error': doc_data.get('processing_error')
+                'content': doc_data.get('content', ''),
+                'metadata': json.dumps({
+                    'chunk_count': doc_data['chunk_count'],
+                    'processing_method': doc_data.get('processing_method', 'unknown'),
+                    **doc_data.get('metadata', {})
+                }),
+                'is_processed': doc_data.get('is_processed', True)
             }
             
             result = self.connection_manager.execute_query(

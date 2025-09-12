@@ -422,18 +422,20 @@ class ConversationRAGSystem:
                     user_data = user_service.get_user_by_id(self.user_id)
                     if user_data:
                         # Save document to Supabase
-                        run_async(document_service.create_document(
+                        doc_data = {
+                            "document_hash": doc_hash,
+                            "filename": filename,
+                            "file_type": file_type,
+                            "file_size": len(file_content),
+                            "content": text[:10000],  # Store first 10k chars as preview
+                            "chunk_count": len(chunks),
+                            "processing_method": "chromadb_rag",
+                            "is_processed": True
+                        }
+                        run_async(document_service.save_document_metadata(
                             user_uuid=user_data['id'],
                             conversation_id=self.conversation_id,
-                            document_id=doc_hash,
-                            filename=filename,
-                            file_type=file_type,
-                            file_size=len(file_content),
-                            content=text[:10000],  # Store first 10k chars as preview
-                            metadata={
-                                "chunk_count": len(chunks),
-                                "processing_method": "chromadb_rag"
-                            }
+                            doc_data=doc_data
                         ))
                 except Exception as e:
                     st.warning(f"Document saved locally but failed to sync with database: {e}")
@@ -513,18 +515,20 @@ class ConversationRAGSystem:
                     user_data = user_service.get_user_by_id(self.user_id)
                     if user_data:
                         # Save document to Supabase
-                        run_async(document_service.create_document(
+                        doc_data = {
+                            "document_hash": doc_hash,
+                            "filename": filename,
+                            "file_type": "image/ocr",
+                            "file_size": 0,  # Image size not available here
+                            "content": text[:10000],  # Store first 10k chars as preview
+                            "chunk_count": len(chunks),
+                            "processing_method": "ocr_chromadb_rag",
+                            "is_processed": True
+                        }
+                        run_async(document_service.save_document_metadata(
                             user_uuid=user_data['id'],
                             conversation_id=self.conversation_id,
-                            document_id=doc_hash,
-                            filename=filename,
-                            file_type="image/ocr",
-                            file_size=0,  # Image size not available here
-                            content=text[:10000],  # Store first 10k chars as preview
-                            metadata={
-                                "chunk_count": len(chunks),
-                                "processing_method": "ocr_chromadb_rag"
-                            }
+                            doc_data=doc_data
                         ))
                 except Exception as e:
                     st.warning(f"Image saved locally but failed to sync with database: {e}")
