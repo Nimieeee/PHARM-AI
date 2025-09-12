@@ -65,3 +65,12 @@ logs/
 user_data/
 *.db
 *.sqlite
+
+# RAG system data
+chroma_db/
+embeddings/
+*.faiss
+*.pkl
+
+# Temporary files for document processing
+temp_*

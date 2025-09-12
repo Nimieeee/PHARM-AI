@@ -6,6 +6,10 @@ from auth import (
     initialize_auth_session, render_auth_page, logout_user,
     load_user_conversations, save_user_conversations
 )
+from rag_interface import (
+    initialize_rag_system, render_rag_sidebar, get_rag_enhanced_prompt,
+    render_rag_page
+)
 import json
 import uuid
 from datetime import datetime
@@ -344,6 +348,20 @@ def render_sidebar():
     with st.sidebar:
         # User info and logout
         st.markdown(f"### 👋 Welcome, {st.session_state.username}!")
+        
+        # Navigation
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("💬 Chat", use_container_width=True, 
+                        type="primary" if st.session_state.current_page == "chat" else "secondary"):
+                st.session_state.current_page = "chat"
+                st.rerun()
+        with col2:
+            if st.button("📚 Knowledge Base", use_container_width=True,
+                        type="primary" if st.session_state.current_page == "knowledge_base" else "secondary"):
+                st.session_state.current_page = "knowledge_base"
+                st.rerun()
+        
         if st.button("🚪 Sign Out", use_container_width=True):
             logout_user()
             st.rerun()
@@ -450,6 +468,11 @@ def render_sidebar():
         
         st.markdown("---")
         
+        # RAG System
+        render_rag_sidebar()
+        
+        st.markdown("---")
+        
         # Disclaimer
         st.warning("⚠️ **Disclaimer:** Educational purposes only. Consult healthcare professionals for medical advice.")
 
@@ -461,8 +484,20 @@ def main():
         render_auth_page()
         return
     
+    # Navigation
+    if "current_page" not in st.session_state:
+        st.session_state.current_page = "chat"
+    
     # Render sidebar for authenticated users
     render_sidebar()
+    
+    # Handle different pages
+    if st.session_state.current_page == "knowledge_base":
+        render_rag_page()
+        return
+    
+    # Chat page (default)
+    st.session_state.current_page = "chat"
     
     # Simple Homepage
     if not st.session_state.current_conversation_id:
@@ -602,7 +637,7 @@ def main():
             with st.chat_message("user"):
                 st.markdown(prompt)
             
-            # Get and display bot response with streaming
+            # Get and display bot response with streaming (RAG-enhanced)
             with st.chat_message("assistant"):
                 message_placeholder = st.empty()
                 full_response = ""
@@ -611,9 +646,17 @@ def main():
                     # Show initial thinking message
                     message_placeholder.markdown("🤔 Thinking...")
                     
+                    # Enhance prompt with RAG if available
+                    rag_system = initialize_rag_system()
+                    enhanced_prompt = prompt
+                    if rag_system:
+                        enhanced_prompt = get_rag_enhanced_prompt(prompt, rag_system)
+                        if enhanced_prompt != prompt:
+                            message_placeholder.markdown("🔍 Searching knowledge base...")
+                    
                     # Try streaming first
                     stream_worked = False
-                    for chunk in get_bot_response_stream(prompt, FIXED_MODEL):
+                    for chunk in get_bot_response_stream(enhanced_prompt, FIXED_MODEL):
                         stream_worked = True
                         full_response += chunk
                         # Update the display with current response + cursor
@@ -626,7 +669,7 @@ def main():
                     else:
                         # Fallback to non-streaming if no chunks received
                         message_placeholder.markdown("🔄 Falling back to standard response...")
-                        full_response = get_bot_response(prompt, FIXED_MODEL)
+                        full_response = get_bot_response(enhanced_prompt, FIXED_MODEL)
                         message_placeholder.markdown(full_response)
                     
                 except Exception as e:

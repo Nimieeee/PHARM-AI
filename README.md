@@ -17,6 +17,9 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 - **🔍 Smart Conversations**: Persistent chat history with context awareness
 - **👥 Multi-User Support**: Each user has completely private and separated conversations
 - **💾 Persistent Storage**: Conversations are saved locally and restored on login
+- **📚 RAG System**: Upload documents and images for enhanced, context-aware responses
+- **🔍 Document Search**: Semantic search through your uploaded knowledge base
+- **🖼️ OCR Support**: Extract text from images using advanced OCR technology
 - **📱 Responsive Design**: Works perfectly on desktop and mobile devices
 
 ## 🚀 Quick Start
@@ -49,10 +52,16 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
    streamlit run streamlit_app.py
    ```
 
-5. **Create your account**:
+5. **Set up RAG system (optional)**:
+   ```bash
+   python setup_rag.py
+   ```
+
+6. **Create your account**:
    - Open the app in your browser
    - Click "Sign Up" to create a new account
    - Sign in and start chatting!
+   - Upload documents to enhance your conversations
 
 ## 🔐 Authentication System
 
@@ -72,6 +81,35 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 - **Separated Conversations**: Each user sees only their own conversations
 - **Individual Settings**: Personal preferences and conversation history
 - **Account Management**: Easy sign-in/sign-out functionality
+
+## 📚 RAG (Retrieval-Augmented Generation) System
+
+### Document Support
+- **PDF Documents**: Extract and process PDF content
+- **Word Documents**: Support for .docx and .doc files
+- **Text Files**: Plain text and CSV files
+- **Images**: OCR text extraction from PNG, JPG, JPEG files
+- **Semantic Search**: Find relevant information using AI embeddings
+
+### Knowledge Base Features
+- **Private Storage**: Each user has their own isolated document collection
+- **Chunked Processing**: Documents are intelligently split for better retrieval
+- **Vector Search**: Uses ChromaDB for fast, semantic document search
+- **Context Integration**: Automatically enhances conversations with relevant document content
+- **Document Management**: Upload, view, search, and delete documents
+
+### RAG-Enhanced Conversations
+- **Automatic Context**: Relevant documents are automatically found and used
+- **Source Citations**: Responses include references to source documents
+- **Fallback Handling**: Works with or without uploaded documents
+- **Real-time Search**: Searches knowledge base for each query
+
+### Technical Implementation
+- **LangChain**: Document processing and text splitting
+- **ChromaDB**: Vector database for semantic search
+- **HuggingFace Embeddings**: Sentence transformers for document embeddings
+- **OCR**: Tesseract for image text extraction
+- **Local Storage**: All documents stored locally for privacy
 
 ## 🎯 Usage Examples
 
