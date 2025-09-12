@@ -67,6 +67,9 @@ class ConversationService:
                     'message_count': 0
                 }
                 
+                logger.info(f"Creating conversation with data: {conversation_data}")
+                logger.info(f"user_uuid value: '{user_uuid}' (type: {type(user_uuid)})")
+                
                 result = self.connection_manager.execute_query(
                     table='conversations',
                     operation='insert',
@@ -545,6 +548,9 @@ class ConversationService:
                     'created_at': datetime.now().isoformat(),
                     'is_archived': False
                 }
+                
+                logger.info(f"Creating conversation with minimal data: {minimal_data}")
+                logger.info(f"user_uuid value: '{user_uuid}' (type: {type(user_uuid)})")
                 
                 result = self.connection_manager.execute_query(
                     table='conversations',
