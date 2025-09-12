@@ -39,8 +39,12 @@ This guide will help you migrate your PharmGPT application from file-based stora
 pip install supabase>=2.0.0
 ```
 
-### 2.2 Update Streamlit Secrets
-Create or update `.streamlit/secrets.toml`:
+### 2.2 Configure Streamlit Secrets
+
+**For Streamlit Cloud (Recommended):**
+1. Go to your Streamlit Cloud app dashboard
+2. Click on "Settings" → "Secrets"
+3. Add your secrets in the web interface:
 
 ```toml
 # Existing API keys
@@ -51,6 +55,21 @@ OPENROUTER_API_KEY = "your_openrouter_key_here"
 SUPABASE_URL = "https://your-project.supabase.co"
 SUPABASE_ANON_KEY = "your_anon_key_here"
 ```
+
+**For Local Development:**
+Create `.streamlit/secrets.toml` (this file is gitignored for security):
+
+```toml
+# Existing API keys
+GROQ_API_KEY = "your_groq_key_here"
+OPENROUTER_API_KEY = "your_openrouter_key_here"
+
+# Supabase configuration
+SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_ANON_KEY = "your_anon_key_here"
+```
+
+**⚠️ IMPORTANT**: Never commit secrets to GitHub. The `.streamlit/` folder is automatically gitignored.
 
 ### 2.3 Test Connection
 Run this test to verify your Supabase connection:
