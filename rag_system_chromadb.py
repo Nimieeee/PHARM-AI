@@ -10,6 +10,16 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import streamlit as st
 
+# Import Supabase services
+try:
+    from services.document_service import document_service
+    from services.user_service import user_service
+    SUPABASE_AVAILABLE = True
+except ImportError:
+    SUPABASE_AVAILABLE = False
+    document_service = None
+    user_service = None
+
 # Import PIL Image at module level
 try:
     from PIL import Image
@@ -126,6 +136,19 @@ class RecursiveCharacterTextSplitter:
         return chunks
 
 from config import CHUNK_SIZE, CHUNK_OVERLAP, MAX_SEARCH_RESULTS
+
+# Helper function to run async functions in Streamlit
+def run_async(coro):
+    """Run async function in Streamlit context."""
+    try:
+        import asyncio
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(coro)
 
 # Default user data directory for RAG system
 USER_DATA_DIR = "user_data"
@@ -392,6 +415,29 @@ class ConversationRAGSystem:
             }
             self._save_metadata(metadata)
             
+            # Save document to Supabase
+            if SUPABASE_AVAILABLE:
+                try:
+                    # Get user UUID from legacy user_id
+                    user_data = user_service.get_user_by_id(self.user_id)
+                    if user_data:
+                        # Save document to Supabase
+                        run_async(document_service.create_document(
+                            user_uuid=user_data['id'],
+                            conversation_id=self.conversation_id,
+                            document_id=doc_hash,
+                            filename=filename,
+                            file_type=file_type,
+                            file_size=len(file_content),
+                            content=text[:10000],  # Store first 10k chars as preview
+                            metadata={
+                                "chunk_count": len(chunks),
+                                "processing_method": "chromadb_rag"
+                            }
+                        ))
+                except Exception as e:
+                    st.warning(f"Document saved locally but failed to sync with database: {e}")
+            
             return True
             
         except Exception as e:
@@ -459,6 +505,29 @@ class ConversationRAGSystem:
                 "conversation_id": self.conversation_id
             }
             self._save_metadata(metadata)
+            
+            # Save image document to Supabase
+            if SUPABASE_AVAILABLE:
+                try:
+                    # Get user UUID from legacy user_id
+                    user_data = user_service.get_user_by_id(self.user_id)
+                    if user_data:
+                        # Save document to Supabase
+                        run_async(document_service.create_document(
+                            user_uuid=user_data['id'],
+                            conversation_id=self.conversation_id,
+                            document_id=doc_hash,
+                            filename=filename,
+                            file_type="image/ocr",
+                            file_size=0,  # Image size not available here
+                            content=text[:10000],  # Store first 10k chars as preview
+                            metadata={
+                                "chunk_count": len(chunks),
+                                "processing_method": "ocr_chromadb_rag"
+                            }
+                        ))
+                except Exception as e:
+                    st.warning(f"Image saved locally but failed to sync with database: {e}")
             
             return True
             
