@@ -10,6 +10,46 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import streamlit as st
 
+# Import PIL Image at module level
+try:
+    from PIL import Image
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
+    Image = None
+
+# Import pytesseract for OCR
+try:
+    import pytesseract
+    PYTESSERACT_AVAILABLE = True
+except ImportError:
+    PYTESSERACT_AVAILABLE = False
+    pytesseract = None
+
+# Import pandas for CSV processing
+try:
+    import pandas as pd
+    PANDAS_AVAILABLE = True
+except ImportError:
+    PANDAS_AVAILABLE = False
+    pd = None
+
+# Import PyPDF2 for PDF processing
+try:
+    import PyPDF2
+    PYPDF2_AVAILABLE = True
+except ImportError:
+    PYPDF2_AVAILABLE = False
+    PyPDF2 = None
+
+# Import docx for Word document processing
+try:
+    import docx
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+    docx = None
+
 # SQLite upgrade for Streamlit Cloud compatibility
 import sys
 try:
@@ -202,6 +242,10 @@ class ConversationRAGSystem:
     
     def _extract_text_from_pdf(self, file_content: bytes) -> str:
         """Extract text from PDF file."""
+        if not PYPDF2_AVAILABLE:
+            st.error("PDF processing not available. Please install PyPDF2.")
+            return ""
+        
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp_file:
                 tmp_file.write(file_content)
@@ -221,6 +265,10 @@ class ConversationRAGSystem:
     
     def _extract_text_from_docx(self, file_content: bytes) -> str:
         """Extract text from DOCX file."""
+        if not DOCX_AVAILABLE:
+            st.error("DOCX processing not available. Please install python-docx.")
+            return ""
+        
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
                 tmp_file.write(file_content)
@@ -237,6 +285,10 @@ class ConversationRAGSystem:
     
     def _extract_text_from_csv(self, file_content: bytes) -> str:
         """Extract text from CSV file."""
+        if not PANDAS_AVAILABLE:
+            st.error("CSV processing not available. Please install pandas.")
+            return ""
+        
         try:
             with tempfile.NamedTemporaryFile(delete=False, suffix='.csv') as tmp_file:
                 tmp_file.write(file_content)
@@ -251,8 +303,12 @@ class ConversationRAGSystem:
             st.error(f"Error extracting CSV text: {e}")
             return ""
     
-    def _extract_text_from_image(self, image: Image.Image) -> str:
+    def _extract_text_from_image(self, image) -> str:
         """Extract text from image using OCR."""
+        if not PYTESSERACT_AVAILABLE:
+            st.error("OCR functionality not available. Please install pytesseract.")
+            return ""
+        
         try:
             text = pytesseract.image_to_string(image)
             return text.strip()
@@ -342,7 +398,7 @@ class ConversationRAGSystem:
             st.error(f"Error adding document: {e}")
             return False
     
-    def add_image(self, image: Image.Image, filename: str) -> bool:
+    def add_image(self, image, filename: str) -> bool:
         """Add image to the RAG system using OCR."""
         if not DEPENDENCIES_AVAILABLE or not self.collection:
             return False
