@@ -6,15 +6,18 @@ from auth import (
     initialize_auth_session, render_auth_page, logout_user,
     load_user_conversations, save_user_conversations
 )
-from rag_interface import (
-    initialize_rag_system, render_rag_sidebar, get_rag_enhanced_prompt,
-    render_rag_page
+from rag_interface_chromadb import (
+    initialize_rag_system, get_rag_enhanced_prompt, 
+    get_conversation_document_count, get_all_user_documents_count
 )
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 import re
 import time
+import io
+import subprocess
+from PIL import Image
 
 # Page configuration
 st.set_page_config(
@@ -170,6 +173,17 @@ def initialize_session_state():
     
     # Only initialize conversation data if user is authenticated
     if st.session_state.authenticated:
+        # Verify user data isolation on first load
+        if "privacy_verified" not in st.session_state:
+            from auth import verify_user_data_isolation, cleanup_orphaned_data
+            is_isolated, message = verify_user_data_isolation()
+            if not is_isolated:
+                # Clean up orphaned data
+                cleaned = cleanup_orphaned_data()
+                if cleaned:
+                    st.warning(f"🔒 Cleaned up orphaned data for privacy: {len(cleaned)} items removed")
+            st.session_state.privacy_verified = True
+        
         if "conversations" not in st.session_state:
             # Load user's conversations from file
             st.session_state.conversations = load_user_conversations(st.session_state.user_id)
@@ -232,8 +246,28 @@ def add_message_to_current_conversation(role: str, content: str):
     save_user_conversations(st.session_state.user_id, st.session_state.conversations)
 
 def delete_conversation(conversation_id: str):
-    """Delete a conversation."""
+    """Delete a conversation and its associated RAG data."""
     if conversation_id in st.session_state.conversations:
+        # Clean up conversation-specific RAG data
+        try:
+            from pathlib import Path
+            import shutil
+            user_rag_dir = Path("user_data") / f"rag_{st.session_state.user_id}"
+            conv_rag_dir = user_rag_dir / f"conversation_{conversation_id}"
+            if conv_rag_dir.exists():
+                shutil.rmtree(conv_rag_dir)
+            
+            # Clean up session state RAG system (both old and new keys)
+            old_rag_key = f"rag_system_{conversation_id}"
+            new_rag_key = f"chromadb_rag_system_{conversation_id}"
+            
+            if old_rag_key in st.session_state:
+                del st.session_state[old_rag_key]
+            if new_rag_key in st.session_state:
+                del st.session_state[new_rag_key]
+        except Exception as e:
+            print(f"Error cleaning up RAG data: {e}")
+        
         del st.session_state.conversations[conversation_id]
         if st.session_state.current_conversation_id == conversation_id:
             # Switch to another conversation or create new one
@@ -349,18 +383,8 @@ def render_sidebar():
         # User info and logout
         st.markdown(f"### 👋 Welcome, {st.session_state.username}!")
         
-        # Navigation
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("💬 Chat", use_container_width=True, 
-                        type="primary" if st.session_state.current_page == "chat" else "secondary"):
-                st.session_state.current_page = "chat"
-                st.rerun()
-        with col2:
-            if st.button("📚 Knowledge Base", use_container_width=True,
-                        type="primary" if st.session_state.current_page == "knowledge_base" else "secondary"):
-                st.session_state.current_page = "knowledge_base"
-                st.rerun()
+        # Navigation - Just show current page
+        st.button("💬 Chat", use_container_width=True, type="primary", disabled=True)
         
         if st.button("🚪 Sign Out", use_container_width=True):
             logout_user()
@@ -417,12 +441,16 @@ def render_sidebar():
                     col1, col2, col3 = st.columns([3, 1, 1])
                     
                     with col1:
-                        # Conversation button
+                        # Conversation button with document count
                         is_active = conv_id == st.session_state.current_conversation_id
                         button_style = "🟢 " if is_active else ""
                         
+                        # Get document count for this conversation
+                        doc_count = get_conversation_document_count(conv_id)
+                        doc_indicator = f" 📚{doc_count}" if doc_count > 0 else ""
+                        
                         if st.button(
-                            f"{button_style}{conv_data['title'][:25]}...",
+                            f"{button_style}{conv_data['title'][:20]}...{doc_indicator}",
                             key=f"conv_{conv_id}",
                             use_container_width=True
                         ):
@@ -468,8 +496,33 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # RAG System
-        render_rag_sidebar()
+        # Document count and upload status
+        if st.session_state.current_conversation_id:
+            # Show documents for current conversation
+            conv_doc_count = get_conversation_document_count()
+            if conv_doc_count > 0:
+                st.success(f"📚 {conv_doc_count} documents in this chat")
+            else:
+                st.info("📚 No documents in this chat yet")
+        
+        # Show total documents across all conversations
+        total_doc_count = get_all_user_documents_count()
+        if total_doc_count > 0:
+            st.info(f"📊 {total_doc_count} total documents across all chats")
+            
+            # Show upload limit status
+            from auth import can_user_upload
+            can_upload, limit_message = can_user_upload(st.session_state.user_id)
+            if can_upload:
+                st.info(f"📤 {limit_message}")
+            else:
+                st.warning(f"📤 {limit_message}")
+        else:
+            # If no current conversation, show general info
+            if not st.session_state.current_conversation_id:
+                st.info("📚 Upload documents in a conversation to build its knowledge base")
+            else:
+                st.info("📚 No documents in this conversation yet")
         
         st.markdown("---")
         
@@ -490,11 +543,6 @@ def main():
     
     # Render sidebar for authenticated users
     render_sidebar()
-    
-    # Handle different pages
-    if st.session_state.current_page == "knowledge_base":
-        render_rag_page()
-        return
     
     # Chat page (default)
     st.session_state.current_page = "chat"
@@ -627,9 +675,68 @@ def main():
         # Display current conversation
         display_chat_messages()
         
-        # Chat input with enhanced placeholder
-        placeholder_text = "Ask me anything about pharmacology..."
-        if prompt := st.chat_input(placeholder_text):
+
+        
+        # Chat input with upload button
+        col1, col2 = st.columns([6, 1])
+        
+        with col1:
+            placeholder_text = "Ask me anything about pharmacology..."
+            prompt = st.chat_input(placeholder_text)
+        
+        with col2:
+            # Upload button next to chat input
+            uploaded_file = st.file_uploader(
+                "📎",
+                type=['pdf', 'txt', 'csv', 'docx', 'doc', 'png', 'jpg', 'jpeg'],
+                key=f"upload_{len(st.session_state.conversations[st.session_state.current_conversation_id]['messages'])}",
+                help="Upload document (Max 10MB, 5 per day)",
+                label_visibility="collapsed"
+            )
+        
+        # Handle file upload
+        if uploaded_file:
+            from auth import can_user_upload, record_user_upload
+            
+            # Get file content for processing
+            file_content = uploaded_file.getvalue()
+            
+            # Check daily upload limit
+            can_upload, limit_message = can_user_upload(st.session_state.user_id)
+            
+            if not can_upload:
+                st.error(f"❌ {limit_message}")
+            else:
+                # Check file size limit (10MB)
+                max_file_size = 10 * 1024 * 1024  # 10MB
+                file_size = len(file_content)
+                
+                if file_size > max_file_size:
+                    st.error(f"❌ File too large ({file_size / (1024*1024):.1f}MB). Max 10MB.")
+                else:
+                    # Process the upload - use current conversation's RAG system
+                    rag_system = initialize_rag_system(st.session_state.current_conversation_id)
+                    if rag_system:
+                        with st.spinner(f"Processing {uploaded_file.name}..."):
+                            try:
+                                if uploaded_file.type.startswith('image/'):
+                                    image = Image.open(io.BytesIO(file_content))
+                                    success = rag_system.add_image(image, uploaded_file.name)
+                                else:
+                                    success = rag_system.add_document(file_content, uploaded_file.name, uploaded_file.type)
+                                
+                                if success:
+                                    record_user_upload(st.session_state.user_id, uploaded_file.name, file_size)
+                                    st.success(f"✅ Uploaded {uploaded_file.name}")
+                                    st.rerun()
+                                else:
+                                    st.error(f"❌ Failed to upload {uploaded_file.name}")
+                            except Exception as e:
+                                st.error(f"❌ Error: {str(e)}")
+                    else:
+                        st.error("❌ Upload system unavailable")
+
+        if prompt:
             # Add user message
             add_message_to_current_conversation("user", prompt)
             
@@ -646,8 +753,8 @@ def main():
                     # Show initial thinking message
                     message_placeholder.markdown("🤔 Thinking...")
                     
-                    # Enhance prompt with RAG if available
-                    rag_system = initialize_rag_system()
+                    # Enhance prompt with RAG if available (conversation-specific)
+                    rag_system = initialize_rag_system(st.session_state.current_conversation_id)
                     enhanced_prompt = prompt
                     if rag_system:
                         enhanced_prompt = get_rag_enhanced_prompt(prompt, rag_system)
