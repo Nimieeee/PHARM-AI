@@ -20,7 +20,7 @@ from langchain_community.document_loaders import (
     PyPDFLoader, TextLoader, CSVLoader, 
     UnstructuredWordDocumentLoader, UnstructuredPowerPointLoader
 )
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
 # Image processing
