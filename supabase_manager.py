@@ -140,6 +140,22 @@ class SupabaseConnectionManager:
             })
             return False
     
+    def set_user_context(self, user_id: str) -> bool:
+        """Set user context for RLS policies."""
+        try:
+            if self._client:
+                # Set the current user context for RLS policies
+                self._client.rpc('set_config', {
+                    'setting_name': 'app.current_user_id',
+                    'new_value': user_id,
+                    'is_local': False
+                }).execute()
+                logger.info(f"User context set for RLS: {user_id}")
+                return True
+        except Exception as e:
+            logger.warning(f"Failed to set user context: {e}")
+        return False
+    
     def execute_query(self, table: str, operation: str, **kwargs) -> Any:
         """Execute database query with error handling and stats tracking."""
         if not self._client:

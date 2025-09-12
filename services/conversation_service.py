@@ -41,6 +41,9 @@ class ConversationService:
         Returns:
             str: Conversation ID
         """
+        # Set user context for RLS policies
+        self.connection_manager.set_user_context(user_uuid)
+        
         # Immediately use the simple method to avoid trigger issues
         logger.info("Using simple conversation creation to avoid trigger issues")
         try:
