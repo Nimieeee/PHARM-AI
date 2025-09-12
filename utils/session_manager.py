@@ -4,7 +4,13 @@ Session State Management - Supabase Version
 
 import streamlit as st
 import asyncio
-from auth import load_user_conversations
+
+# Import with error handling for Streamlit Cloud
+try:
+    from auth import load_user_conversations
+except ImportError as e:
+    st.error(f"Failed to import auth module: {e}")
+    st.stop()
 
 # Helper function to run async functions in Streamlit
 def run_async(coro):

@@ -8,22 +8,39 @@ from typing import Dict, List, Tuple, Optional
 import streamlit as st
 from config import SESSION_TIMEOUT_HOURS, UPLOAD_LIMIT_PER_DAY
 
-# Import Supabase services
-from services.user_service import user_service
-from services.session_service import session_service, create_session_sync, validate_session_sync, logout_session_sync
-from services.conversation_service import conversation_service, get_user_conversations_sync, update_conversation_sync
-from services.document_service import document_service
+# Import Supabase services with error handling
+try:
+    from services.user_service import user_service
+    from services.session_service import session_service, create_session_sync, validate_session_sync, logout_session_sync
+    from services.conversation_service import conversation_service, get_user_conversations_sync, update_conversation_sync
+    from services.document_service import document_service
+except ImportError as e:
+    st.error(f"Failed to import services: {e}")
+    st.info("This might be a dependency issue. Please check your requirements.txt")
+    st.stop()
 
 # Helper function to run async functions in Streamlit
 def run_async(coro):
-    """Run async function in Streamlit context."""
+    """Run async function in Streamlit context with better error handling."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        # Try to get existing event loop
         loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("Event loop is closed")
     except RuntimeError:
+        # Create new event loop for Streamlit Cloud compatibility
+        logger.info("Creating new event loop for async operation")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
     
-    return loop.run_until_complete(coro)
+    try:
+        return loop.run_until_complete(coro)
+    except Exception as e:
+        logger.error(f"Error running async operation: {e}")
+        raise
 
 # Session validation cache to prevent duplicate validation
 _session_cache = {}

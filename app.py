@@ -7,6 +7,13 @@ For Streamlit Cloud deployment, make sure to:
 2. Use app.py as the main file
 """
 
+# Apply Streamlit Cloud fixes first
+try:
+    from streamlit_cloud_fix import apply_all_fixes
+    apply_all_fixes()
+except ImportError:
+    pass  # Fixes not available, continue anyway
+
 import streamlit as st
 from utils.session_manager import initialize_session_state
 from utils.navigation import render_navigation
