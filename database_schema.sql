@@ -56,6 +56,7 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE TABLE IF NOT EXISTS documents (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_uuid UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    conversation_id UUID REFERENCES conversations(id) ON DELETE CASCADE,
     document_id VARCHAR(255) UNIQUE NOT NULL,
     filename VARCHAR(500) NOT NULL,
     file_type VARCHAR(50),
@@ -77,6 +78,7 @@ CREATE INDEX IF NOT EXISTS idx_conversations_conversation_id ON conversations(co
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_uuid ON messages(conversation_uuid);
 CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at);
 CREATE INDEX IF NOT EXISTS idx_documents_user_uuid ON documents(user_uuid);
+CREATE INDEX IF NOT EXISTS idx_documents_conversation_id ON documents(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_documents_document_id ON documents(document_id);
 
 -- Enable Row Level Security (RLS)

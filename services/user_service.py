@@ -11,9 +11,12 @@ from typing import Dict, List, Tuple, Optional
 import streamlit as st
 import logging
 
-from supabase_manager import get_supabase_client
-
 logger = logging.getLogger(__name__)
+
+def get_supabase_client():
+    """Lazy import to avoid circular dependencies"""
+    from supabase_manager import get_supabase_client as _get_client
+    return _get_client()
 
 class UserService:
     """Service class for user account management operations."""
