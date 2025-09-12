@@ -9,7 +9,30 @@ from typing import Dict, List, Optional, Tuple
 import streamlit as st
 import logging
 
-from supabase_manager import connection_manager, SupabaseError, ErrorHandler
+# Lazy import to avoid circular dependencies
+def get_connection_manager():
+    """Get connection manager with lazy import."""
+    try:
+        from supabase_manager import connection_manager
+        return connection_manager
+    except ImportError:
+        return None
+
+def get_supabase_error():
+    """Get SupabaseError with lazy import."""
+    try:
+        from supabase_manager import SupabaseError
+        return SupabaseError
+    except ImportError:
+        return Exception
+
+def get_error_handler():
+    """Get ErrorHandler with lazy import."""
+    try:
+        from supabase_manager import ErrorHandler
+        return ErrorHandler
+    except ImportError:
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +40,14 @@ class SessionService:
     """Service class for authentication session management."""
     
     def __init__(self, session_timeout_hours: int = 24):
-        self.connection_manager = connection_manager
+        self.connection_manager = None  # Initialize lazily
         self.session_timeout_hours = session_timeout_hours
+    
+    def _get_connection_manager(self):
+        """Get connection manager with lazy loading."""
+        if self.connection_manager is None:
+            self.connection_manager = get_connection_manager()
+        return self.connection_manager
     
     def _generate_session_id(self) -> str:
         """Generate secure session ID."""
@@ -56,7 +85,7 @@ class SessionService:
                 'user_agent': user_agent
             }
             
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='insert',
                 data=session_data
@@ -67,11 +96,11 @@ class SessionService:
                 return session_id
             else:
                 logger.error(f"Failed to create session for user: {username}")
-                raise SupabaseError("Failed to create session")
+                raise get_supabase_error()("Failed to create session")
                 
         except Exception as e:
             logger.error(f"Error creating session for {username}: {str(e)}")
-            raise SupabaseError(f"Session creation failed: {str(e)}")
+            raise get_supabase_error()(f"Session creation failed: {str(e)}")
     
     async def validate_session(self, session_id: str) -> Optional[Dict]:
         """
@@ -87,7 +116,7 @@ class SessionService:
             return None
         
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
                 eq={'session_id': session_id}
@@ -128,7 +157,7 @@ class SessionService:
         try:
             new_expiry = self._get_expiry_time()
             
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='update',
                 data={
@@ -150,7 +179,7 @@ class SessionService:
     async def update_last_activity(self, session_id: str) -> bool:
         """Update session's last activity timestamp."""
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='update',
                 data={'last_activity': datetime.now().isoformat()},
@@ -177,7 +206,7 @@ class SessionService:
             return True
         
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='delete',
                 eq={'session_id': session_id}
@@ -201,7 +230,7 @@ class SessionService:
             int: Number of sessions logged out
         """
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='delete',
                 eq={'user_id': user_uuid}
@@ -227,7 +256,7 @@ class SessionService:
             current_time = datetime.now().isoformat()
             
             # First, get expired sessions to count them
-            expired_result = self.connection_manager.execute_query(
+            expired_result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
                 columns='session_id'
@@ -269,7 +298,7 @@ class SessionService:
             List[Dict]: List of active sessions
         """
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
                 columns='session_id,created_at,last_activity,ip_address,user_agent',
@@ -297,7 +326,7 @@ class SessionService:
     async def get_session_info(self, session_id: str) -> Optional[Dict]:
         """Get detailed session information."""
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
                 eq={'session_id': session_id}
@@ -317,7 +346,7 @@ class SessionService:
             return False
         
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
                 columns='expires_at',
@@ -338,7 +367,7 @@ class SessionService:
         """Get session statistics."""
         try:
             # Get total sessions
-            total_result = self.connection_manager.execute_query(
+            total_result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
                 columns='count(*)'
