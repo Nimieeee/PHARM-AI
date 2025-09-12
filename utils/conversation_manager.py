@@ -6,7 +6,11 @@ import streamlit as st
 import uuid
 import asyncio
 from datetime import datetime
-from services.conversation_service import conversation_service
+from services.conversation_service import (
+    conversation_service, create_conversation_sync, update_conversation_sync,
+    add_message_sync, update_conversation_title_sync, delete_conversation_sync,
+    duplicate_conversation_sync
+)
 from services.user_service import user_service
 
 # Fixed model
@@ -36,11 +40,11 @@ def create_new_conversation():
         title = f"New Chat {st.session_state.conversation_counter}"
         
         # Create conversation in Supabase
-        conversation_id = run_async(conversation_service.create_conversation(
+        conversation_id = create_conversation_sync(
             user_data['id'], 
             title, 
             FIXED_MODEL
-        ))
+        )
         
         # Update local session state
         st.session_state.conversations[conversation_id] = {
@@ -88,11 +92,11 @@ def add_message_to_current_conversation(role: str, content: str):
         }
         
         # Add message to Supabase
-        success = run_async(conversation_service.add_message(
+        success = add_message_sync(
             user_data['id'],
             st.session_state.current_conversation_id,
             message
-        ))
+        )
         
         if success:
             # Update local session state
@@ -104,11 +108,11 @@ def add_message_to_current_conversation(role: str, content: str):
                 st.session_state.conversations[st.session_state.current_conversation_id]["title"] = title
                 
                 # Update title in Supabase
-                run_async(conversation_service.update_conversation_title(
+                update_conversation_title_sync(
                     user_data['id'],
                     st.session_state.current_conversation_id,
                     title
-                ))
+                )
             
             # Update cache
             conversations_cache_key = f"conversations_cache_{st.session_state.user_id}"
@@ -130,10 +134,10 @@ def delete_conversation(conversation_id: str):
                 return
             
             # Delete conversation from Supabase (this will cascade delete related documents)
-            success = run_async(conversation_service.delete_conversation(
+            success = delete_conversation_sync(
                 user_data['id'],
                 conversation_id
-            ))
+            )
             
             if success:
                 # Clean up session state
@@ -176,11 +180,11 @@ def duplicate_conversation(conversation_id: str):
         new_title = f"Copy of {original_conv['title']}"
         
         # Duplicate conversation in Supabase
-        new_conversation_id = run_async(conversation_service.duplicate_conversation(
+        new_conversation_id = duplicate_conversation_sync(
             user_data['id'],
             conversation_id,
             new_title
-        ))
+        )
         
         if new_conversation_id:
             # Update local session state

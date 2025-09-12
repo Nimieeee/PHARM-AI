@@ -173,7 +173,8 @@ def initialize_auth_session():
 
 def login_user(username: str, password: str) -> bool:
     """Login user and create session."""
-    if authenticate_user(username, password):
+    success, message = authenticate_user(username, password)
+    if success:
         session_id = create_session(username)
         st.session_state.session_id = session_id
         st.session_state.authenticated = True

@@ -569,6 +569,50 @@ def update_conversation_sync(user_uuid: str, conversation_id: str, data: Dict) -
     
     return loop.run_until_complete(conversation_service.update_conversation(user_uuid, conversation_id, data))
 
+def add_message_sync(user_uuid: str, conversation_id: str, message: Dict) -> bool:
+    """Add message to conversation (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(conversation_service.add_message(user_uuid, conversation_id, message))
+
+def update_conversation_title_sync(user_uuid: str, conversation_id: str, title: str) -> bool:
+    """Update conversation title (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(conversation_service.update_conversation_title(user_uuid, conversation_id, title))
+
+def delete_conversation_sync(user_uuid: str, conversation_id: str) -> bool:
+    """Delete conversation (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(conversation_service.delete_conversation(user_uuid, conversation_id))
+
+def duplicate_conversation_sync(user_uuid: str, conversation_id: str, new_title: str = None) -> Optional[str]:
+    """Duplicate conversation (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(conversation_service.duplicate_conversation(user_uuid, conversation_id, new_title))
+
 # Convenience functions for backward compatibility
 async def create_conversation(user_uuid: str, title: str) -> str:
     """Create new conversation."""
