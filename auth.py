@@ -11,7 +11,7 @@ from config import SESSION_TIMEOUT_HOURS, UPLOAD_LIMIT_PER_DAY
 # Import Supabase services
 from services.user_service import user_service
 from services.session_service import session_service, create_session_sync, validate_session_sync, logout_session_sync
-from services.conversation_service import conversation_service
+from services.conversation_service import conversation_service, get_user_conversations_sync, update_conversation_sync
 from services.document_service import document_service
 
 # Helper function to run async functions in Streamlit
@@ -194,7 +194,7 @@ def load_user_conversations(user_id: str) -> Dict:
         if not user_data:
             return {}
         
-        conversations = conversation_service.get_user_conversations(user_data['id'])
+        conversations = get_user_conversations_sync(user_data['id'])
         return conversations
     except Exception as e:
         st.error(f"Error loading conversations: {e}")
@@ -211,7 +211,7 @@ def save_user_conversations(user_id: str, conversations: Dict):
         
         # Update each conversation in Supabase
         for conv_id, conv_data in conversations.items():
-            conversation_service.update_conversation(
+            update_conversation_sync(
                 user_data['id'],
                 conv_id,
                 conv_data

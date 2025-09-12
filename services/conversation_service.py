@@ -10,7 +10,30 @@ from typing import Dict, List, Optional, Tuple
 import streamlit as st
 import logging
 
-from supabase_manager import connection_manager, SupabaseError, ErrorHandler
+# Lazy import to avoid circular dependencies
+def get_connection_manager():
+    """Get connection manager with lazy import."""
+    try:
+        from supabase_manager import connection_manager
+        return connection_manager
+    except ImportError:
+        return None
+
+def get_supabase_error():
+    """Get SupabaseError with lazy import."""
+    try:
+        from supabase_manager import SupabaseError
+        return SupabaseError
+    except ImportError:
+        return Exception
+
+def get_error_handler():
+    """Get ErrorHandler with lazy import."""
+    try:
+        from supabase_manager import ErrorHandler
+        return ErrorHandler
+    except ImportError:
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +41,13 @@ class ConversationService:
     """Service class for conversation and message management."""
     
     def __init__(self):
-        self.connection_manager = connection_manager
+        self.connection_manager = None  # Initialize lazily
+    
+    def _get_connection_manager(self):
+        """Get connection manager with lazy loading."""
+        if self.connection_manager is None:
+            self.connection_manager = get_connection_manager()
+        return self.connection_manager
     
     def _generate_conversation_id(self) -> str:
         """Generate unique conversation ID."""
@@ -44,10 +73,10 @@ class ConversationService:
         # Validate user_uuid is not None or empty
         if not user_uuid or user_uuid.strip() == '':
             logger.error(f"Invalid user_uuid provided: '{user_uuid}'")
-            raise SupabaseError("User UUID cannot be null or empty")
+            raise get_supabase_error()("User UUID cannot be null or empty")
         
         # Set user context for RLS policies
-        self.connection_manager.set_user_context(user_uuid)
+        self._get_connection_manager().set_user_context(user_uuid)
         
         conversation_id = self._generate_conversation_id()
         
@@ -65,7 +94,7 @@ class ConversationService:
         logger.debug(f"Conversation data: {conversation_data}")
         
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='insert',
                 data=conversation_data
@@ -76,14 +105,14 @@ class ConversationService:
                 return conversation_id
             else:
                 logger.error("No data returned from conversation insert")
-                raise SupabaseError("Failed to create conversation - no data returned")
+                raise get_supabase_error()("Failed to create conversation - no data returned")
                 
         except Exception as e:
             logger.error(f"Conversation creation failed: {str(e)}")
             # Log the actual error details for debugging
             if hasattr(e, 'details'):
                 logger.error(f"Error details: {e.details}")
-            raise SupabaseError(f"Conversation creation failed: {str(e)}")
+            raise get_supabase_error()(f"Conversation creation failed: {str(e)}")
     
     async def get_user_conversations(self, user_uuid: str, include_archived: bool = False, limit: int = 100) -> Dict:
         """
@@ -103,7 +132,7 @@ class ConversationService:
             if not include_archived:
                 eq_conditions['is_archived'] = False
             
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='select',
                 eq=eq_conditions,
@@ -146,7 +175,7 @@ class ConversationService:
             Optional[Dict]: Conversation data or None if not found
         """
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='select',
                 eq={
@@ -205,7 +234,7 @@ class ConversationService:
             
             safe_data['updated_at'] = datetime.now().isoformat()
             
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='update',
                 data=safe_data,
@@ -236,7 +265,7 @@ class ConversationService:
             bool: Success status
         """
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='delete',
                 eq={
@@ -505,6 +534,40 @@ class ConversationService:
 
 # Global conversation service instance
 conversation_service = ConversationService()
+
+# Sync wrapper methods for Streamlit compatibility
+def create_conversation_sync(user_uuid: str, title: str, model: str = None) -> str:
+    """Create new conversation (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(conversation_service.create_conversation(user_uuid, title, model))
+
+def get_user_conversations_sync(user_uuid: str, include_archived: bool = False, limit: int = 100) -> Dict:
+    """Get user conversations (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(conversation_service.get_user_conversations(user_uuid, include_archived, limit))
+
+def update_conversation_sync(user_uuid: str, conversation_id: str, data: Dict) -> bool:
+    """Update conversation (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(conversation_service.update_conversation(user_uuid, conversation_id, data))
 
 # Convenience functions for backward compatibility
 async def create_conversation(user_uuid: str, title: str) -> str:
