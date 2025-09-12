@@ -10,6 +10,14 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import streamlit as st
 
+# SQLite upgrade for Streamlit Cloud compatibility
+import sys
+try:
+    import pysqlite3
+    sys.modules['sqlite3'] = pysqlite3
+except ImportError:
+    pass
+
 # Document processing imports
 try:
     import chromadb
