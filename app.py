@@ -25,12 +25,7 @@ st.set_page_config(
 )
 
 def main():
-    """Main application entry point with performance optimizations."""
-    # Apply performance optimizations first
-    from performance_config import apply_performance_optimizations, increment_metric
-    apply_performance_optimizations()
-    increment_metric('page_loads')
-    
+    """Main application entry point."""
     # Initialize session state
     initialize_session_state()
     
