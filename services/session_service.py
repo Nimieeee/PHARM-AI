@@ -399,6 +399,40 @@ class SessionService:
 # Global session service instance
 session_service = SessionService()
 
+# Sync wrapper methods for Streamlit compatibility
+def create_session_sync(username: str, user_uuid: str) -> str:
+    """Create authentication session (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(session_service.create_session(username, user_uuid))
+
+def validate_session_sync(session_id: str) -> Optional[Dict]:
+    """Validate session (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(session_service.validate_session(session_id))
+
+def logout_session_sync(session_id: str) -> bool:
+    """Logout session (sync wrapper)."""
+    import asyncio
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    return loop.run_until_complete(session_service.logout_session(session_id))
+
 # Convenience functions for backward compatibility
 async def create_session(username: str, user_uuid: str) -> str:
     """Create authentication session."""

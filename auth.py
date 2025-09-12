@@ -10,7 +10,7 @@ from config import SESSION_TIMEOUT_HOURS, UPLOAD_LIMIT_PER_DAY
 
 # Import Supabase services
 from services.user_service import user_service
-from services.session_service import session_service
+from services.session_service import session_service, create_session_sync, validate_session_sync, logout_session_sync
 from services.conversation_service import conversation_service
 from services.document_service import document_service
 
@@ -54,7 +54,7 @@ def create_session(username: str) -> str:
         if not user_data:
             raise Exception("User not found")
         
-        session_id = session_service.create_session(username, user_data['id'])
+        session_id = create_session_sync(username, user_data['id'])
         return session_id
     except Exception as e:
         st.error(f"Error creating session: {str(e)}")
@@ -82,7 +82,7 @@ def validate_session(session_id: str) -> Optional[str]:
             del _session_cache[cache_key]
     
     try:
-        session_data = session_service.validate_session(session_id)
+        session_data = validate_session_sync(session_id)
         if session_data:
             username = session_data['username']
             # Cache successful validation
@@ -99,7 +99,7 @@ def validate_session(session_id: str) -> Optional[str]:
 def logout_user(session_id: str):
     """Logout user by removing session using Supabase."""
     try:
-        session_service.logout_session(session_id)
+        logout_session_sync(session_id)
     except Exception as e:
         st.error(f"Error logging out: {str(e)}")
 
