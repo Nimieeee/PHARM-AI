@@ -1,197 +1,240 @@
 #!/usr/bin/env python3
 """
-Migration Script: Pinecone to ChromaDB
-Migrates existing RAG data from Pinecone-based system to ChromaDB
+Migration Script - Migrate from Pinecone to ChromaDB
 """
 
+import os
 import json
-from pathlib import Path
 import shutil
 from datetime import datetime
+from config import USER_DATA_DIR
 
-def migrate_to_chromadb():
-    """Migrate existing Pinecone RAG data to ChromaDB structure."""
-    print("🔄 Migrating from Pinecone to ChromaDB...")
+def backup_existing_data():
+    """Create backup of existing user data."""
+    if not os.path.exists(USER_DATA_DIR):
+        print("ℹ️  No existing user data to backup")
+        return None
     
-    user_data_dir = Path("user_data")
-    if not user_data_dir.exists():
-        print("✅ No user data found - nothing to migrate")
-        return
-    
-    # Find all user RAG directories
-    rag_dirs = list(user_data_dir.glob("rag_*"))
-    
-    if not rag_dirs:
-        print("✅ No RAG directories found - nothing to migrate")
-        return
-    
-    print(f"📁 Found {len(rag_dirs)} user RAG directories")
-    
-    migrated_users = 0
-    migrated_conversations = 0
-    
-    for rag_dir in rag_dirs:
-        user_id = rag_dir.name.replace("rag_", "")
-        print(f"\n👤 Processing user: {user_id[:8]}...")
-        
-        # Find conversation directories
-        conv_dirs = list(rag_dir.glob("conversation_*"))
-        
-        if not conv_dirs:
-            print("   📂 No conversation directories found")
-            continue
-        
-        user_migrated = False
-        
-        for conv_dir in conv_dirs:
-            conv_id = conv_dir.name.replace("conversation_", "")
-            metadata_file = conv_dir / "documents_metadata.json"
-            chroma_dir = conv_dir / "chroma_db"
-            
-            # Skip if already has ChromaDB
-            if chroma_dir.exists():
-                print(f"   ✅ Conversation {conv_id[:8]}... already has ChromaDB")
-                continue
-            
-            # Check if has documents metadata
-            if not metadata_file.exists():
-                print(f"   📝 Conversation {conv_id[:8]}... has no documents")
-                continue
-            
-            try:
-                # Load metadata
-                with open(metadata_file, 'r') as f:
-                    metadata = json.load(f)
-                
-                if not metadata:
-                    print(f"   📝 Conversation {conv_id[:8]}... has empty metadata")
-                    continue
-                
-                print(f"   📚 Conversation {conv_id[:8]}... has {len(metadata)} documents")
-                
-                # Create ChromaDB directory structure
-                chroma_dir.mkdir(parents=True, exist_ok=True)
-                
-                # Create a migration info file
-                migration_info = {
-                    "migrated_at": datetime.now().isoformat(),
-                    "original_documents": len(metadata),
-                    "migration_status": "metadata_only",
-                    "note": "Document content needs to be re-uploaded. Only metadata was preserved."
-                }
-                
-                migration_file = conv_dir / "migration_info.json"
-                with open(migration_file, 'w') as f:
-                    json.dump(migration_info, f, indent=2)
-                
-                print(f"   ✅ Prepared ChromaDB structure for conversation {conv_id[:8]}...")
-                migrated_conversations += 1
-                user_migrated = True
-                
-            except Exception as e:
-                print(f"   ❌ Error migrating conversation {conv_id[:8]}...: {e}")
-        
-        if user_migrated:
-            migrated_users += 1
-    
-    print(f"\n🎯 Migration Summary:")
-    print(f"   👥 Users processed: {migrated_users}")
-    print(f"   💬 Conversations migrated: {migrated_conversations}")
-    
-    if migrated_conversations > 0:
-        print(f"\n📝 Important Notes:")
-        print(f"   • ChromaDB structure has been prepared")
-        print(f"   • Document metadata has been preserved")
-        print(f"   • ⚠️  You need to re-upload documents for full functionality")
-        print(f"   • The app will now use ChromaDB instead of Pinecone")
-        print(f"   • No more Pinecone API limits!")
-    else:
-        print(f"\n✅ No migration needed - all conversations already use ChromaDB")
-
-def cleanup_old_pinecone_files():
-    """Clean up old Pinecone-related files (optional)."""
-    print("\n🧹 Cleaning up old Pinecone files...")
-    
-    files_to_check = [
-        "test_pinecone.py",
-        "rag_system.py",  # Old Pinecone-based system
-        "rag_interface.py"  # Old Pinecone-based interface
-    ]
-    
-    cleaned_files = []
-    
-    for file_path in files_to_check:
-        file_obj = Path(file_path)
-        if file_obj.exists():
-            # Create backup
-            backup_path = Path(f"{file_path}.pinecone_backup")
-            shutil.copy2(file_obj, backup_path)
-            cleaned_files.append(file_path)
-            print(f"   📦 Backed up {file_path} to {backup_path}")
-    
-    if cleaned_files:
-        print(f"   ✅ Backed up {len(cleaned_files)} old Pinecone files")
-        print(f"   💡 You can delete the backup files once you're sure ChromaDB works well")
-    else:
-        print(f"   ✅ No old Pinecone files to clean up")
-
-def verify_chromadb_setup():
-    """Verify ChromaDB is properly set up."""
-    print("\n🔍 Verifying ChromaDB setup...")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = f"{USER_DATA_DIR}_backup_{timestamp}"
     
     try:
-        import chromadb
-        print("   ✅ ChromaDB package is installed")
-        
-        # Test basic ChromaDB functionality
-        from rag_system_chromadb import ChromaRAGSystem
-        
-        # Create a test system
-        test_rag = ChromaRAGSystem("test-user", "test-conversation")
-        health = test_rag.health_check()
-        
-        if health['chromadb_ready']:
-            print("   ✅ ChromaDB is working correctly")
-            print(f"   📊 Mode: {health['mode']}")
-            
-            # Clean up test data
-            test_dir = Path("user_data") / "rag_test-user"
-            if test_dir.exists():
-                shutil.rmtree(test_dir)
-                print("   🧹 Cleaned up test data")
-            
-            return True
-        else:
-            print("   ❌ ChromaDB setup has issues")
-            return False
-            
-    except ImportError:
-        print("   ❌ ChromaDB package not installed")
-        print("   💡 Run: pip install chromadb")
-        return False
+        shutil.copytree(USER_DATA_DIR, backup_dir)
+        print(f"✅ Backup created: {backup_dir}")
+        return backup_dir
     except Exception as e:
-        print(f"   ❌ ChromaDB verification failed: {e}")
+        print(f"❌ Backup failed: {e}")
+        return None
+
+def migrate_user_data():
+    """Migrate user data structure for ChromaDB."""
+    print("🔄 Migrating user data structure...")
+    
+    if not os.path.exists(USER_DATA_DIR):
+        print("ℹ️  No user data to migrate")
+        return
+    
+    # Load users
+    users_file = os.path.join(USER_DATA_DIR, "users.json")
+    if not os.path.exists(users_file):
+        print("ℹ️  No users file found")
+        return
+    
+    try:
+        with open(users_file, 'r') as f:
+            users = json.load(f)
+    except Exception as e:
+        print(f"❌ Error loading users: {e}")
+        return
+    
+    # Migrate each user's data
+    for username, user_data in users.items():
+        user_id = user_data["user_id"]
+        print(f"   Migrating user: {username} ({user_id})")
+        
+        # Ensure user directories exist
+        conv_dir = os.path.join(USER_DATA_DIR, f"conversations_{user_id}")
+        rag_dir = os.path.join(USER_DATA_DIR, f"rag_{user_id}")
+        
+        os.makedirs(conv_dir, exist_ok=True)
+        os.makedirs(rag_dir, exist_ok=True)
+        
+        # Migrate conversations if they exist in old format
+        old_conv_file = os.path.join(USER_DATA_DIR, f"{user_id}_conversations.json")
+        new_conv_file = os.path.join(conv_dir, "conversations.json")
+        
+        if os.path.exists(old_conv_file) and not os.path.exists(new_conv_file):
+            try:
+                shutil.move(old_conv_file, new_conv_file)
+                print(f"     ✅ Migrated conversations")
+            except Exception as e:
+                print(f"     ❌ Failed to migrate conversations: {e}")
+        
+        # Clean up old Pinecone data if it exists
+        old_pinecone_dir = os.path.join(USER_DATA_DIR, f"pinecone_{user_id}")
+        if os.path.exists(old_pinecone_dir):
+            try:
+                shutil.rmtree(old_pinecone_dir)
+                print(f"     🗑️  Removed old Pinecone data")
+            except Exception as e:
+                print(f"     ❌ Failed to remove old Pinecone data: {e}")
+    
+    print("✅ User data migration completed")
+
+def clean_old_files():
+    """Clean up old migration files and temporary data."""
+    print("🧹 Cleaning up old files...")
+    
+    if not os.path.exists(USER_DATA_DIR):
+        return
+    
+    # Files to remove
+    old_files = [
+        "migration_log.txt",
+        "pinecone_backup.json",
+        "temp_migration_data.json"
+    ]
+    
+    removed_count = 0
+    for filename in old_files:
+        filepath = os.path.join(USER_DATA_DIR, filename)
+        if os.path.exists(filepath):
+            try:
+                os.remove(filepath)
+                removed_count += 1
+                print(f"   🗑️  Removed: {filename}")
+            except Exception as e:
+                print(f"   ❌ Failed to remove {filename}: {e}")
+    
+    # Remove old user-specific files with old naming pattern
+    for item in os.listdir(USER_DATA_DIR):
+        if item.endswith("_conversations.json") or item.startswith("pinecone_"):
+            filepath = os.path.join(USER_DATA_DIR, item)
+            try:
+                if os.path.isfile(filepath):
+                    os.remove(filepath)
+                elif os.path.isdir(filepath):
+                    shutil.rmtree(filepath)
+                removed_count += 1
+                print(f"   🗑️  Removed: {item}")
+            except Exception as e:
+                print(f"   ❌ Failed to remove {item}: {e}")
+    
+    if removed_count > 0:
+        print(f"✅ Cleaned up {removed_count} old files")
+    else:
+        print("ℹ️  No old files to clean up")
+
+def verify_migration():
+    """Verify that migration was successful."""
+    print("🔍 Verifying migration...")
+    
+    if not os.path.exists(USER_DATA_DIR):
+        print("❌ User data directory not found")
         return False
+    
+    # Load users
+    users_file = os.path.join(USER_DATA_DIR, "users.json")
+    if not os.path.exists(users_file):
+        print("❌ Users file not found")
+        return False
+    
+    try:
+        with open(users_file, 'r') as f:
+            users = json.load(f)
+    except Exception as e:
+        print(f"❌ Error loading users: {e}")
+        return False
+    
+    # Check each user's directory structure
+    all_good = True
+    for username, user_data in users.items():
+        user_id = user_data["user_id"]
+        
+        conv_dir = os.path.join(USER_DATA_DIR, f"conversations_{user_id}")
+        rag_dir = os.path.join(USER_DATA_DIR, f"rag_{user_id}")
+        
+        if not os.path.exists(conv_dir):
+            print(f"❌ Missing conversations directory for user {username}")
+            all_good = False
+        
+        if not os.path.exists(rag_dir):
+            print(f"❌ Missing RAG directory for user {username}")
+            all_good = False
+        
+        if all_good:
+            print(f"   ✅ User {username}: directories OK")
+    
+    if all_good:
+        print("✅ Migration verification passed")
+    else:
+        print("❌ Migration verification failed")
+    
+    return all_good
+
+def main():
+    """Main migration function."""
+    print("🚀 PharmBot ChromaDB Migration Tool")
+    print("=" * 40)
+    print("This tool migrates your PharmBot data to use ChromaDB")
+    print("instead of Pinecone for better reliability and performance.")
+    print()
+    
+    # Check if migration is needed
+    if not os.path.exists(USER_DATA_DIR):
+        print("ℹ️  No existing data found. No migration needed.")
+        return
+    
+    print("Migration steps:")
+    print("1. Backup existing data")
+    print("2. Migrate user data structure")
+    print("3. Clean up old files")
+    print("4. Verify migration")
+    print()
+    
+    confirm = input("Do you want to proceed with migration? (y/N): ").strip().lower()
+    if confirm != 'y':
+        print("❌ Migration cancelled")
+        return
+    
+    # Step 1: Backup
+    print("\n" + "="*50)
+    print("STEP 1: Creating backup...")
+    backup_dir = backup_existing_data()
+    if not backup_dir:
+        print("❌ Migration aborted due to backup failure")
+        return
+    
+    # Step 2: Migrate
+    print("\n" + "="*50)
+    print("STEP 2: Migrating data structure...")
+    migrate_user_data()
+    
+    # Step 3: Clean up
+    print("\n" + "="*50)
+    print("STEP 3: Cleaning up old files...")
+    clean_old_files()
+    
+    # Step 4: Verify
+    print("\n" + "="*50)
+    print("STEP 4: Verifying migration...")
+    success = verify_migration()
+    
+    # Final status
+    print("\n" + "="*50)
+    if success:
+        print("🎉 MIGRATION COMPLETED SUCCESSFULLY!")
+        print(f"   Backup saved to: {backup_dir}")
+        print("   Your PharmBot is now using ChromaDB for better performance!")
+        print("\nNext steps:")
+        print("1. Install ChromaDB dependencies: pip install chromadb")
+        print("2. Test your application to ensure everything works")
+        print("3. If everything works well, you can delete the backup directory")
+    else:
+        print("❌ MIGRATION FAILED!")
+        print(f"   Your original data is backed up in: {backup_dir}")
+        print("   Please check the errors above and try again")
+        print("   You can restore from backup if needed")
 
 if __name__ == "__main__":
-    print("🚀 Pinecone to ChromaDB Migration Tool")
-    print("=" * 50)
-    
-    # Verify ChromaDB setup first
-    if not verify_chromadb_setup():
-        print("\n❌ ChromaDB setup verification failed!")
-        print("Please install ChromaDB and fix any issues before migrating.")
-        exit(1)
-    
-    # Perform migration
-    migrate_to_chromadb()
-    
-    # Optional cleanup
-    print("\n" + "=" * 50)
-    response = input("Do you want to backup old Pinecone files? (y/N): ").lower().strip()
-    if response in ['y', 'yes']:
-        cleanup_old_pinecone_files()
-    
-    print("\n🎉 Migration completed!")
-    print("Your PharmBot now uses ChromaDB - unlimited, free, and fast!")
-    print("Remember to re-upload your documents for full functionality.")
+    main()

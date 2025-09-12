@@ -76,13 +76,15 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 - **No Data Sharing**: User conversations are never shared between accounts
 - **Secure Hashing**: Passwords use SHA-256 with random salts
 - **Session Management**: Secure session handling with timeout protection
+- **Data Isolation**: Each user's data is completely isolated in separate directories
+- **Privacy Verification**: Built-in tools to verify and maintain data privacy
 
 ### Multi-User Support
 - **Separated Conversations**: Each user sees only their own conversations
 - **Individual Settings**: Personal preferences and conversation history
 - **Account Management**: Easy sign-in/sign-out functionality
 
-## 📚 RAG (Retrieval-Augmented Generation) System
+## 📚 Conversation-Specific RAG System
 
 ### Document Support
 - **PDF Documents**: Extract and process PDF content
@@ -92,24 +94,26 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 - **Semantic Search**: Find relevant information using AI embeddings
 
 ### Knowledge Base Features
-- **Private Storage**: Each user has their own isolated document collection
+- **Conversation Isolation**: Each chat has its own isolated document collection
+- **No Cross-Chat Interference**: Documents in one conversation don't affect others
 - **Chunked Processing**: Documents are intelligently split for better retrieval
-- **Vector Search**: Uses ChromaDB for fast, semantic document search
+- **Vector Search**: Uses Pinecone/local storage for fast, semantic document search
 - **Context Integration**: Automatically enhances conversations with relevant document content
-- **Document Management**: Upload, view, search, and delete documents
+- **Document Management**: Upload, view, search, and delete documents per conversation
 
 ### RAG-Enhanced Conversations
-- **Automatic Context**: Relevant documents are automatically found and used
-- **Source Citations**: Responses include references to source documents
+- **Conversation-Specific Context**: Only documents from the current chat are used
+- **Perfect Isolation**: No interference from documents in other conversations
+- **Source Citations**: Responses include references to conversation-specific documents
 - **Fallback Handling**: Works with or without uploaded documents
-- **Real-time Search**: Searches knowledge base for each query
+- **Real-time Search**: Searches only the current conversation's knowledge base
 
 ### Technical Implementation
 - **LangChain**: Document processing and text splitting
-- **ChromaDB**: Vector database for semantic search
+- **Pinecone/Local Storage**: Vector database for semantic search
 - **HuggingFace Embeddings**: Sentence transformers for document embeddings
 - **OCR**: Tesseract for image text extraction
-- **Local Storage**: All documents stored locally for privacy
+- **Conversation Isolation**: Each chat maintains separate document storage
 
 ## 🎯 Usage Examples
 
@@ -132,15 +136,27 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 
 ```
 pharmbot/
-├── streamlit_app.py      # Main Streamlit application
-├── config.py            # Configuration and API setup
-├── openai_client.py     # Groq API client
-├── prompts.py           # AI system prompts
-├── drug_database.py     # Drug reference database
-├── main.py              # CLI utilities
-├── requirements.txt     # Python dependencies
-├── .env.example         # Environment variables template
-└── README.md           # This file
+├── streamlit_app.py              # Main Streamlit application
+├── rag_system_chromadb.py        # ChromaDB-based RAG system
+├── rag_interface_chromadb.py     # RAG interface layer
+├── config.py                     # Configuration and API setup
+├── openai_client.py              # Groq API client
+├── prompts.py                    # AI system prompts
+├── auth.py                       # Authentication & user management
+├── drug_database.py              # Drug reference database
+├── reset_upload_limit.py         # Upload limit management
+├── verify_privacy.py             # Privacy verification
+├── requirements.txt              # Python dependencies
+├── .env.example                  # Environment variables template
+├── README.md                     # This file
+└── user_data/                    # User data storage
+    ├── users.json
+    ├── sessions.json
+    ├── uploads.json
+    └── rag_{user_id}/
+        └── conversation_{conv_id}/
+            ├── chroma_db/        # ChromaDB vector database
+            └── documents_metadata.json
 ```
 
 ## 🎨 Features Showcase
@@ -211,12 +227,38 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Icons and emojis from various sources
 - Inspired by modern AI chat interfaces
 
+## 🔒 Privacy & Data Management
+
+### Verification Tools
+Run these commands to ensure your data privacy:
+
+```bash
+# Verify user data isolation
+python verify_privacy.py
+
+# Clean up any orphaned data
+python reset_user_data.py
+```
+
+### Data Structure
+Each user's data is stored in isolated directories:
+- `user_data/conversations_{user_id}/` - Private conversations
+- `user_data/rag_{user_id}/` - Private document uploads
+- `user_data/users.json` - User accounts (passwords hashed)
+
+### Privacy Guarantee
+- **Complete Isolation**: Users can never see each other's data
+- **Automatic Cleanup**: System automatically removes orphaned data
+- **Local Storage**: All data stays on your server
+- **No Cross-User Access**: Technical safeguards prevent data leaks
+
 ## 📞 Support
 
 If you have questions or need help:
 - Open an issue on GitHub
 - Check the documentation
 - Review the example usage
+- Run `python verify_privacy.py` for data privacy verification
 
 ---
 

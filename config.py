@@ -1,43 +1,49 @@
+"""
+Configuration settings for PharmBot
+"""
+
 import os
-from pathlib import Path
+from dotenv import load_dotenv
 
-# Try to load from environment first
-API_KEY = os.getenv("GROQ_API_KEY")
+# Load environment variables
+load_dotenv()
 
-# If not found, read directly from .env file
-if not API_KEY:
-    env_file = Path(__file__).parent / '.env'
-    if env_file.exists():
-        with open(env_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line.startswith('GROQ_API_KEY=') and not line.startswith('#'):
-                    API_KEY = line.split('=', 1)[1].strip()
-                    break
+# API Configuration
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-BASE_URL = "https://api.groq.com/openai/v1"
-
-
-
-# Validate API key
-if not API_KEY:
-    raise ValueError(
-        "GROQ_API_KEY not found in environment variables. "
-        "Please create a .env file with your Groq API key. "
-        "Get one from: https://console.groq.com/keys"
-    )
-
-if not API_KEY.startswith("gsk_"):
-    raise ValueError(
-        f"Invalid Groq API key format. Found: '{API_KEY[:10]}...' "
-        "API key should start with 'gsk_'. "
-        "Get a valid key from: https://console.groq.com/keys"
-    )
-
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/117.0.0.0 Safari/537.36"
-    )
+# Model configurations
+MODEL_CONFIGS = {
+    "normal": {
+        "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
+        "api_key": GROQ_API_KEY,
+        "base_url": "https://api.groq.com/openai/v1",
+        "description": "Llama 4 Maverick (Balanced)"
+    },
+    "turbo": {
+        "model": "openrouter/sonoma-sky-alpha",
+        "api_key": OPENROUTER_API_KEY,
+        "base_url": "https://openrouter.ai/api/v1",
+        "description": "Sonoma Sky Alpha (Fast)"
+    }
 }
+
+# Application settings
+APP_TITLE = "PharmBot - AI Pharmacology Assistant"
+APP_ICON = "💊"
+
+# File upload settings
+MAX_FILE_SIZE_MB = 10
+ALLOWED_FILE_TYPES = ['pdf', 'txt', 'csv', 'docx', 'doc', 'png', 'jpg', 'jpeg']
+
+# User data settings
+USER_DATA_DIR = "user_data"
+UPLOAD_LIMIT_PER_DAY = -1  # -1 means unlimited uploads
+
+# RAG settings
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 200
+MAX_SEARCH_RESULTS = 5
+
+# Session settings
+SESSION_TIMEOUT_HOURS = 24

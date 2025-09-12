@@ -1,313 +1,414 @@
-import streamlit as st
-import hashlib
+"""
+Authentication and User Management System
+"""
+
 import json
 import os
-from pathlib import Path
-from datetime import datetime
-import uuid
+import hashlib
 import secrets
+import time
+from datetime import datetime, timedelta
+from typing import Dict, List, Tuple, Optional
+import streamlit as st
+from config import USER_DATA_DIR, SESSION_TIMEOUT_HOURS, UPLOAD_LIMIT_PER_DAY
 
-# User data directory
-USER_DATA_DIR = Path("user_data")
-USER_DATA_DIR.mkdir(exist_ok=True)
+# File paths
+USERS_FILE = os.path.join(USER_DATA_DIR, "users.json")
+SESSIONS_FILE = os.path.join(USER_DATA_DIR, "sessions.json")
+UPLOADS_FILE = os.path.join(USER_DATA_DIR, "uploads.json")
 
-# Users file
-USERS_FILE = USER_DATA_DIR / "users.json"
+def ensure_user_data_dir():
+    """Ensure user data directory exists."""
+    os.makedirs(USER_DATA_DIR, exist_ok=True)
 
-# Session timeout (in seconds) - 24 hours
-SESSION_TIMEOUT = 24 * 60 * 60
-
-def generate_salt() -> str:
-    """Generate a random salt for password hashing."""
-    return secrets.token_hex(32)
-
-def hash_password(password: str, salt: str = None) -> tuple:
-    """Hash a password using SHA-256 with salt."""
+def hash_password(password: str, salt: str = None) -> Tuple[str, str]:
+    """Hash password with salt."""
     if salt is None:
-        salt = generate_salt()
+        salt = secrets.token_hex(32)
     
-    # Combine password and salt
-    salted_password = password + salt
-    password_hash = hashlib.sha256(salted_password.encode()).hexdigest()
-    
+    password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
     return password_hash, salt
 
-def load_users() -> dict:
+def load_users() -> Dict:
     """Load users from file."""
-    if USERS_FILE.exists():
-        try:
+    ensure_user_data_dir()
+    try:
+        if os.path.exists(USERS_FILE):
             with open(USERS_FILE, 'r') as f:
                 return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {}
+    except Exception as e:
+        st.error(f"Error loading users: {e}")
     return {}
 
-def save_users(users: dict):
+def save_users(users: Dict):
     """Save users to file."""
-    with open(USERS_FILE, 'w') as f:
-        json.dump(users, f, indent=2)
+    ensure_user_data_dir()
+    try:
+        with open(USERS_FILE, 'w') as f:
+            json.dump(users, f, indent=2)
+    except Exception as e:
+        st.error(f"Error saving users: {e}")
 
-def create_user(username: str, password: str, email: str = "") -> tuple:
-    """Create a new user account. Returns (success, message)."""
+def load_sessions() -> Dict:
+    """Load sessions from file."""
+    ensure_user_data_dir()
+    try:
+        if os.path.exists(SESSIONS_FILE):
+            with open(SESSIONS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def save_sessions(sessions: Dict):
+    """Save sessions to file."""
+    ensure_user_data_dir()
+    try:
+        with open(SESSIONS_FILE, 'w') as f:
+            json.dump(sessions, f, indent=2)
+    except Exception as e:
+        st.error(f"Error saving sessions: {e}")
+
+def create_user(username: str, password: str) -> tuple[bool, str]:
+    """Create a new user account."""
     users = load_users()
-    
-    # Validate username
-    if not username or len(username) < 3:
-        return False, "Username must be at least 3 characters long."
     
     if username in users:
-        return False, "Username already exists. Please choose a different username."
+        return False, "Username already exists"
     
-    # Validate password
-    if len(password) < 6:
-        return False, "Password must be at least 6 characters long."
-    
-    # Create user data
-    user_id = str(uuid.uuid4())
-    password_hash, salt = hash_password(password)
-    
-    users[username] = {
-        "user_id": user_id,
-        "password_hash": password_hash,
-        "salt": salt,
-        "email": email,
-        "created_at": datetime.now().isoformat(),
-        "last_login": None,
-        "login_count": 0
-    }
-    
-    save_users(users)
-    
-    # Create user's conversation directory
-    user_conv_dir = USER_DATA_DIR / f"conversations_{user_id}"
-    user_conv_dir.mkdir(exist_ok=True)
-    
-    return True, "Account created successfully!"
+    try:
+        password_hash, salt = hash_password(password)
+        
+        users[username] = {
+            "password_hash": password_hash,
+            "salt": salt,
+            "created_at": datetime.now().isoformat(),
+            "user_id": hashlib.md5(username.encode()).hexdigest()
+        }
+        
+        save_users(users)
+        
+        # Create user-specific directories
+        user_id = users[username]["user_id"]
+        user_conv_dir = os.path.join(USER_DATA_DIR, f"conversations_{user_id}")
+        user_rag_dir = os.path.join(USER_DATA_DIR, f"rag_{user_id}")
+        os.makedirs(user_conv_dir, exist_ok=True)
+        os.makedirs(user_rag_dir, exist_ok=True)
+        
+        return True, "Account created successfully"
+    except Exception as e:
+        return False, f"Error creating account: {str(e)}"
 
-def authenticate_user(username: str, password: str) -> tuple:
-    """Authenticate a user. Returns (success, message)."""
+def authenticate_user(username: str, password: str) -> tuple[bool, str]:
+    """Authenticate user credentials."""
     users = load_users()
-    
-    if not username or not password:
-        return False, "Please enter both username and password."
     
     if username not in users:
-        return False, "Invalid username or password."
+        return False, "Username not found"
     
     user_data = users[username]
-    salt = user_data.get("salt", "")
-    stored_hash = user_data["password_hash"]
+    password_hash, _ = hash_password(password, user_data["salt"])
     
-    # Hash the provided password with the stored salt
-    password_hash, _ = hash_password(password, salt)
-    
-    if password_hash != stored_hash:
-        return False, "Invalid username or password."
-    
-    # Update last login and login count
-    users[username]["last_login"] = datetime.now().isoformat()
-    users[username]["login_count"] = users[username].get("login_count", 0) + 1
-    save_users(users)
-    
-    return True, f"Welcome back, {username}!"
+    if password_hash == user_data["password_hash"]:
+        return True, "Authentication successful"
+    else:
+        return False, "Invalid password"
 
-def get_user_id(username: str) -> str:
-    """Get user ID for a username."""
+def create_session(username: str) -> str:
+    """Create a new session for user."""
+    sessions = load_sessions()
+    session_id = secrets.token_urlsafe(32)
+    
+    sessions[session_id] = {
+        "username": username,
+        "created_at": datetime.now().isoformat(),
+        "expires_at": (datetime.now() + timedelta(hours=SESSION_TIMEOUT_HOURS)).isoformat()
+    }
+    
+    save_sessions(sessions)
+    return session_id
+
+def validate_session(session_id: str) -> Optional[str]:
+    """Validate session and return username if valid."""
+    if not session_id:
+        return None
+    
+    sessions = load_sessions()
+    
+    if session_id not in sessions:
+        return None
+    
+    session_data = sessions[session_id]
+    expires_at = datetime.fromisoformat(session_data["expires_at"])
+    
+    if datetime.now() > expires_at:
+        # Session expired, remove it
+        del sessions[session_id]
+        save_sessions(sessions)
+        return None
+    
+    return session_data["username"]
+
+def logout_user(session_id: str):
+    """Logout user by removing session."""
+    if not session_id:
+        return
+    
+    sessions = load_sessions()
+    if session_id in sessions:
+        del sessions[session_id]
+        save_sessions(sessions)
+
+def get_user_id(username: str) -> Optional[str]:
+    """Get user ID for username."""
     users = load_users()
-    return users.get(username, {}).get("user_id", "")
-
-def get_user_conversations_file(user_id: str) -> Path:
-    """Get the conversations file path for a user."""
-    return USER_DATA_DIR / f"conversations_{user_id}" / "conversations.json"
-
-def load_user_conversations(user_id: str) -> dict:
-    """Load conversations for a specific user."""
-    conv_file = get_user_conversations_file(user_id)
-    if conv_file.exists():
-        try:
-            with open(conv_file, 'r') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, FileNotFoundError):
-            return {}
-    return {}
-
-def save_user_conversations(user_id: str, conversations: dict):
-    """Save conversations for a specific user."""
-    conv_file = get_user_conversations_file(user_id)
-    conv_file.parent.mkdir(exist_ok=True)
-    
-    # Convert datetime objects to strings for JSON serialization
-    serializable_conversations = {}
-    for conv_id, conv_data in conversations.items():
-        serializable_conv = conv_data.copy()
-        if 'created_at' in serializable_conv and hasattr(serializable_conv['created_at'], 'isoformat'):
-            serializable_conv['created_at'] = serializable_conv['created_at'].isoformat()
-        
-        # Handle messages with timestamps
-        if 'messages' in serializable_conv:
-            for message in serializable_conv['messages']:
-                if 'timestamp' in message and hasattr(message['timestamp'], 'isoformat'):
-                    message['timestamp'] = message['timestamp'].isoformat()
-        
-        serializable_conversations[conv_id] = serializable_conv
-    
-    with open(conv_file, 'w') as f:
-        json.dump(serializable_conversations, f, indent=2)
+    if username in users:
+        return users[username]["user_id"]
+    return None
 
 def initialize_auth_session():
     """Initialize authentication session state."""
+    # Check for existing session
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = None
+    
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
+    
     if "username" not in st.session_state:
-        st.session_state.username = ""
+        st.session_state.username = None
+    
     if "user_id" not in st.session_state:
-        st.session_state.user_id = ""
+        st.session_state.user_id = None
+    
+    # Validate existing session
+    if st.session_state.session_id:
+        username = validate_session(st.session_state.session_id)
+        if username:
+            st.session_state.authenticated = True
+            st.session_state.username = username
+            st.session_state.user_id = get_user_id(username)
+        else:
+            # Invalid session, clear state
+            st.session_state.session_id = None
+            st.session_state.authenticated = False
+            st.session_state.username = None
+            st.session_state.user_id = None
 
-def login_user(username: str):
-    """Log in a user."""
-    st.session_state.authenticated = True
-    st.session_state.username = username
-    st.session_state.user_id = get_user_id(username)
+def login_user(username: str, password: str) -> bool:
+    """Login user and create session."""
+    if authenticate_user(username, password):
+        session_id = create_session(username)
+        st.session_state.session_id = session_id
+        st.session_state.authenticated = True
+        st.session_state.username = username
+        st.session_state.user_id = get_user_id(username)
+        return True
+    return False
 
-def logout_user():
-    """Log out the current user."""
+def logout_current_user():
+    """Logout current user."""
+    if st.session_state.session_id:
+        logout_user(st.session_state.session_id)
+    
+    # Clear session state
+    st.session_state.session_id = None
     st.session_state.authenticated = False
-    st.session_state.username = ""
-    st.session_state.user_id = ""
-    # Clear conversation data
-    if "conversations" in st.session_state:
-        del st.session_state.conversations
-    if "current_conversation_id" in st.session_state:
-        del st.session_state.current_conversation_id
+    st.session_state.username = None
+    st.session_state.user_id = None
+    
+    # Clear conversation state
+    keys_to_clear = [k for k in st.session_state.keys() if 'conversation' in k.lower()]
+    for key in keys_to_clear:
+        del st.session_state[key]
 
-def render_auth_page():
-    """Render the authentication page."""
-    # Custom CSS for auth page
-    st.markdown("""
-    <style>
-        .auth-header {
-            text-align: center;
-            padding: 2rem 0;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 15px;
-            color: white;
-            margin-bottom: 2rem;
-        }
-        .auth-form {
-            max-width: 400px;
-            margin: 0 auto;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+def load_user_conversations(user_id: str) -> Dict:
+    """Load conversations for a specific user."""
+    conv_file = os.path.join(USER_DATA_DIR, f"conversations_{user_id}", "conversations.json")
+    try:
+        if os.path.exists(conv_file):
+            with open(conv_file, 'r') as f:
+                content = f.read().strip()
+                if not content:
+                    # Empty file, return empty dict
+                    return {}
+                return json.loads(content)
+    except json.JSONDecodeError as e:
+        st.warning(f"Corrupted conversation file for user {user_id}. Creating backup and starting fresh.")
+        # Backup corrupted file
+        if os.path.exists(conv_file):
+            backup_file = f"{conv_file}.backup_{int(time.time())}"
+            try:
+                import shutil
+                shutil.copy2(conv_file, backup_file)
+                os.remove(conv_file)  # Remove corrupted file
+            except Exception:
+                pass
+    except Exception as e:
+        st.error(f"Error loading conversations: {e}")
+    return {}
+
+def save_user_conversations(user_id: str, conversations: Dict):
+    """Save conversations for a specific user."""
+    conv_dir = os.path.join(USER_DATA_DIR, f"conversations_{user_id}")
+    os.makedirs(conv_dir, exist_ok=True)
+    conv_file = os.path.join(conv_dir, "conversations.json")
+    try:
+        with open(conv_file, 'w') as f:
+            json.dump(conversations, f, indent=2)
+    except Exception as e:
+        st.error(f"Error saving conversations: {e}")
+
+# Upload limit management
+def load_uploads() -> Dict:
+    """Load upload tracking data."""
+    ensure_user_data_dir()
+    try:
+        if os.path.exists(UPLOADS_FILE):
+            with open(UPLOADS_FILE, 'r') as f:
+                return json.load(f)
+    except Exception:
+        pass
+    return {}
+
+def save_uploads(uploads: Dict):
+    """Save upload tracking data."""
+    ensure_user_data_dir()
+    try:
+        with open(UPLOADS_FILE, 'w') as f:
+            json.dump(uploads, f, indent=2)
+    except Exception as e:
+        st.error(f"Error saving uploads: {e}")
+
+def can_user_upload(user_id: str) -> Tuple[bool, str]:
+    """Check if user can upload more files."""
+    # Always allow uploads - no limit
+    if UPLOAD_LIMIT_PER_DAY == -1:
+        return True, "Unlimited uploads allowed"
     
-    # Header
-    st.markdown("""
-    <div class="auth-header">
-        <h1>💊 PharmBot</h1>
-        <h3>AI-Powered Pharmacology Assistant</h3>
-        <p>Sign in to access your personal conversations</p>
-    </div>
-    """, unsafe_allow_html=True)
+    # Legacy code for if limits are re-enabled
+    uploads = load_uploads()
     
-    # Create tabs for login and signup
-    tab1, tab2 = st.tabs(["🔑 Sign In", "📝 Sign Up"])
+    if user_id not in uploads:
+        return True, "Upload allowed"
     
-    with tab1:
-        st.markdown("#### Welcome back!")
-        with st.form("login_form"):
-            username = st.text_input("Username", placeholder="Enter your username", help="Your unique username")
-            password = st.text_input("Password", type="password", placeholder="Enter your password")
-            remember_me = st.checkbox("Remember me", help="Stay signed in for 24 hours")
-            login_button = st.form_submit_button("Sign In", use_container_width=True, type="primary")
-            
-            if login_button:
-                success, message = authenticate_user(username, password)
-                if success:
-                    login_user(username)
-                    st.success(message)
-                    st.rerun()
-                else:
-                    st.error(message)
+    user_uploads = uploads[user_id]
+    now = datetime.now()
     
-    with tab2:
-        st.markdown("#### Create your account")
-        with st.form("signup_form"):
-            new_username = st.text_input(
-                "Choose Username", 
-                placeholder="Enter a unique username (3+ characters)",
-                help="Username must be at least 3 characters long"
-            )
-            new_email = st.text_input(
-                "Email (optional)", 
-                placeholder="your.email@example.com",
-                help="Optional: for account recovery"
-            )
-            new_password = st.text_input(
-                "Choose Password", 
-                type="password", 
-                placeholder="Enter a secure password (6+ characters)",
-                help="Password must be at least 6 characters long"
-            )
-            confirm_password = st.text_input(
-                "Confirm Password", 
-                type="password", 
-                placeholder="Confirm your password"
-            )
+    # Count uploads in last 24 hours
+    recent_uploads = 0
+    for upload in user_uploads:
+        upload_time = datetime.fromisoformat(upload["timestamp"])
+        if now - upload_time < timedelta(hours=24):
+            recent_uploads += 1
+    
+    if recent_uploads >= UPLOAD_LIMIT_PER_DAY:
+        return False, f"Upload limit reached ({UPLOAD_LIMIT_PER_DAY} files per 24 hours)"
+    
+    return True, f"Upload allowed ({recent_uploads}/{UPLOAD_LIMIT_PER_DAY} used)"
+
+def record_user_upload(user_id: str, filename: str, file_size: int):
+    """Record a user upload."""
+    uploads = load_uploads()
+    
+    if user_id not in uploads:
+        uploads[user_id] = []
+    
+    uploads[user_id].append({
+        "filename": filename,
+        "file_size": file_size,
+        "timestamp": datetime.now().isoformat()
+    })
+    
+    save_uploads(uploads)
+
+def verify_user_data_isolation() -> Tuple[bool, str]:
+    """Verify that user data is properly isolated."""
+    try:
+        users = load_users()
+        user_dirs = []
+        
+        # Check for user-specific directories
+        if os.path.exists(USER_DATA_DIR):
+            for item in os.listdir(USER_DATA_DIR):
+                if item.startswith("conversations_") or item.startswith("rag_"):
+                    user_dirs.append(item)
+        
+        # Verify each directory belongs to a valid user
+        valid_user_ids = set()
+        for username, user_data in users.items():
+            valid_user_ids.add(user_data["user_id"])
+        
+        orphaned_dirs = []
+        for dir_name in user_dirs:
+            if dir_name.startswith("conversations_"):
+                user_id = dir_name.replace("conversations_", "")
+            elif dir_name.startswith("rag_"):
+                user_id = dir_name.replace("rag_", "")
+            else:
+                continue
             
-            # Terms checkbox
-            agree_terms = st.checkbox(
-                "I agree that this is for educational purposes only and will consult healthcare professionals for medical advice",
-                help="Required to create an account"
-            )
-            
-            signup_button = st.form_submit_button("Create Account", use_container_width=True, type="primary")
-            
-            if signup_button:
-                if not agree_terms:
-                    st.error("Please agree to the terms to create an account.")
-                elif new_password != confirm_password:
-                    st.error("Passwords do not match.")
-                else:
-                    success, message = create_user(new_username, new_password, new_email)
-                    if success:
-                        st.success(message)
-                        st.balloons()
-                        st.info("You can now sign in with your new account!")
+            if user_id not in valid_user_ids:
+                orphaned_dirs.append(dir_name)
+        
+        if orphaned_dirs:
+            return False, f"Found orphaned directories: {orphaned_dirs}"
+        
+        return True, "User data isolation verified"
+        
+    except Exception as e:
+        return False, f"Error verifying isolation: {e}"
+
+def cleanup_orphaned_data() -> List[str]:
+    """Clean up orphaned user data directories."""
+    try:
+        users = load_users()
+        valid_user_ids = set()
+        for username, user_data in users.items():
+            valid_user_ids.add(user_data["user_id"])
+        
+        cleaned = []
+        if os.path.exists(USER_DATA_DIR):
+            for item in os.listdir(USER_DATA_DIR):
+                if item.startswith("conversations_") or item.startswith("rag_"):
+                    if item.startswith("conversations_"):
+                        user_id = item.replace("conversations_", "")
+                    elif item.startswith("rag_"):
+                        user_id = item.replace("rag_", "")
                     else:
-                        st.error(message)
-    
-    # Features section
-    st.markdown("---")
-    st.markdown("### ✨ Why Create an Account?")
-    
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown("""
-        **🔒 Private Conversations**
+                        continue
+                    
+                    if user_id not in valid_user_ids:
+                        import shutil
+                        dir_path = os.path.join(USER_DATA_DIR, item)
+                        shutil.rmtree(dir_path, ignore_errors=True)
+                        cleaned.append(item)
         
-        Your chats are completely private and separated from other users.
-        """)
-    
-    with col2:
-        st.markdown("""
-        **💾 Saved History**
+        return cleaned
         
-        Access your conversation history anytime, anywhere.
-        """)
+    except Exception as e:
+        st.error(f"Error cleaning orphaned data: {e}")
+        return []
+
+def get_user_upload_count(user_id: str) -> int:
+    """Get the number of uploads for a user in the last 24 hours."""
+    # If unlimited uploads, return total uploads today for stats
+    uploads = load_uploads()
     
-    with col3:
-        st.markdown("""
-        **🎯 Personalized Experience**
-        
-        Tailored pharmacology assistance based on your interests.
-        """)
+    if user_id not in uploads:
+        return 0
     
-    # Footer
-    st.markdown("---")
-    st.markdown("""
-    <div style="text-align: center; color: #666; font-size: 0.9rem;">
-        <p>🔒 <strong>Privacy:</strong> Your data is stored locally and never shared</p>
-        <p>⚠️ <strong>Disclaimer:</strong> Educational purposes only - Always consult healthcare professionals</p>
-        <p>🛡️ <strong>Security:</strong> Passwords are hashed and salted for maximum security</p>
-    </div>
-    """, unsafe_allow_html=True)
+    user_uploads = uploads[user_id]
+    now = datetime.now()
+    
+    # Count uploads in last 24 hours
+    recent_uploads = 0
+    for upload in user_uploads:
+        try:
+            upload_time = datetime.fromisoformat(upload["timestamp"])
+            if now - upload_time < timedelta(hours=24):
+                recent_uploads += 1
+        except Exception:
+            continue
+    
+    return recent_uploads
