@@ -85,7 +85,10 @@ class RecursiveCharacterTextSplitter:
         
         return chunks
 
-from config import USER_DATA_DIR, CHUNK_SIZE, CHUNK_OVERLAP, MAX_SEARCH_RESULTS
+from config import CHUNK_SIZE, CHUNK_OVERLAP, MAX_SEARCH_RESULTS
+
+# Default user data directory for RAG system
+USER_DATA_DIR = "user_data"
 
 class ConversationRAGSystem:
     """RAG system for conversation-specific document storage and retrieval."""
