@@ -48,11 +48,11 @@ class ConversationService:
                 'conversation_id': conversation_id,
                 'user_id': user_uuid,
                 'title': title,
-                'messages': [],  # Empty message array - will be handled as JSONB by Supabase
+                'messages': json.dumps([]),  # Ensure JSONB format for Supabase
                 'model': model or 'meta-llama/llama-4-maverick-17b-128e-instruct',
                 'created_at': datetime.now().isoformat(),
-                'is_archived': False
-                # message_count will be set automatically by trigger
+                'is_archived': False,
+                'message_count': 0  # Explicitly set to avoid trigger issues
             }
             
             result = self.connection_manager.execute_query(
@@ -183,8 +183,12 @@ class ConversationService:
             if not safe_data:
                 return False
             
-            # Handle messages update - message_count will be updated by trigger
-            # No need to manually set message_count as it's handled by the database trigger
+            # Handle messages update
+            if 'messages' in safe_data:
+                # Ensure messages are properly formatted as JSON string for JSONB
+                if isinstance(safe_data['messages'], list):
+                    safe_data['messages'] = json.dumps(safe_data['messages'])
+                safe_data['message_count'] = len(data['messages']) if isinstance(data['messages'], list) else 0
             
             safe_data['updated_at'] = datetime.now().isoformat()
             

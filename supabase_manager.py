@@ -29,15 +29,21 @@ def validate_order_clause(order_clause: str) -> str:
     if not order_clause:
         return 'created_at.desc'
     
+    original_clause = order_clause
+    
     # Remove any duplicate direction specifiers
     if '.desc.asc' in order_clause:
         order_clause = order_clause.replace('.desc.asc', '.desc')
+        logger.warning(f"Fixed malformed order clause: {original_clause} -> {order_clause}")
     elif '.asc.desc' in order_clause:
         order_clause = order_clause.replace('.asc.desc', '.asc')
+        logger.warning(f"Fixed malformed order clause: {original_clause} -> {order_clause}")
     elif '.desc.desc' in order_clause:
         order_clause = order_clause.replace('.desc.desc', '.desc')
+        logger.warning(f"Fixed malformed order clause: {original_clause} -> {order_clause}")
     elif '.asc.asc' in order_clause:
         order_clause = order_clause.replace('.asc.asc', '.asc')
+        logger.warning(f"Fixed malformed order clause: {original_clause} -> {order_clause}")
     
     # Ensure proper format
     if '.' not in order_clause:
@@ -160,8 +166,26 @@ class SupabaseConnectionManager:
                     result = result.limit(kwargs['limit'])
                 
                 if 'order' in kwargs:
-                    validated_order = validate_order_clause(kwargs['order'])
-                    result = result.order(validated_order)
+                    order_param = kwargs['order']
+                    # Aggressive fix for malformed order clauses
+                    clean_order = str(order_param)
+                    
+                    # Remove any .asc that might be appended incorrectly
+                    if clean_order.endswith('.desc.asc'):
+                        clean_order = clean_order[:-4]  # Remove .asc
+                    elif clean_order.endswith('.asc.desc'):
+                        clean_order = clean_order[:-5] + '.asc'  # Keep .asc, remove .desc
+                    elif clean_order.endswith('.desc.desc'):
+                        clean_order = clean_order[:-5]  # Remove duplicate .desc
+                    elif clean_order.endswith('.asc.asc'):
+                        clean_order = clean_order[:-4]  # Remove duplicate .asc
+                    
+                    # Ensure proper format
+                    if '.' not in clean_order:
+                        clean_order = f"{clean_order}.desc"
+                    
+                    logger.info(f"Order clause fixed: '{order_param}' -> '{clean_order}'")
+                    result = result.order(clean_order)
                 
                 return result.execute()
             
