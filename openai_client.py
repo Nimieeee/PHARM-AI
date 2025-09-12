@@ -11,3 +11,15 @@ def chat_completion(model: str, messages: list):
     """Get a standard chat completion response."""
     response = openai.chat.completions.create(model=model, messages=messages)
     return response.choices[0].message.content
+
+def chat_completion_stream(model: str, messages: list):
+    """Get a streaming chat completion response."""
+    stream = openai.chat.completions.create(
+        model=model, 
+        messages=messages,
+        stream=True
+    )
+    
+    for chunk in stream:
+        if chunk.choices[0].delta.content is not None:
+            yield chunk.choices[0].delta.content

@@ -9,7 +9,7 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 
 ## ✨ Features
 
-- **🤖 AI-Powered**: Uses OpenRouter with Sonoma Sky Alpha model for expert pharmacology responses
+- **🤖 AI-Powered**: Uses Groq API with Llama 4 Maverick model for fast, expert pharmacology responses
 - **💬 ChatGPT-Style Interface**: Modern conversation management with search and organization
 - **🎨 Beautiful UI**: System-aware design that adapts to light/dark mode preferences
 - **📚 Educational Focus**: Specialized for pharmacology learning and research
@@ -20,7 +20,7 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 
 ### Prerequisites
 - Python 3.8 or higher
-- OpenRouter API key ([Get one here](https://openrouter.ai/keys))
+- Groq API key ([Get one here](https://console.groq.com/keys))
 
 ### Installation
 
@@ -38,7 +38,7 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 3. **Set up environment variables**:
    ```bash
    cp .env.example .env
-   # Edit .env and add your OpenRouter API key
+   # Edit .env and add your Groq API key
    ```
 
 4. **Run the application**:
@@ -69,7 +69,7 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit that provid
 pharmbot/
 ├── streamlit_app.py      # Main Streamlit application
 ├── config.py            # Configuration and API setup
-├── openai_client.py     # OpenRouter client
+├── openai_client.py     # Groq API client
 ├── prompts.py           # AI system prompts
 ├── drug_database.py     # Drug reference database
 ├── main.py              # CLI utilities
@@ -100,11 +100,17 @@ pharmbot/
 
 ## 🔧 Configuration
 
-The app uses OpenRouter's Sonoma Sky Alpha model by default. You can modify the model in `streamlit_app.py`:
+The app uses Groq's Llama 4 Maverick model by default. You can modify the model in `streamlit_app.py`:
 
 ```python
-FIXED_MODEL = "openrouter/sonoma-sky-alpha"
+FIXED_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
 ```
+
+Available Groq models:
+- `meta-llama/llama-4-maverick-17b-128e-instruct` (Current - Latest Llama 4 model)
+- `llama-3.1-70b-versatile` (Alternative - Best balance of speed and quality)
+- `llama-3.1-8b-instant` (Fastest)
+- `mixtral-8x7b-32768` (Good for longer contexts)
 
 ## 🤝 Contributing
 
@@ -136,7 +142,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - Built with [Streamlit](https://streamlit.io/)
-- Powered by [OpenRouter](https://openrouter.ai/)
+- Powered by [Groq](https://groq.com/)
 - Icons and emojis from various sources
 - Inspired by modern AI chat interfaces
 

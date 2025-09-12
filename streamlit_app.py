@@ -1,11 +1,12 @@
 import streamlit as st
-from openai_client import chat_completion
+from openai_client import chat_completion, chat_completion_stream
 from prompts import pharmacology_system_prompt
 from drug_database import get_drug_info, get_drug_categories, COMMON_DRUGS
 import json
 import uuid
 from datetime import datetime
 import re
+import time
 
 # Page configuration
 st.set_page_config(
@@ -15,8 +16,8 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Fixed model
-FIXED_MODEL = "openrouter/sonoma-sky-alpha"
+# Fixed model - Llama 4 Maverick for pharmacology
+FIXED_MODEL = "meta-llama/llama-4-maverick-17b-128e-instruct"
 
 # System-aware CSS that adapts to light/dark mode
 st.markdown("""
@@ -286,6 +287,23 @@ def get_bot_response(user_input: str, model: str) -> str:
     except Exception as e:
         return f"Error: {str(e)}"
 
+def get_bot_response_stream(user_input: str, model: str):
+    """Get streaming response from the selected model."""
+    try:
+        messages = [{"role": "system", "content": pharmacology_system_prompt}]
+        
+        # Add conversation history
+        current_messages = get_current_messages()
+        for msg in current_messages[-10:]:  # Keep last 10 messages for context
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        
+        # Add current user input
+        messages.append({"role": "user", "content": user_input})
+        
+        return chat_completion_stream(model=model, messages=messages)
+    except Exception as e:
+        yield f"Error: {str(e)}"
+
 def render_sidebar():
     """Render the sidebar with conversations and settings."""
     with st.sidebar:
@@ -537,14 +555,31 @@ def main():
             with st.chat_message("user"):
                 st.markdown(prompt)
             
-            # Get and display bot response
+            # Get and display bot response with streaming
             with st.chat_message("assistant"):
-                with st.spinner("Analyzing..."):
-                    response = get_bot_response(prompt, FIXED_MODEL)
-                    st.markdown(response)
+                message_placeholder = st.empty()
+                full_response = ""
+                
+                try:
+                    # Show initial thinking message
+                    message_placeholder.markdown("🤔 Thinking...")
+                    
+                    for chunk in get_bot_response_stream(prompt, FIXED_MODEL):
+                        full_response += chunk
+                        # Update the display with current response + cursor
+                        message_placeholder.markdown(full_response + "▌")
+                        time.sleep(0.02)  # Small delay to make streaming visible
+                    
+                    # Remove cursor and show final response
+                    message_placeholder.markdown(full_response)
+                    
+                except Exception as e:
+                    error_msg = f"❌ Error: {str(e)}"
+                    message_placeholder.markdown(error_msg)
+                    full_response = error_msg
             
             # Add bot response to conversation
-            add_message_to_current_conversation("assistant", response)
+            add_message_to_current_conversation("assistant", full_response)
 
 if __name__ == "__main__":
     main()
