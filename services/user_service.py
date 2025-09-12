@@ -15,8 +15,15 @@ logger = logging.getLogger(__name__)
 
 def get_supabase_client():
     """Lazy import to avoid circular dependencies"""
-    from supabase_manager import get_supabase_client as _get_client
-    return _get_client()
+    try:
+        from supabase_manager import get_supabase_client as _get_client
+        return _get_client()
+    except ImportError as e:
+        # Handle circular import gracefully
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"Delayed import needed for supabase_manager: {e}")
+        return None
 
 # User data cache to prevent duplicate database calls
 _user_cache = {}
@@ -26,7 +33,20 @@ class UserService:
     """Service class for user account management operations."""
     
     def __init__(self):
-        self.supabase = get_supabase_client()
+        self.supabase = None  # Initialize lazily
+        self._initialized = False
+    
+    def _ensure_client(self):
+        """Ensure Supabase client is initialized."""
+        if not self._initialized:
+            try:
+                from supabase_manager import get_supabase_client as _get_client
+                self.supabase = _get_client()
+                self._initialized = True
+            except Exception as e:
+                logger.error(f"Failed to initialize Supabase client: {e}")
+                self.supabase = None
+        return self.supabase
     
     def _hash_password(self, password: str, salt: str = None) -> Tuple[str, str]:
         """Hash password with salt for secure storage."""
@@ -115,7 +135,7 @@ class UserService:
         logger.info(f"🔐 USER_SERVICE.AUTHENTICATE_USER called for user: {username}")
         
         try:
-            if not self.supabase:
+            if not self._ensure_client():
                 logger.error("❌ No Supabase client available")
                 return False, "Database connection not available", None
                 
@@ -169,7 +189,7 @@ class UserService:
                 del _user_cache[cache_key]
         
         try:
-            if not self.supabase:
+            if not self._ensure_client():
                 logger.error("❌ No Supabase client available")
                 return None
                 

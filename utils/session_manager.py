@@ -27,17 +27,23 @@ def initialize_session_state():
     
     # Smart caching - avoid repeated initialization within same session
     cache_key = "last_auth_init_time"
+    init_marker = "auth_initialized_this_run"
     current_time = time.time()
+    
+    # Check if we've already initialized auth in this very session run
+    if init_marker in st.session_state:
+        logger.info("💾 Skipping auth initialization (already done this run)")
+        return
     
     # Only re-initialize auth if it's been more than 10 seconds or not initialized
     if (cache_key not in st.session_state or
-        current_time - st.session_state[cache_key] > 10.0 or
-        not st.session_state.get('authenticated', False)):
+        current_time - st.session_state.get(cache_key, 0) > 10.0):
         
         logger.info("🆕 Running auth initialization (cache miss or timeout)")
         from auth import initialize_auth_session
         initialize_auth_session()
         st.session_state[cache_key] = current_time
+        st.session_state[init_marker] = True
     else:
         logger.info("💾 Skipping auth initialization (cached)")
     
