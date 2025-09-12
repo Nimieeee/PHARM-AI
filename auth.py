@@ -33,7 +33,7 @@ _cache_timeout_seconds = 30  # Cache session validation for 30 seconds
 def create_user(username: str, password: str) -> Tuple[bool, str]:
     """Create a new user account using Supabase."""
     try:
-        success, message = run_async(user_service.create_user(username, password))
+        success, message = user_service.create_user(username, password)
         return success, message
     except Exception as e:
         return False, f"Error creating account: {str(e)}"
@@ -41,7 +41,7 @@ def create_user(username: str, password: str) -> Tuple[bool, str]:
 def authenticate_user(username: str, password: str) -> Tuple[bool, str]:
     """Authenticate user credentials using Supabase."""
     try:
-        success, message, user_data = run_async(user_service.authenticate_user(username, password))
+        success, message, user_data = user_service.authenticate_user(username, password)
         return success, message
     except Exception as e:
         return False, f"Authentication error: {str(e)}"
@@ -50,11 +50,11 @@ def create_session(username: str) -> str:
     """Create a new session for user using Supabase."""
     try:
         # Get user data first
-        user_data = run_async(user_service.get_user_by_username(username))
+        user_data = user_service.get_user_by_username(username)
         if not user_data:
             raise Exception("User not found")
         
-        session_id = run_async(session_service.create_session(username, user_data['id']))
+        session_id = session_service.create_session(username, user_data['id'])
         return session_id
     except Exception as e:
         st.error(f"Error creating session: {str(e)}")
@@ -82,7 +82,7 @@ def validate_session(session_id: str) -> Optional[str]:
             del _session_cache[cache_key]
     
     try:
-        session_data = run_async(session_service.validate_session(session_id))
+        session_data = session_service.validate_session(session_id)
         if session_data:
             username = session_data['username']
             # Cache successful validation
@@ -99,14 +99,14 @@ def validate_session(session_id: str) -> Optional[str]:
 def logout_user(session_id: str):
     """Logout user by removing session using Supabase."""
     try:
-        run_async(session_service.logout_session(session_id))
+        session_service.logout_session(session_id)
     except Exception as e:
         st.error(f"Error logging out: {str(e)}")
 
 def get_user_id(username: str) -> Optional[str]:
     """Get user ID for username using Supabase."""
     try:
-        user_data = run_async(user_service.get_user_by_username(username))
+        user_data = user_service.get_user_by_username(username)
         if user_data:
             return user_data['user_id']  # Legacy user_id field
         return None
@@ -194,7 +194,7 @@ def load_user_conversations(user_id: str) -> Dict:
         if not user_data:
             return {}
         
-        conversations = run_async(conversation_service.get_user_conversations(user_data['id']))
+        conversations = conversation_service.get_user_conversations(user_data['id'])
         return conversations
     except Exception as e:
         st.error(f"Error loading conversations: {e}")
@@ -211,11 +211,11 @@ def save_user_conversations(user_id: str, conversations: Dict):
         
         # Update each conversation in Supabase
         for conv_id, conv_data in conversations.items():
-            run_async(conversation_service.update_conversation(
-                user_data['id'], 
-                conv_id, 
+            conversation_service.update_conversation(
+                user_data['id'],
+                conv_id,
                 conv_data
-            ))
+            )
     except Exception as e:
         st.error(f"Error saving conversations: {e}")
 
