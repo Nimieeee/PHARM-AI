@@ -27,7 +27,7 @@ def create_new_conversation():
     """Create a new conversation using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+        user_data = user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
             st.error("User not found")
             return None
@@ -76,7 +76,7 @@ def add_message_to_current_conversation(role: str, content: str):
             create_new_conversation()
         
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+        user_data = user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
             st.error("User not found")
             return
@@ -124,7 +124,7 @@ def delete_conversation(conversation_id: str):
     try:
         if conversation_id in st.session_state.conversations:
             # Get user UUID from legacy user_id
-            user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+            user_data = user_service.get_user_by_id(st.session_state.user_id)
             if not user_data:
                 st.error("User not found")
                 return
@@ -167,7 +167,7 @@ def duplicate_conversation(conversation_id: str):
             return None
         
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+        user_data = user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
             st.error("User not found")
             return None

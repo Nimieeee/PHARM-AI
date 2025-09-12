@@ -161,6 +161,13 @@ def render_chat_interface():
                 help="Upload document (Max 10MB, unlimited uploads)",
                 label_visibility="collapsed"
             )
+            
+            # Check file size if file is uploaded
+            if uploaded_file is not None:
+                file_size_mb = uploaded_file.size / (1024 * 1024)
+                if file_size_mb > 10:
+                    st.error(f"File size ({file_size_mb:.1f}MB) exceeds the 10MB limit. Please upload a smaller file.")
+                    uploaded_file = None
         
         with col3:
             send_clicked = st.button("Send", type="primary", use_container_width=True)

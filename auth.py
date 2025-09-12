@@ -144,7 +144,7 @@ def load_user_conversations(user_id: str) -> Dict:
     """Load conversations for a specific user using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(user_id))
+        user_data = user_service.get_user_by_id(user_id)
         if not user_data:
             return {}
         
@@ -158,7 +158,7 @@ def save_user_conversations(user_id: str, conversations: Dict):
     """Save conversations for a specific user using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(user_id))
+        user_data = user_service.get_user_by_id(user_id)
         if not user_data:
             st.error(f"User not found: {user_id}")
             return
@@ -182,7 +182,7 @@ def can_user_upload(user_id: str) -> Tuple[bool, str]:
     
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(user_id))
+        user_data = user_service.get_user_by_id(user_id)
         if not user_data:
             return False, "User not found"
         
@@ -210,7 +210,7 @@ def record_user_upload(user_id: str, filename: str, file_size: int):
     """Record a user upload using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(user_id))
+        user_data = user_service.get_user_by_id(user_id)
         if not user_data:
             st.error(f"User not found: {user_id}")
             return

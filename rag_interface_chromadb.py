@@ -41,7 +41,7 @@ def display_rag_sidebar(conversation_id: str):
     
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+        user_data = user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
             st.sidebar.error("User not found")
             return
@@ -156,7 +156,7 @@ def get_conversation_document_count(conversation_id: str = None) -> int:
     
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+        user_data = user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
             return 0
         
@@ -176,7 +176,7 @@ def get_all_user_documents_count() -> int:
     
     try:
         # Get user UUID from legacy user_id
-        user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+        user_data = user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
             return 0
         
