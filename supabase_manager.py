@@ -167,25 +167,24 @@ class SupabaseConnectionManager:
                 
                 if 'order' in kwargs:
                     order_param = kwargs['order']
-                    # Aggressive fix for malformed order clauses
-                    clean_order = str(order_param)
+                    logger.info(f"Original order parameter: '{order_param}'")
                     
-                    # Remove any .asc that might be appended incorrectly
-                    if clean_order.endswith('.desc.asc'):
-                        clean_order = clean_order[:-4]  # Remove .asc
-                    elif clean_order.endswith('.asc.desc'):
-                        clean_order = clean_order[:-5] + '.asc'  # Keep .asc, remove .desc
-                    elif clean_order.endswith('.desc.desc'):
-                        clean_order = clean_order[:-5]  # Remove duplicate .desc
-                    elif clean_order.endswith('.asc.asc'):
-                        clean_order = clean_order[:-4]  # Remove duplicate .asc
+                    # Parse column and direction
+                    if '.' in str(order_param):
+                        column, direction = str(order_param).rsplit('.', 1)
+                        # Ensure only valid directions
+                        if direction not in ['asc', 'desc']:
+                            direction = 'desc'
+                    else:
+                        column = str(order_param)
+                        direction = 'desc'
                     
-                    # Ensure proper format
-                    if '.' not in clean_order:
-                        clean_order = f"{clean_order}.desc"
+                    # Reconstruct clean order
+                    clean_order = f"{column}.{direction}"
+                    logger.info(f"Clean order clause: '{clean_order}'")
                     
-                    logger.info(f"Order clause fixed: '{order_param}' -> '{clean_order}'")
-                    result = result.order(clean_order)
+                    # Use the order method with explicit column and direction
+                    result = result.order(column, desc=(direction == 'desc'))
                 
                 return result.execute()
             

@@ -485,6 +485,49 @@ class ConversationService:
         logger.info(f"Batch updated {success_count}/{len(updates)} conversations")
         return success_count
 
+
+    async def create_conversation_simple(self, user_uuid: str, title: str, model: str = None) -> str:
+        """
+        Simple conversation creation without relying on database triggers.
+        Fallback method for when the main creation fails.
+        """
+        try:
+            conversation_id = self._generate_conversation_id()
+            
+            # Use minimal data to avoid trigger issues
+            conversation_data = {
+                'conversation_id': conversation_id,
+                'user_id': user_uuid,
+                'title': title,
+                'model': model or 'meta-llama/llama-4-maverick-17b-128e-instruct',
+                'created_at': datetime.now().isoformat(),
+                'is_archived': False
+                # Don't include messages or message_count to avoid trigger
+            }
+            
+            result = self.connection_manager.execute_query(
+                table='conversations',
+                operation='insert',
+                data=conversation_data
+            )
+            
+            if result.data:
+                # Manually add empty messages array after creation
+                await self.update_conversation(
+                    user_uuid,
+                    conversation_id,
+                    {'messages': [], 'message_count': 0}
+                )
+                logger.info(f"Conversation created (simple): {conversation_id}")
+                return conversation_id
+            else:
+                raise SupabaseError("Failed to create conversation")
+                
+        except Exception as e:
+            logger.error(f"Error creating simple conversation: {str(e)}")
+            raise SupabaseError(f"Simple conversation creation failed: {str(e)}")
+
+
 # Global conversation service instance
 conversation_service = ConversationService()
 
