@@ -58,7 +58,8 @@ class ConversationService:
                 
                 conversation_data = {
                     'conversation_id': conversation_id,
-                    'user_id': user_uuid,
+                    'user_uuid': user_uuid,  # Primary field
+                    'user_id': user_uuid,    # Legacy compatibility
                     'title': title,
                     'model': model or 'meta-llama/llama-4-maverick-17b-128e-instruct',
                     'created_at': datetime.now().isoformat(),
@@ -537,7 +538,8 @@ class ConversationService:
                 # Fallback to minimal insert without messages field
                 minimal_data = {
                     'conversation_id': conversation_id,
-                    'user_id': user_uuid,
+                    'user_uuid': user_uuid,  # Primary field
+                    'user_id': user_uuid,    # Legacy compatibility
                     'title': title,
                     'model': model,
                     'created_at': datetime.now().isoformat(),

@@ -46,7 +46,8 @@ class DocumentService:
             
             document_metadata = {
                 'document_hash': doc_data['document_hash'],
-                'user_id': user_uuid,
+                'user_uuid': user_uuid,  # Primary field
+                'user_id': user_uuid,    # Legacy compatibility
                 'conversation_id': conversation_id,
                 'filename': doc_data['filename'],
                 'file_type': doc_data['file_type'],
