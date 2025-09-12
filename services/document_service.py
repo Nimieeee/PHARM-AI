@@ -10,7 +10,30 @@ from typing import Dict, List, Optional, Tuple
 import streamlit as st
 import logging
 
-from supabase_manager import connection_manager, SupabaseError, ErrorHandler
+# Lazy import to avoid circular dependencies
+def get_connection_manager():
+    """Get connection manager with lazy import."""
+    try:
+        from supabase_manager import connection_manager
+        return connection_manager
+    except ImportError:
+        return None
+
+def get_supabase_error():
+    """Get SupabaseError with lazy import."""
+    try:
+        from supabase_manager import SupabaseError
+        return SupabaseError
+    except ImportError:
+        return Exception
+
+def get_error_handler():
+    """Get ErrorHandler with lazy import."""
+    try:
+        from supabase_manager import ErrorHandler
+        return ErrorHandler
+    except ImportError:
+        return None
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +41,13 @@ class DocumentService:
     """Service class for document metadata management in RAG system."""
     
     def __init__(self):
-        self.connection_manager = connection_manager
+        self.connection_manager = None  # Initialize lazily
+    
+    def _get_connection_manager(self):
+        """Get connection manager with lazy loading."""
+        if self.connection_manager is None:
+            self.connection_manager = get_connection_manager()
+        return self.connection_manager
     
     def _generate_document_hash(self, content: str, filename: str, conversation_id: str) -> str:
         """Generate unique hash for document content in conversation context."""
@@ -61,7 +90,7 @@ class DocumentService:
                 'is_processed': doc_data.get('is_processed', True)
             }
             
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='upsert',
                 data=document_metadata
@@ -90,7 +119,7 @@ class DocumentService:
             List[Dict]: List of document metadata
         """
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='select',
                 eq={
@@ -137,7 +166,7 @@ class DocumentService:
             List[Dict]: List of document metadata
         """
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='select',
                 eq={'user_id': user_uuid},
@@ -182,7 +211,7 @@ class DocumentService:
             Optional[Dict]: Document metadata or None if not found
         """
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='select',
                 eq={
@@ -226,7 +255,7 @@ class DocumentService:
             bool: Success status
         """
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='delete',
                 eq={
@@ -254,10 +283,18 @@ class DocumentService:
             int: Number of documents deleted
         """
         try:
-            # First get the documents to count them
-            documents = await self.get_conversation_documents(user_uuid, conversation_id)
+            # Get documents directly from database to count them
+            doc_result = self._get_connection_manager().execute_query(
+                table='documents',
+                operation='select',
+                eq={
+                    'user_id': user_uuid,
+                    'conversation_id': conversation_id
+                }
+            )
+            documents = doc_result.data if doc_result.data else []
             
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='delete',
                 eq={
@@ -293,7 +330,7 @@ class DocumentService:
                 'processing_error': processing_error
             }
             
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='update',
                 data=update_data,
@@ -328,9 +365,38 @@ class DocumentService:
         try:
             # Get documents to search
             if conversation_id:
-                documents = await self.get_conversation_documents(user_uuid, conversation_id)
+                result = self._get_connection_manager().execute_query(
+                    table='documents',
+                    operation='select',
+                    eq={
+                        'user_id': user_uuid,
+                        'conversation_id': conversation_id
+                    },
+                    order='added_at.desc'
+                )
             else:
-                documents = await self.get_user_documents(user_uuid)
+                result = self._get_connection_manager().execute_query(
+                    table='documents',
+                    operation='select',
+                    eq={'user_id': user_uuid},
+                    order='added_at.desc'
+                )
+            
+            documents = []
+            if result.data:
+                for doc in result.data:
+                    documents.append({
+                        'document_hash': doc['document_hash'],
+                        'filename': doc['filename'],
+                        'file_type': doc['file_type'],
+                        'file_size': doc['file_size'],
+                        'content': doc.get('content', ''),
+                        'chunk_count': doc.get('chunk_count', 0),
+                        'added_at': doc['added_at'],
+                        'is_processed': doc.get('is_processed', True),
+                        'processing_error': doc.get('processing_error'),
+                        'metadata': json.loads(doc.get('metadata', '{}')) if doc.get('metadata') else {}
+                    })
             
             # Search in filenames and metadata (client-side for now)
             results = []
@@ -373,7 +439,25 @@ class DocumentService:
     async def get_document_stats(self, user_uuid: str) -> Dict:
         """Get document statistics for a user."""
         try:
-            documents = await self.get_user_documents(user_uuid)
+            result = self._get_connection_manager().execute_query(
+                table='documents',
+                operation='select',
+                eq={'user_id': user_uuid},
+                order='added_at.desc'
+            )
+            
+            documents = []
+            if result.data:
+                for doc in result.data:
+                    documents.append({
+                        'document_hash': doc['document_hash'],
+                        'filename': doc['filename'],
+                        'file_type': doc['file_type'],
+                        'file_size': doc['file_size'],
+                        'chunk_count': doc.get('chunk_count', 0),
+                        'added_at': doc['added_at'],
+                        'conversation_id': doc['conversation_id']
+                    })
             
             total_documents = len(documents)
             total_size = sum(doc['file_size'] for doc in documents)
@@ -410,8 +494,16 @@ class DocumentService:
     async def get_conversation_document_count(self, user_uuid: str, conversation_id: str) -> int:
         """Get document count for a specific conversation."""
         try:
-            documents = await self.get_conversation_documents(user_uuid, conversation_id)
-            return len(documents)
+            result = self._get_connection_manager().execute_query(
+                table='documents',
+                operation='select',
+                columns='document_hash',
+                eq={
+                    'user_id': user_uuid,
+                    'conversation_id': conversation_id
+                }
+            )
+            return len(result.data) if result.data else 0
             
         except Exception as e:
             logger.error(f"Error getting document count for conversation {conversation_id}: {str(e)}")
@@ -420,7 +512,7 @@ class DocumentService:
     async def check_document_exists(self, user_uuid: str, document_hash: str, conversation_id: str) -> bool:
         """Check if a document already exists in a conversation."""
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='select',
                 columns='document_hash',
@@ -440,7 +532,7 @@ class DocumentService:
     async def update_document_metadata(self, user_uuid: str, document_hash: str, metadata: Dict) -> bool:
         """Update document metadata."""
         try:
-            result = self.connection_manager.execute_query(
+            result = self._get_connection_manager().execute_query(
                 table='documents',
                 operation='update',
                 data={'metadata': json.dumps(metadata)},
@@ -473,8 +565,19 @@ class DocumentService:
         success_count = 0
         
         for doc_hash in document_hashes:
-            if await self.delete_document(user_uuid, doc_hash):
-                success_count += 1
+            try:
+                result = self._get_connection_manager().execute_query(
+                    table='documents',
+                    operation='delete',
+                    eq={
+                        'user_id': user_uuid,
+                        'document_hash': doc_hash
+                    }
+                )
+                if result.data:
+                    success_count += 1
+            except Exception as e:
+                logger.error(f"Error deleting document {doc_hash}: {str(e)}")
         
         logger.info(f"Batch deleted {success_count}/{len(document_hashes)} documents")
         return success_count

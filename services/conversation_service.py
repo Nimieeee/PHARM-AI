@@ -283,19 +283,53 @@ class ConversationService:
     
     async def archive_conversation(self, user_uuid: str, conversation_id: str) -> bool:
         """Archive a conversation (soft delete)."""
-        return await self.update_conversation(
-            user_uuid, 
-            conversation_id, 
-            {'is_archived': True}
-        )
+        try:
+            result = self._get_connection_manager().execute_query(
+                table='conversations',
+                operation='update',
+                data={
+                    'is_archived': True,
+                    'updated_at': datetime.now().isoformat()
+                },
+                eq={
+                    'user_uuid': user_uuid,
+                    'conversation_id': conversation_id
+                }
+            )
+            
+            if result.data:
+                logger.info(f"Conversation archived: {conversation_id}")
+                return True
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error archiving conversation {conversation_id}: {str(e)}")
+            return False
     
     async def unarchive_conversation(self, user_uuid: str, conversation_id: str) -> bool:
         """Unarchive a conversation."""
-        return await self.update_conversation(
-            user_uuid, 
-            conversation_id, 
-            {'is_archived': False}
-        )
+        try:
+            result = self._get_connection_manager().execute_query(
+                table='conversations',
+                operation='update',
+                data={
+                    'is_archived': False,
+                    'updated_at': datetime.now().isoformat()
+                },
+                eq={
+                    'user_uuid': user_uuid,
+                    'conversation_id': conversation_id
+                }
+            )
+            
+            if result.data:
+                logger.info(f"Conversation unarchived: {conversation_id}")
+                return True
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error unarchiving conversation {conversation_id}: {str(e)}")
+            return False
     
     async def add_message(self, user_uuid: str, conversation_id: str, message: Dict) -> bool:
         """
@@ -372,11 +406,28 @@ class ConversationService:
     
     async def update_conversation_title(self, user_uuid: str, conversation_id: str, title: str) -> bool:
         """Update conversation title."""
-        return await self.update_conversation(
-            user_uuid,
-            conversation_id,
-            {'title': title}
-        )
+        try:
+            result = self._get_connection_manager().execute_query(
+                table='conversations',
+                operation='update',
+                data={
+                    'title': title,
+                    'updated_at': datetime.now().isoformat()
+                },
+                eq={
+                    'user_uuid': user_uuid,
+                    'conversation_id': conversation_id
+                }
+            )
+            
+            if result.data:
+                logger.info(f"Conversation title updated: {conversation_id}")
+                return True
+            return False
+            
+        except Exception as e:
+            logger.error(f"Error updating conversation title {conversation_id}: {str(e)}")
+            return False
     
     async def duplicate_conversation(self, user_uuid: str, conversation_id: str, new_title: str = None) -> Optional[str]:
         """

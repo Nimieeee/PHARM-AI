@@ -131,12 +131,21 @@ class SessionService:
             expires_at = datetime.fromisoformat(session_data['expires_at'].replace('Z', '+00:00'))
             if datetime.now() > expires_at.replace(tzinfo=None):
                 # Session expired, remove it
-                await self.logout_session(session_id)
+                self._get_connection_manager().execute_query(
+                    table='sessions',
+                    operation='delete',
+                    eq={'session_id': session_id}
+                )
                 logger.info(f"Expired session removed: {session_id}")
                 return None
             
             # Update last activity
-            await self.update_last_activity(session_id)
+            self._get_connection_manager().execute_query(
+                table='sessions',
+                operation='update',
+                data={'last_activity': datetime.now().isoformat()},
+                eq={'session_id': session_id}
+            )
             
             return session_data
             
