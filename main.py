@@ -1,7 +1,5 @@
 from openai_client import chat_completion
-from website import Website
 from prompts import system_prompt, user_prompt, pharmacology_system_prompt
-from streamer import stream_brochure
 import subprocess
 import sys
 
