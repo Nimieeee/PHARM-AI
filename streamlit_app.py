@@ -184,8 +184,14 @@ def create_new_conversation():
 
 def get_current_messages():
     """Get messages from current conversation."""
-    if st.session_state.current_conversation_id and st.session_state.current_conversation_id in st.session_state.conversations:
-        return st.session_state.conversations[st.session_state.current_conversation_id]["messages"]
+    try:
+        if (hasattr(st.session_state, 'current_conversation_id') and 
+            st.session_state.current_conversation_id and 
+            hasattr(st.session_state, 'conversations') and
+            st.session_state.current_conversation_id in st.session_state.conversations):
+            return st.session_state.conversations[st.session_state.current_conversation_id]["messages"]
+    except Exception:
+        pass
     return []
 
 def add_message_to_current_conversation(role: str, content: str):
@@ -300,7 +306,10 @@ def get_bot_response_stream(user_input: str, model: str):
         # Add current user input
         messages.append({"role": "user", "content": user_input})
         
-        return chat_completion_stream(model=model, messages=messages)
+        # Yield from the stream
+        for chunk in chat_completion_stream(model=model, messages=messages):
+            yield chunk
+            
     except Exception as e:
         yield f"Error: {str(e)}"
 
@@ -564,19 +573,34 @@ def main():
                     # Show initial thinking message
                     message_placeholder.markdown("🤔 Thinking...")
                     
+                    # Try streaming first
+                    stream_worked = False
                     for chunk in get_bot_response_stream(prompt, FIXED_MODEL):
+                        stream_worked = True
                         full_response += chunk
                         # Update the display with current response + cursor
                         message_placeholder.markdown(full_response + "▌")
                         time.sleep(0.02)  # Small delay to make streaming visible
                     
-                    # Remove cursor and show final response
-                    message_placeholder.markdown(full_response)
+                    # If streaming worked, show final response
+                    if stream_worked:
+                        message_placeholder.markdown(full_response)
+                    else:
+                        # Fallback to non-streaming if no chunks received
+                        message_placeholder.markdown("🔄 Falling back to standard response...")
+                        full_response = get_bot_response(prompt, FIXED_MODEL)
+                        message_placeholder.markdown(full_response)
                     
                 except Exception as e:
-                    error_msg = f"❌ Error: {str(e)}"
-                    message_placeholder.markdown(error_msg)
-                    full_response = error_msg
+                    # Fallback to non-streaming on error
+                    try:
+                        message_placeholder.markdown("🔄 Streaming failed, trying standard response...")
+                        full_response = get_bot_response(prompt, FIXED_MODEL)
+                        message_placeholder.markdown(full_response)
+                    except Exception as e2:
+                        error_msg = f"❌ Error: {str(e2)}"
+                        message_placeholder.markdown(error_msg)
+                        full_response = error_msg
             
             # Add bot response to conversation
             add_message_to_current_conversation("assistant", full_response)
