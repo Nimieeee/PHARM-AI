@@ -514,10 +514,10 @@ class ConversationService:
             # Raw SQL insert that bypasses triggers
             sql = """
             INSERT INTO conversations (
-                conversation_id, user_id, title, model, 
+                conversation_id, user_uuid, user_id, title, model, 
                 created_at, is_archived, messages, message_count
             ) VALUES (
-                %s, %s, %s, %s, 
+                %s, %s, %s, %s, %s, 
                 NOW(), false, '[]'::jsonb, 0
             )
             """
@@ -526,7 +526,7 @@ class ConversationService:
                 # Try using rpc to execute raw SQL
                 result = client.rpc('exec_sql', {
                     'sql': sql,
-                    'params': [conversation_id, user_uuid, title, model]
+                    'params': [conversation_id, user_uuid, user_uuid, title, model]
                 }).execute()
                 
                 logger.info(f"Conversation created via raw SQL: {conversation_id}")
