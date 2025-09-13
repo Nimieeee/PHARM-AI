@@ -183,22 +183,20 @@ def render_chat_input():
                 st.error("Failed to save your message. Please try again.")
                 return
             
-            # Display user message immediately
-            with st.chat_message("user"):
-                st.markdown(user_input.strip())
+            logger.info("✅ User message saved, generating AI response...")
             
             # Generate and display AI response
             generate_ai_response(user_input.strip())
             
-            # Don't rerun immediately - let the response complete first
+            logger.info("✅ AI response generation completed")
             
         except Exception as e:
             logger.error(f"Error processing message: {e}")
-            st.error("Failed to process your message. Please try again.")
+            st.error(f"Failed to process your message: {str(e)}")
 
 def generate_ai_response(user_prompt: str):
     """Generate and display AI response."""
-    logger.info("Generating AI response")
+    logger.info(f"Generating AI response for: {user_prompt[:50]}...")
     
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
@@ -271,8 +269,8 @@ def generate_ai_response(user_prompt: str):
                 success = run_async(add_message_to_current_conversation("assistant", full_response))
                 if success:
                     logger.info("✅ AI response saved to conversation")
-                    # Trigger a rerun after successful save
-                    st.rerun()
+                    # Don't rerun immediately - let the user see the response first
+                    # The response is already displayed in the UI above
                 else:
                     logger.error("❌ Failed to save AI response")
                     st.error("Failed to save the response. Please try again.")
