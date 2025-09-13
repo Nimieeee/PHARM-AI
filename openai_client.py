@@ -6,15 +6,16 @@ Supports both Groq and OpenRouter APIs with performance optimizations
 import openai
 from typing import Iterator, Dict, List
 import streamlit as st
-from config import MODEL_CONFIGS
+from config import get_model_configs
 import hashlib
 import json
 
 def get_available_model_modes() -> Dict:
     """Get available model modes based on API key availability."""
     available_modes = {}
+    model_configs = get_model_configs()
     
-    for mode, config in MODEL_CONFIGS.items():
+    for mode, config in model_configs.items():
         if config["api_key"]:
             available_modes[mode] = config
     
@@ -24,7 +25,8 @@ def get_available_model_modes() -> Dict:
 def get_client_for_model(model: str) -> openai.OpenAI:
     """Get OpenAI client for specific model - cached for performance."""
     # Find which config this model belongs to
-    for mode, config in MODEL_CONFIGS.items():
+    model_configs = get_model_configs()
+    for mode, config in model_configs.items():
         if config["model"] == model:
             if not config["api_key"]:
                 raise ValueError(f"API key not configured for {mode} mode")

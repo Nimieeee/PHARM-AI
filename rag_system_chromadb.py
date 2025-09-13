@@ -10,15 +10,18 @@ from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import streamlit as st
 
-# Import Supabase services
-try:
-    from services.document_service import document_service
-    from services.user_service import user_service
-    SUPABASE_AVAILABLE = True
-except ImportError:
-    SUPABASE_AVAILABLE = False
-    document_service = None
-    user_service = None
+# Import Supabase services (only when in Streamlit context)
+def _get_supabase_services():
+    """Get Supabase services if available and in Streamlit context."""
+    try:
+        # Only import if we're in a Streamlit context
+        if 'streamlit' in sys.modules:
+            from services.document_service import document_service
+            from services.user_service import user_service
+            return document_service, user_service, True
+    except ImportError:
+        pass
+    return None, None, False
 
 # Import PIL Image at module level
 try:
@@ -68,6 +71,9 @@ try:
 except ImportError:
     pass
 
+# Import sqlite3 after potential replacement
+import sqlite3
+
 # Lazy import flag - dependencies loaded only when needed
 DEPENDENCIES_AVAILABLE = None
 
@@ -86,7 +92,9 @@ def _check_dependencies():
             DEPENDENCIES_AVAILABLE = True
         except ImportError as e:
             DEPENDENCIES_AVAILABLE = False
-            st.warning(f"RAG system unavailable: {e}")
+            # Only show warning if in Streamlit context
+            if 'streamlit' in sys.modules:
+                st.warning(f"RAG system unavailable: {e}")
     return DEPENDENCIES_AVAILABLE
 
 # Simple text splitter class to avoid heavy dependencies
@@ -193,14 +201,29 @@ class ConversationRAGSystem:
             return True
             
         try:
-            # Initialize ChromaDB client
-            self.client = chromadb.PersistentClient(
-                path=self.chroma_dir,
-                settings=Settings(
-                    anonymized_telemetry=False,
-                    allow_reset=True
+            # Import dependencies here to catch specific errors
+            import chromadb
+            from chromadb.config import Settings
+            from sentence_transformers import SentenceTransformer
+            
+            # Initialize ChromaDB client with fallback
+            try:
+                self.client = chromadb.PersistentClient(
+                    path=self.chroma_dir,
+                    settings=Settings(
+                        anonymized_telemetry=False,
+                        allow_reset=True
+                    )
                 )
-            )
+            except Exception as chroma_error:
+                # Fallback: try in-memory client for Streamlit Cloud
+                st.warning("⚠️ Using temporary document storage (files will be lost on restart)")
+                self.client = chromadb.Client(
+                    settings=Settings(
+                        anonymized_telemetry=False,
+                        allow_reset=True
+                    )
+                )
             
             # Get or create collection
             collection_name = f"conv_{self.conversation_id}"
@@ -211,7 +234,8 @@ class ConversationRAGSystem:
             
             # Initialize embeddings model (cached globally)
             if 'global_embeddings_model' not in st.session_state:
-                st.session_state.global_embeddings_model = SentenceTransformer('all-MiniLM-L6-v2')
+                with st.spinner("🤖 Loading AI model for document processing..."):
+                    st.session_state.global_embeddings_model = SentenceTransformer('all-MiniLM-L6-v2')
             self.embeddings_model = st.session_state.global_embeddings_model
             
             # Initialize text splitter (lightweight, can be recreated)
@@ -233,8 +257,12 @@ class ConversationRAGSystem:
             self._initialized = True
             return True
             
+        except ImportError as e:
+            st.error(f"❌ RAG system dependencies missing: {e}")
+            st.info("💡 Some document processing features may not be available.")
+            return False
         except Exception as e:
-            st.error(f"Error initializing RAG system: {e}")
+            st.error(f"❌ Error initializing RAG system: {e}")
             self.client = None
             self.collection = None
             return False
@@ -260,7 +288,8 @@ class ConversationRAGSystem:
     async def _get_conversation_db_id(self, user_uuid: str, conversation_id: str) -> Optional[str]:
         """Get the actual database ID for a conversation from its conversation_id field."""
         try:
-            if SUPABASE_AVAILABLE:
+            # Only try if we're in Streamlit context
+            if 'streamlit' in sys.modules:
                 from supabase_manager import get_supabase_client
                 supabase = await get_supabase_client()
                 
@@ -277,7 +306,8 @@ class ConversationRAGSystem:
             
             return None
         except Exception as e:
-            st.warning(f"Error looking up conversation ID: {e}")
+            if 'streamlit' in sys.modules:
+                st.warning(f"Error looking up conversation ID: {e}")
             return None
     
     def _generate_document_hash(self, content: str, filename: str) -> str:
@@ -364,7 +394,7 @@ class ConversationRAGSystem:
     
     async def add_document(self, file_content: bytes, filename: str, file_type: str) -> bool:
         """Add document to the RAG system."""
-        if not DEPENDENCIES_AVAILABLE:
+        if not _check_dependencies():
             return False
             
         if not self._initialize_components():
@@ -438,8 +468,9 @@ class ConversationRAGSystem:
             }
             self._save_metadata(metadata)
             
-            # Save document to Supabase
-            if SUPABASE_AVAILABLE:
+            # Save document to Supabase (only in Streamlit context)
+            document_service, user_service, supabase_available = _get_supabase_services()
+            if supabase_available:
                 try:
                     # Get user UUID from legacy user_id
                     user_data = await user_service.get_user_by_id(self.user_id)
@@ -465,9 +496,11 @@ class ConversationRAGSystem:
                                 doc_data=doc_data
                             )
                         else:
-                            st.warning(f"Could not find conversation {self.conversation_id} in database")
+                            if 'streamlit' in sys.modules:
+                                st.warning(f"Could not find conversation {self.conversation_id} in database")
                 except Exception as e:
-                    st.warning(f"Document saved locally but failed to sync with database: {e}")
+                    if 'streamlit' in sys.modules:
+                        st.warning(f"Document saved locally but failed to sync with database: {e}")
             
             return True
             
@@ -477,7 +510,7 @@ class ConversationRAGSystem:
     
     async def add_image(self, image, filename: str) -> bool:
         """Add image to the RAG system using OCR."""
-        if not DEPENDENCIES_AVAILABLE or not self.collection:
+        if not _check_dependencies():
             return False
         
         try:
@@ -537,8 +570,9 @@ class ConversationRAGSystem:
             }
             self._save_metadata(metadata)
             
-            # Save image document to Supabase
-            if SUPABASE_AVAILABLE:
+            # Save image document to Supabase (only in Streamlit context)
+            document_service, user_service, supabase_available = _get_supabase_services()
+            if supabase_available:
                 try:
                     # Get user UUID from legacy user_id
                     user_data = await user_service.get_user_by_id(self.user_id)
@@ -564,9 +598,11 @@ class ConversationRAGSystem:
                                 doc_data=doc_data
                             )
                         else:
-                            st.warning(f"Could not find conversation {self.conversation_id} in database")
+                            if 'streamlit' in sys.modules:
+                                st.warning(f"Could not find conversation {self.conversation_id} in database")
                 except Exception as e:
-                    st.warning(f"Image saved locally but failed to sync with database: {e}")
+                    if 'streamlit' in sys.modules:
+                        st.warning(f"Image saved locally but failed to sync with database: {e}")
             
             return True
             
@@ -576,7 +612,7 @@ class ConversationRAGSystem:
     
     def search_documents(self, query: str, max_results: int = MAX_SEARCH_RESULTS) -> List[Dict]:
         """Search documents for relevant content."""
-        if not DEPENDENCIES_AVAILABLE:
+        if not _check_dependencies():
             return []
             
         if not self._initialize_components():
@@ -628,7 +664,7 @@ class ConversationRAGSystem:
     
     def delete_document(self, document_hash: str) -> bool:
         """Delete a document from the RAG system."""
-        if not DEPENDENCIES_AVAILABLE or not self.collection:
+        if not _check_dependencies():
             return False
         
         try:
@@ -671,7 +707,7 @@ def initialize_rag_system(conversation_id: str) -> Optional[ConversationRAGSyste
     if not st.session_state.authenticated or not st.session_state.user_id:
         return None
     
-    if not DEPENDENCIES_AVAILABLE:
+    if not _check_dependencies():
         return None
     
     try:

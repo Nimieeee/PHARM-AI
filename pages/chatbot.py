@@ -15,7 +15,14 @@ from openai_client import chat_completion_stream, chat_completion, get_available
 from prompts import pharmacology_system_prompt
 from rag_interface_chromadb import initialize_rag_system, get_rag_enhanced_prompt
 from auth import can_user_upload, record_user_upload
-from config import MODEL_CONFIGS
+from config import get_model_configs
+
+# Helper function to get model for selected mode
+def get_selected_model(mode_key="model_mode", default_mode="normal"):
+    """Get the selected model for the given mode."""
+    selected_mode = st.session_state.get(mode_key, default_mode)
+    model_configs = get_model_configs()
+    return model_configs[selected_mode]["model"]
 
 # Default model mode
 DEFAULT_MODE = "normal"
@@ -287,8 +294,7 @@ def handle_chat_input(prompt):
             messages = get_messages_for_api(enhanced_prompt)
 
             # Get selected model from mode
-            selected_mode = st.session_state.get("model_mode", DEFAULT_MODE)
-            selected_model = MODEL_CONFIGS[selected_mode]["model"]
+            selected_model = get_selected_model("model_mode", DEFAULT_MODE)
 
             # Generate streaming response with optimized updates
             message_placeholder.markdown("🔄 Generating response...")
@@ -350,8 +356,7 @@ def handle_chat_input(prompt):
             # Error fallback - still use enhanced prompt with RAG
             try:
                 logger.info("🔄 Trying non-streaming fallback...")
-                selected_mode = st.session_state.get("model_mode", DEFAULT_MODE)
-                selected_model = MODEL_CONFIGS[selected_mode]["model"]
+                selected_model = get_selected_model("model_mode", DEFAULT_MODE)
                 full_response = chat_completion(selected_model, get_messages_for_api(enhanced_prompt))
                 message_placeholder.markdown(full_response)
                 logger.info(f"✅ Non-streaming fallback successful: {len(full_response)} chars")
@@ -442,8 +447,7 @@ def generate_assistant_response(user_prompt: str):
             message_placeholder.markdown("🔄 Generating new response...")
 
             # Get selected model from mode
-            selected_mode = st.session_state.get("model_mode", DEFAULT_MODE)
-            selected_model = MODEL_CONFIGS[selected_mode]["model"]
+            selected_model = get_selected_model("model_mode", DEFAULT_MODE)
 
             # Generate streaming response with optimized updates
             stream_worked = False
@@ -470,8 +474,7 @@ def generate_assistant_response(user_prompt: str):
         except Exception as e:
             # Error fallback
             try:
-                selected_mode = st.session_state.get("model_mode", DEFAULT_MODE)
-                selected_model = MODEL_CONFIGS[selected_mode]["model"]
+                selected_model = get_selected_model("model_mode", DEFAULT_MODE)
                 full_response = chat_completion(selected_model, get_messages_for_api(enhanced_prompt))
                 message_placeholder.markdown(full_response)
             except Exception as e2:
@@ -516,63 +519,75 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
         st.info(f"📤 Processing {uploaded_file.name}...")
 
         # Process the upload asynchronously
-        rag_system = initialize_rag_system(st.session_state.current_conversation_id)
+        progress_placeholder = st.empty()
+        
+        try:
+            progress_placeholder.markdown("🔄 Initializing document processor...")
+            rag_system = initialize_rag_system(st.session_state.current_conversation_id)
 
-        if rag_system:
-            # Process file in background
-            progress_placeholder = st.empty()
+            if rag_system:
+                # Process file in background
+                try:
+                    progress_placeholder.markdown("📄 Processing document content...")
 
-            try:
-                progress_placeholder.markdown("🔄 Processing file...")
-
-                if is_image:
-                    image = Image.open(io.BytesIO(file_content))
-                    result = await rag_system.add_image(image, uploaded_file.name)
-                else:
-                    result = await rag_system.add_document(file_content, uploaded_file.name, uploaded_file.type)
-
-                progress_placeholder.empty()
-
-                if result == True:
-                    # New document added successfully
-                    record_user_upload(st.session_state.user_id, uploaded_file.name, file_size)
-                    st.success(f"✅ Uploaded {uploaded_file.name}")
-
-                    # Generate prompt
-                    if custom_prompt:
-                        auto_prompt = f"I just uploaded a file called '{uploaded_file.name}'. {custom_prompt}"
+                    if is_image:
+                        progress_placeholder.markdown("🖼️ Extracting text from image...")
+                        image = Image.open(io.BytesIO(file_content))
+                        result = await rag_system.add_image(image, uploaded_file.name)
                     else:
-                        if is_image:
-                            auto_prompt = f"I just uploaded an image called '{uploaded_file.name}'. Please analyze and explain what you can see in this image, focusing on any scientific, medical, or pharmacological content."
+                        progress_placeholder.markdown("📝 Extracting and processing text...")
+                        result = await rag_system.add_document(file_content, uploaded_file.name, uploaded_file.type)
+
+                    progress_placeholder.empty()
+
+                    if result == True:
+                        # New document added successfully
+                        record_user_upload(st.session_state.user_id, uploaded_file.name, file_size)
+                        st.success(f"✅ Successfully processed {uploaded_file.name}")
+
+                        # Generate prompt
+                        if custom_prompt:
+                            auto_prompt = f"I just uploaded a file called '{uploaded_file.name}'. {custom_prompt}"
                         else:
-                            auto_prompt = f"I just uploaded a document called '{uploaded_file.name}'. Please summarize the key points and main content of this document."
+                            if is_image:
+                                auto_prompt = f"I just uploaded an image called '{uploaded_file.name}'. Please analyze and explain what you can see in this image, focusing on any scientific, medical, or pharmacological content."
+                            else:
+                                auto_prompt = f"I just uploaded a document called '{uploaded_file.name}'. Please summarize the key points and main content of this document."
 
-                    # Add message and generate response
-                    run_async(add_message_to_current_conversation("user", auto_prompt))
+                        # Add message and generate response
+                        run_async(add_message_to_current_conversation("user", auto_prompt))
 
-                    # Display messages
-                    with st.chat_message("user"):
-                        st.markdown(auto_prompt)
+                        # Display messages
+                        with st.chat_message("user"):
+                            st.markdown(auto_prompt)
 
-                    # Generate response asynchronously
-                    generate_file_analysis_response(auto_prompt)
+                        # Generate response asynchronously
+                        generate_file_analysis_response(auto_prompt)
 
-                    # Clear uploader
-                    st.session_state.upload_counter += 1
-                    st.rerun()
+                        # Clear uploader
+                        st.session_state.upload_counter += 1
+                        st.rerun()
 
-                elif result == "duplicate":
-                    st.info(f"📚 Document '{uploaded_file.name}' already exists in this conversation's knowledge base.")
-                    st.session_state.upload_counter += 1
-                else:
-                    st.error(f"❌ Failed to upload {uploaded_file.name}")
-                    st.session_state.upload_counter += 1
+                    elif result == "duplicate":
+                        st.info(f"📚 Document '{uploaded_file.name}' already exists in this conversation's knowledge base.")
+                        st.session_state.upload_counter += 1
+                    else:
+                        st.error(f"❌ Failed to process {uploaded_file.name}. The document may be corrupted or in an unsupported format.")
+                        st.session_state.upload_counter += 1
 
-            except Exception as e:
+                except Exception as e:
+                    progress_placeholder.empty()
+                    st.error(f"❌ Error processing file: {str(e)}")
+                    st.info("💡 Try uploading a different file or check if the file is corrupted.")
+            else:
                 progress_placeholder.empty()
-                st.error(f"❌ Error processing file: {str(e)}")
-        else:
-            st.error("❌ Upload system unavailable")
+                st.error("❌ Document processing system unavailable")
+                st.info("💡 This may be due to missing dependencies. Some document features may not work on Streamlit Cloud.")
+                
+        except Exception as e:
+            if progress_placeholder:
+                progress_placeholder.empty()
+            st.error(f"❌ Error initializing document processor: {str(e)}")
 
     except Exception as e:
         st.error(f"❌ Error handling file upload: {str(e)}")
@@ -596,8 +611,7 @@ def generate_file_analysis_response(auto_prompt: str):
                 pass  # Use original prompt if RAG fails
 
             # Get model config
-            selected_mode = st.session_state.get("model_mode", DEFAULT_MODE)
-            selected_model = MODEL_CONFIGS[selected_mode]["model"]
+            selected_model = get_selected_model("model_mode", DEFAULT_MODE)
 
             # Generate response with optimized streaming
             message_placeholder.markdown("🔄 Generating analysis...")

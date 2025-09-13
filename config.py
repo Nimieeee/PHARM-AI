@@ -3,32 +3,47 @@ Configuration settings for PharmGPT
 """
 
 import streamlit as st
+import os
 
-# API Configuration - Only use Streamlit secrets (secure for both local and cloud)
-try:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-    OPENROUTER_API_KEY = st.secrets["OPENROUTER_API_KEY"]
-except KeyError as e:
-    st.error(f"Missing API key in Streamlit secrets: {e}")
-    st.info("Please add your API keys to Streamlit secrets or .streamlit/secrets.toml file")
-    GROQ_API_KEY = None
-    OPENROUTER_API_KEY = None
+# API Configuration - Lazy loading to avoid secrets access outside Streamlit
+def get_api_keys():
+    """Get API keys from Streamlit secrets or environment variables."""
+    try:
+        # Try Streamlit secrets first (when in Streamlit context)
+        if hasattr(st, 'secrets'):
+            return st.secrets.get("GROQ_API_KEY"), st.secrets.get("OPENROUTER_API_KEY")
+    except:
+        pass
+    
+    # Fallback to environment variables
+    return os.environ.get("GROQ_API_KEY"), os.environ.get("OPENROUTER_API_KEY")
 
-# Model configurations
-MODEL_CONFIGS = {
-    "normal": {
-        "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
-        "api_key": GROQ_API_KEY,
-        "base_url": "https://api.groq.com/openai/v1",
-        "description": "Llama 4 Maverick (Balanced)"
-    },
-    "turbo": {
-        "model": "openrouter/sonoma-sky-alpha",
-        "api_key": OPENROUTER_API_KEY,
-        "base_url": "https://openrouter.ai/api/v1",
-        "description": "Sonoma Sky Alpha (Fast)"
+# Initialize as None, will be loaded when needed
+GROQ_API_KEY = None
+OPENROUTER_API_KEY = None
+
+# Model configurations - will be populated when API keys are loaded
+def get_model_configs():
+    """Get model configurations with API keys."""
+    groq_key, openrouter_key = get_api_keys()
+    
+    return {
+        "normal": {
+            "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "api_key": groq_key,
+            "base_url": "https://api.groq.com/openai/v1",
+            "description": "Llama 4 Maverick (Balanced)"
+        },
+        "turbo": {
+            "model": "openrouter/sonoma-sky-alpha",
+            "api_key": openrouter_key,
+            "base_url": "https://openrouter.ai/api/v1",
+            "description": "Sonoma Sky Alpha (Fast)"
+        }
     }
-}
+
+# Backward compatibility
+MODEL_CONFIGS = {}
 
 # Application settings
 APP_TITLE = "PharmGPT - AI Pharmacology Assistant"
@@ -41,15 +56,22 @@ ALLOWED_FILE_TYPES = ['pdf', 'txt', 'csv', 'docx', 'doc', 'png', 'jpg', 'jpeg']
 # Database settings - Supabase only
 USE_SUPABASE = True  # Always use Supabase (file-based storage removed)
 
-# Supabase configuration (loaded from secrets)
-try:
-    SUPABASE_URL = st.secrets["SUPABASE_URL"]
-    SUPABASE_ANON_KEY = st.secrets["SUPABASE_ANON_KEY"]
-except KeyError as e:
-    st.error(f"Missing Supabase configuration in Streamlit secrets: {e}")
-    st.info("Please add SUPABASE_URL and SUPABASE_ANON_KEY to your Streamlit secrets")
-    SUPABASE_URL = None
-    SUPABASE_ANON_KEY = None
+# Supabase configuration - Lazy loading
+def get_supabase_config():
+    """Get Supabase configuration from secrets or environment."""
+    try:
+        # Try Streamlit secrets first
+        if hasattr(st, 'secrets'):
+            return st.secrets.get("SUPABASE_URL"), st.secrets.get("SUPABASE_ANON_KEY")
+    except:
+        pass
+    
+    # Fallback to environment variables
+    return os.environ.get("SUPABASE_URL"), os.environ.get("SUPABASE_ANON_KEY")
+
+# Initialize as None, will be loaded when needed
+SUPABASE_URL = None
+SUPABASE_ANON_KEY = None
 
 # Upload settings
 UPLOAD_LIMIT_PER_DAY = -1  # -1 means unlimited uploads
