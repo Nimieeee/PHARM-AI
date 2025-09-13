@@ -222,8 +222,8 @@ def render_chat_interface():
                             run_async(process_uploaded_file(uploaded_file, custom_prompt))
                         logger.info(f"✅ File processing completed for: {uploaded_file.name}")
                         
-                        # Force a rerun to show the results
-                        st.rerun()
+                        # Success message
+                        st.success(f"✅ Successfully processed {uploaded_file.name}")
                         
                     except Exception as file_error:
                         logger.error(f"💥 File processing failed for {uploaded_file.name}: {file_error}")

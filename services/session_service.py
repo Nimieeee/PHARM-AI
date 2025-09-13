@@ -249,7 +249,7 @@ class SessionService:
             int: Number of sessions logged out
         """
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='delete',
                 eq={'user_id': user_uuid}
@@ -275,7 +275,7 @@ class SessionService:
             current_time = datetime.now().isoformat()
             
             # First, get expired sessions to count them
-            expired_result = self._get_connection_manager().execute_query(
+            expired_result = await self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
                 columns='session_id'

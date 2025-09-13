@@ -147,15 +147,23 @@ def initialize_auth_session():
     import logging
     logger = logging.getLogger(__name__)
 
-    # TEMPORARY: Auto-login for Streamlit Cloud testing
-    if "STREAMLIT_CLOUD_TEST" not in st.session_state:
-        st.session_state.STREAMLIT_CLOUD_TEST = True
-        st.session_state.authenticated = True
-        st.session_state.username = "tolu"
-        st.session_state.user_id = "e4443c52948edad6132f34b6378a9901"
-        st.session_state.session_id = "test-session-123"
-        logger.info("🚀 STREAMLIT CLOUD TEST MODE: Auto-authenticated as tolu")
-        return
+    # Check if we're in a valid session first
+    if st.session_state.get('authenticated') and st.session_state.get('session_id'):
+        # Validate existing session
+        username = validate_session(st.session_state.session_id)
+        if username:
+            # Session is still valid, update user info
+            st.session_state.username = username
+            st.session_state.user_id = get_user_legacy_id(username)
+            logger.info(f"✅ Existing session validated for user: {username}")
+            return
+        else:
+            # Session expired, clear state
+            logger.info("⚠️ Session expired, clearing authentication state")
+            st.session_state.authenticated = False
+            st.session_state.username = None
+            st.session_state.user_id = None
+            st.session_state.session_id = None
 
     # Attempt to retrieve session_id from query parameters first
     query_params = st.query_params

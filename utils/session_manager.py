@@ -46,7 +46,7 @@ def initialize_session_state():
         return
     
     # On Streamlit Cloud, be more aggressive about keeping sessions alive
-    timeout_seconds = 300.0  # 5 minutes instead of 10 seconds
+    timeout_seconds = 600.0  # 10 minutes for better persistence
     
     # Only re-initialize auth if it's been more than timeout or not initialized
     if (cache_key not in st.session_state or
@@ -81,13 +81,18 @@ def initialize_session_state():
     
     # Only initialize conversation-related state if authenticated
     if st.session_state.authenticated:
-        # Cache privacy verification to avoid repeated checks
+        # Ensure user data isolation
         privacy_key = f"privacy_verified_{st.session_state.user_id}"
         if privacy_key not in st.session_state:
-            from auth import verify_user_data_isolation, cleanup_orphaned_data
-            is_isolated, message = verify_user_data_isolation()
-            if not is_isolated:
-                # Clean up orphaned data
+            # Clear any session state that might belong to other users
+            keys_to_clear = []
+            for key in st.session_state.keys():
+                if ('conversation' in key.lower() or 'rag_system' in key.lower()) and st.session_state.user_id not in key:
+                    keys_to_clear.append(key)
+            
+            for key in keys_to_clear:
+                del st.session_state[key]
+                logger.info(f"🔒 Cleared potentially cross-user data: {key}")
                 cleaned = cleanup_orphaned_data()
                 if cleaned:
                     st.warning(f"🔒 Cleaned up orphaned data for privacy: {len(cleaned)} items removed")
