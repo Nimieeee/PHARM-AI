@@ -234,7 +234,9 @@ class SupabaseConnectionManager:
         # Check event loop before executing query
         self._check_event_loop()
         
-        if not self._client:
+        # Ensure client is available (this will initialize if needed)
+        client = await self.get_client()
+        if not client:
             raise ConnectionError("Supabase client not initialized")
 
         start_time = time.time()
@@ -242,7 +244,7 @@ class SupabaseConnectionManager:
 
         try:
             # Get table reference
-            table_ref = self._client.table(table)
+            table_ref = client.table(table)
 
             # Execute operation based on type
             if operation == 'select':
@@ -323,10 +325,11 @@ class SupabaseConnectionManager:
                 
                 # Try to reinitialize and retry the query once
                 try:
-                    if await self._initialize_client():
+                    fresh_client = await self.get_client()
+                    if fresh_client:
                         logger.info("Client reinitialized, retrying query...")
                         # Retry the query with fresh client
-                        table_ref = self._client.table(table)
+                        table_ref = fresh_client.table(table)
                         
                         if operation == 'select':
                             columns = kwargs.get('columns', '*')

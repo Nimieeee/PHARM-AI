@@ -252,28 +252,8 @@ class UserService:
             return None
 
         except Exception as e:
-            # Handle asyncio event loop binding issues
-            if "bound to a different event loop" in str(e) or "asyncio" in str(e).lower():
-                logger.warning(f"AsyncIO event loop issue for user {user_id}, reinitializing client")
-                self._initialized = False
-                self.supabase = None
-                # Force connection manager to reinitialize
-                try:
-                    from supabase_manager import get_connection_manager
-                    self.connection_manager = get_connection_manager()
-                    # Force complete reset
-                    self.connection_manager.force_client_reset()
-                    result = await self.connection_manager.execute_query(
-                        table='users',
-                        operation='select',
-                        eq={'user_id': user_id}
-                    )
-                    if result.data:
-                        return result.data[0]
-                except Exception as retry_e:
-                    logger.error(f"Retry failed for user {user_id}: {str(retry_e)}")
-            else:
-                logger.error(f"Error getting user by ID {user_id}: {str(e)}")
+            logger.error(f"Error getting user by ID {user_id}: {str(e)}")
+            # The connection manager should handle AsyncIO issues automatically now
             return None
 
     async def get_user_by_uuid(self, uuid_id: str) -> Optional[Dict]:
