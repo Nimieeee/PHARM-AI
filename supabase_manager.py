@@ -171,16 +171,18 @@ class SupabaseConnectionManager:
         """Set user context for RLS policies."""
         try:
             if self._client:
-                # Set the current user context for RLS policies
-                await self._client.rpc('set_config', {
-                    'setting_name': 'app.current_user_id',
-                    'new_value': user_id,
-                    'is_local': False
+                # Use the custom set_user_context function defined in the database
+                await self._client.rpc('set_user_context', {
+                    'user_identifier': user_id
                 }).execute()
                 logger.info(f"User context set for RLS: {user_id}")
                 return True
         except Exception as e:
-            logger.warning(f"Failed to set user context: {e}")
+            # This is optional functionality - don't fail if the function doesn't exist
+            if "PGRST202" in str(e) or "not found" in str(e).lower():
+                logger.info(f"RLS context function not available (this is optional): {e}")
+            else:
+                logger.warning(f"Failed to set user context: {e}")
         return False
 
     async def execute_query(self, table: str, operation: str, **kwargs) -> Any:

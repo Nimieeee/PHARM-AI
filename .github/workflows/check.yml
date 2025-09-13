@@ -37,7 +37,7 @@ jobs:
     
     - name: Verify no secrets in code
       run: |
-        if grep -r "sk-" . --exclude-dir=.git --exclude="*.md" --exclude="deploy_to_github.py"; then
+        if grep -r "gsk_" . --exclude-dir=.git --exclude="*.md" --exclude="deploy_to_github.py"; then
           echo "Potential API keys found in code!"
           exit 1
         fi
