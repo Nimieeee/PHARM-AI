@@ -147,6 +147,16 @@ def initialize_auth_session():
     import logging
     logger = logging.getLogger(__name__)
 
+    # TEMPORARY: Auto-login for Streamlit Cloud testing
+    if "STREAMLIT_CLOUD_TEST" not in st.session_state:
+        st.session_state.STREAMLIT_CLOUD_TEST = True
+        st.session_state.authenticated = True
+        st.session_state.username = "tolu"
+        st.session_state.user_id = "e4443c52948edad6132f34b6378a9901"
+        st.session_state.session_id = "test-session-123"
+        logger.info("🚀 STREAMLIT CLOUD TEST MODE: Auto-authenticated as tolu")
+        return
+
     # Attempt to retrieve session_id from query parameters first
     query_params = st.query_params
     if "session_id" in query_params and query_params["session_id"][0]:
