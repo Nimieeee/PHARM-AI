@@ -38,6 +38,12 @@ def render_chatbot_page():
         st.error("Please sign in to use the chatbot.")
         return
     
+    # Initialize response generation flags
+    if 'generating_response' not in st.session_state:
+        st.session_state.generating_response = False
+    if 'new_response_ready' not in st.session_state:
+        st.session_state.new_response_ready = False
+    
     # Check if we have a conversation, if not show welcome screen
     if not st.session_state.get('current_conversation_id'):
         render_welcome_screen()
@@ -58,6 +64,8 @@ def render_welcome_screen():
             try:
                 conversation_id = run_async(create_new_conversation())
                 if conversation_id:
+                    # Use st.rerun() with a small delay to ensure conversation is created
+                    st.success("✅ New conversation created!")
                     st.rerun()
                 else:
                     st.error("Failed to create conversation. Please try again.")
@@ -83,7 +91,8 @@ def render_welcome_screen():
                 if conversation_id:
                     success = run_async(add_message_to_current_conversation("user", example))
                     if success:
-                        st.rerun()
+                        # Generate AI response immediately instead of rerunning
+                        generate_ai_response(example)
                     else:
                         st.error("Failed to send message. Please try again.")
                 else:
@@ -154,7 +163,7 @@ def display_chat_messages():
                 with col1:
                     if st.button("🔄 Regenerate", key=f"regenerate_{i}", help="Generate a new response"):
                         regenerate_last_response()
-                        st.rerun()
+                        # Don't rerun immediately - let the regenerated response display
 
 def render_chat_input():
     """Render the chat input interface."""
@@ -197,6 +206,9 @@ def render_chat_input():
 def generate_ai_response(user_prompt: str):
     """Generate and display AI response."""
     logger.info(f"Generating AI response for: {user_prompt[:50]}...")
+    
+    # Set a flag to indicate response generation is in progress
+    st.session_state.generating_response = True
     
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
@@ -263,14 +275,19 @@ def generate_ai_response(user_prompt: str):
             message_placeholder.markdown(error_msg)
             full_response = error_msg
 
+        finally:
+            # Clear the response generation flag
+            st.session_state.generating_response = False
+
         # Save AI response to conversation
         if full_response and not full_response.startswith("❌ Error"):
             try:
                 success = run_async(add_message_to_current_conversation("assistant", full_response))
                 if success:
                     logger.info("✅ AI response saved to conversation")
-                    # Don't rerun immediately - let the user see the response first
-                    # The response is already displayed in the UI above
+                    # Response is already displayed in the UI above
+                    # Mark that we have a new response to show
+                    st.session_state.new_response_ready = True
                 else:
                     logger.error("❌ Failed to save AI response")
                     st.error("Failed to save the response. Please try again.")

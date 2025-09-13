@@ -36,8 +36,12 @@ def render_sidebar():
         # New conversation button
         if st.button("➕ New Chat", use_container_width=True, type="primary"):
             from utils.conversation_manager import create_new_conversation, run_async
-            run_async(create_new_conversation())
-            st.rerun()
+            conversation_id = run_async(create_new_conversation())
+            if conversation_id:
+                st.success("✅ New conversation created!")
+                st.rerun()
+            else:
+                st.error("Failed to create conversation")
         
         # List conversations
         if st.session_state.conversations:
@@ -77,8 +81,12 @@ def render_sidebar():
                         # Delete button
                         if st.button("🗑️", key=f"del_{conv_id}", help="Delete conversation"):
                             from utils.conversation_manager import run_async
-                            run_async(delete_conversation(conv_id))
-                            st.rerun()
+                            success = run_async(delete_conversation(conv_id))
+                            if success:
+                                st.success("✅ Conversation deleted!")
+                                st.rerun()
+                            else:
+                                st.error("Failed to delete conversation")
                     
                     # Show options if toggled
                     if st.session_state.get(f"show_options_{conv_id}", False):
