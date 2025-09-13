@@ -257,21 +257,21 @@ class ConversationRAGSystem:
         except Exception as e:
             st.error(f"Error saving metadata: {e}")
     
-    def _get_conversation_db_id(self, user_uuid: str, conversation_id: str) -> Optional[str]:
+    async def _get_conversation_db_id(self, user_uuid: str, conversation_id: str) -> Optional[str]:
         """Get the actual database ID for a conversation from its conversation_id field."""
         try:
             if SUPABASE_AVAILABLE:
                 from supabase_manager import get_supabase_client
-                supabase = get_supabase_client()
+                supabase = await get_supabase_client()
                 
                 # Query conversations table to find the actual ID
-                result = supabase.table('conversations').select('id').eq('user_uuid', user_uuid).eq('conversation_id', conversation_id).execute()
+                result = await supabase.table('conversations').select('id').eq('user_uuid', user_uuid).eq('conversation_id', conversation_id).execute()
                 
                 if result.data and len(result.data) > 0:
                     return result.data[0]['id']
                 else:
                     # Fallback: maybe the conversation_id is already the database ID
-                    result = supabase.table('conversations').select('id').eq('user_uuid', user_uuid).eq('id', conversation_id).execute()
+                    result = await supabase.table('conversations').select('id').eq('user_uuid', user_uuid).eq('id', conversation_id).execute()
                     if result.data and len(result.data) > 0:
                         return result.data[0]['id']
             
@@ -362,7 +362,7 @@ class ConversationRAGSystem:
             st.error(f"Error extracting text from image: {e}")
             return ""
     
-    def add_document(self, file_content: bytes, filename: str, file_type: str) -> bool:
+    async def add_document(self, file_content: bytes, filename: str, file_type: str) -> bool:
         """Add document to the RAG system."""
         if not DEPENDENCIES_AVAILABLE:
             return False
@@ -442,10 +442,10 @@ class ConversationRAGSystem:
             if SUPABASE_AVAILABLE:
                 try:
                     # Get user UUID from legacy user_id
-                    user_data = user_service.get_user_by_id(self.user_id)
+                    user_data = await user_service.get_user_by_id(self.user_id)
                     if user_data:
                         # Get the actual conversation database ID from conversation_id
-                        actual_conversation_id = self._get_conversation_db_id(user_data['id'], self.conversation_id)
+                        actual_conversation_id = await self._get_conversation_db_id(user_data['id'], self.conversation_id)
                         if actual_conversation_id:
                             # Save document to Supabase
                             doc_data = {
@@ -475,7 +475,7 @@ class ConversationRAGSystem:
             st.error(f"Error adding document: {e}")
             return False
     
-    def add_image(self, image, filename: str) -> bool:
+    async def add_image(self, image, filename: str) -> bool:
         """Add image to the RAG system using OCR."""
         if not DEPENDENCIES_AVAILABLE or not self.collection:
             return False
@@ -541,10 +541,10 @@ class ConversationRAGSystem:
             if SUPABASE_AVAILABLE:
                 try:
                     # Get user UUID from legacy user_id
-                    user_data = user_service.get_user_by_id(self.user_id)
+                    user_data = await user_service.get_user_by_id(self.user_id)
                     if user_data:
                         # Get the actual conversation database ID from conversation_id
-                        actual_conversation_id = self._get_conversation_db_id(user_data['id'], self.conversation_id)
+                        actual_conversation_id = await self._get_conversation_db_id(user_data['id'], self.conversation_id)
                         if actual_conversation_id:
                             # Save document to Supabase
                             doc_data = {

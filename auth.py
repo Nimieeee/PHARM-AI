@@ -50,7 +50,6 @@ _cache_timeout_seconds = 30  # Cache session validation for 30 seconds
 def create_user(username: str, password: str) -> Tuple[bool, str]:
     """Create a new user account using Supabase."""
     try:
-        st.write(type(user_service.create_user(username, password)))
         success, message = run_async(user_service.create_user(username, password))
         return success, message
     except Exception as e:
@@ -121,38 +120,59 @@ def logout_user(session_id: str):
     except Exception as e:
         st.error(f"Error logging out: {str(e)}")
 
-def get_user_id(username: str) -> Optional[str]:
-    """Get user ID for username using Supabase."""
+def get_user_uuid(username: str) -> Optional[str]:
+    """Get user UUID for username using Supabase."""
     try:
         user_data = run_async(user_service.get_user_by_username(username))
         if user_data:
-            return user_data['user_id']  # Legacy user_id field
+            return user_data['id']  # Return the actual UUID
         return None
     except Exception as e:
-        st.error(f"Error getting user ID: {str(e)}")
+        st.error(f"Error getting user UUID: {str(e)}")
+        return None
+
+def get_user_legacy_id(username: str) -> Optional[str]:
+    """Get user legacy ID (user_id) for username using Supabase."""
+    try:
+        user_data = run_async(user_service.get_user_by_username(username))
+        if user_data:
+            return user_data['user_id']  # Return the legacy user_id (MD5 hash)
+        return None
+    except Exception as e:
+        st.error(f"Error getting user legacy ID: {str(e)}")
         return None
 
 def initialize_auth_session():
     """Initialize authentication session state."""
     import logging
     logger = logging.getLogger(__name__)
-    logger.info(f"🔐 INITIALIZE_AUTH_SESSION called - session_id: {st.session_state.get('session_id', 'None')}, authenticated: {st.session_state.get('authenticated', False)}")
-    
+
+    # Attempt to retrieve session_id from query parameters first
+    query_params = st.query_params
+    if "session_id" in query_params and query_params["session_id"][0]:
+        st.session_state.session_id = query_params["session_id"][0]
+        logger.info(f"🔗 Retrieved session_id from URL: {st.session_state.session_id}")
+    elif "session_id" not in st.session_state or st.session_state.session_id is None:
+        st.session_state.session_id = None
+        logger.info("🆕 Initializing new session_id as None")
+
     # Check for existing session
     if "session_id" not in st.session_state:
         st.session_state.session_id = None
         logger.info("🆕 Initializing new session_id as None")
-    
+
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
         logger.info("🆕 Initializing authenticated as False")
-    
+
     if "username" not in st.session_state:
         st.session_state.username = None
-    
+
     if "user_id" not in st.session_state:
         st.session_state.user_id = None
-    
+
+    logger.info(f"🔐 INITIALIZE_AUTH_SESSION called - session_id (after init): {st.session_state.get('session_id', 'None')}, authenticated (after init): {st.session_state.get('authenticated', False)}")
+
     # Validate existing session
     if st.session_state.session_id:
         logger.info(f"🔍 Validating existing session: {st.session_state.session_id}")
@@ -161,28 +181,42 @@ def initialize_auth_session():
             logger.info(f"✅ Session valid for user: {username}")
             st.session_state.authenticated = True
             st.session_state.username = username
-            st.session_state.user_id = get_user_id(username)
+            st.session_state.user_id = get_user_legacy_id(username)
+            # Ensure session_id is in URL if valid
+            st.query_params["session_id"] = st.session_state.session_id
         else:
-            logger.warning("❌ Session invalid, clearing state")
+            logger.warning(f"❌ Session invalid for {st.session_state.session_id}, clearing state")
             # Invalid session, clear state
             st.session_state.session_id = None
             st.session_state.authenticated = False
             st.session_state.username = None
             st.session_state.user_id = None
+            if "session_id" in st.query_params:
+                del st.query_params["session_id"]
     else:
         logger.info("ℹ️  No session_id to validate")
 
 def login_user(username: str, password: str) -> bool:
     """Login user and create session."""
+    logger.info(f"Attempting login for user: {username}")
     success, message = authenticate_user(username, password)
     if success:
+        logger.info(f"Authentication successful for user: {username}")
         session_id = create_session(username)
-        st.session_state.session_id = session_id
-        st.session_state.authenticated = True
-        st.session_state.username = username
-        st.session_state.user_id = get_user_id(username)
-        return True
-    return False
+        if session_id:
+            st.session_state.session_id = session_id
+            st.session_state.authenticated = True
+            st.session_state.username = username
+            st.session_state.user_id = get_user_legacy_id(username)
+            st.query_params["session_id"] = session_id
+            logger.info(f"Session created and set for user {username} with ID: {session_id}")
+            return True
+        else:
+            logger.error(f"Failed to create session for user: {username}")
+            return False
+    else:
+        logger.warning(f"Authentication failed for user {username}: {message}")
+        return False
 
 def logout_current_user():
     """Logout current user."""
@@ -199,11 +233,10 @@ def logout_current_user():
     st.session_state.authenticated = False
     st.session_state.username = None
     st.session_state.user_id = None
+    if "session_id" in st.query_params:
+        del st.query_params["session_id"]
     
-    # Clear conversation state
-    keys_to_clear = [k for k in st.session_state.keys() if 'conversation' in k.lower()]
-    for key in keys_to_clear:
-        del st.session_state[key]
+    
 
 def load_user_conversations(user_id: str) -> Dict:
     """Load conversations for a specific user using Supabase."""
@@ -257,12 +290,12 @@ def can_user_upload(user_id: str) -> Tuple[bool, str]:
         
         cutoff_time = (datetime.now() - timedelta(hours=24)).isoformat()
         
-        result = connection_manager.execute_query(
+        result = run_async(connection_manager.execute_query(
             table='uploads',
             operation='select',
             columns='count(*)',
             eq={'user_id': user_data['id']}
-        )
+        ))
         
         # For now, simplified implementation
         return True, "Upload allowed"
@@ -290,11 +323,11 @@ def record_user_upload(user_id: str, filename: str, file_size: int):
             'uploaded_at': datetime.now().isoformat()
         }
         
-        connection_manager.execute_query(
+        run_async(connection_manager.execute_query(
             table='uploads',
             operation='insert',
             data=upload_data
-        )
+        ))
         
     except Exception as e:
         st.error(f"Error recording upload: {e}")

@@ -7,9 +7,7 @@ import uuid
 import asyncio
 from datetime import datetime
 from services.conversation_service import (
-    conversation_service, create_conversation_sync, update_conversation_sync,
-    add_message_sync, update_conversation_title_sync, delete_conversation_sync,
-    duplicate_conversation_sync
+    conversation_service
 )
 from services.user_service import user_service
 
@@ -21,26 +19,41 @@ def run_async(coro):
     """Run async function in Streamlit context."""
     try:
         loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # If loop is already running, we need to use a different approach
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(asyncio.run, coro)
+                return future.result()
+        else:
+            return loop.run_until_complete(coro)
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(coro)
+        # No event loop exists, create a new one
+        return asyncio.run(coro)
 
-def create_new_conversation():
+async def create_new_conversation():
     """Create a new conversation using Supabase."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        # Debug logging
+        logger.info(f"🆕 Creating new conversation for user_id: {st.session_state.get('user_id', 'None')}")
+        
         # Get user UUID from legacy user_id
-        user_data = user_service.get_user_by_id(st.session_state.user_id)
+        user_data = await user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
-            st.error("User not found")
+            logger.error(f"❌ User not found for user_id: {st.session_state.user_id}")
+            st.error(f"User not found (ID: {st.session_state.user_id})")
             return None
+        
+        logger.info(f"✅ Found user: {user_data.get('username')} (UUID: {user_data.get('id')})")
         
         st.session_state.conversation_counter += 1
         title = f"New Chat {st.session_state.conversation_counter}"
         
         # Create conversation in Supabase
-        conversation_id = create_conversation_sync(
+        conversation_id = await conversation_service.create_conversation(
             user_data['id'], 
             title, 
             FIXED_MODEL
@@ -73,14 +86,14 @@ def get_current_messages():
         pass
     return []
 
-def add_message_to_current_conversation(role: str, content: str):
+async def add_message_to_current_conversation(role: str, content: str):
     """Add message to current conversation using Supabase."""
     try:
         if not st.session_state.current_conversation_id:
-            create_new_conversation()
+            await create_new_conversation()
         
         # Get user UUID from legacy user_id
-        user_data = user_service.get_user_by_id(st.session_state.user_id)
+        user_data = await user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
             st.error("User not found")
             return
@@ -92,7 +105,7 @@ def add_message_to_current_conversation(role: str, content: str):
         }
         
         # Add message to Supabase
-        success = add_message_sync(
+        success = await conversation_service.add_message(
             user_data['id'],
             st.session_state.current_conversation_id,
             message
@@ -108,7 +121,7 @@ def add_message_to_current_conversation(role: str, content: str):
                 st.session_state.conversations[st.session_state.current_conversation_id]["title"] = title
                 
                 # Update title in Supabase
-                update_conversation_title_sync(
+                await conversation_service.update_conversation_title(
                     user_data['id'],
                     st.session_state.current_conversation_id,
                     title
@@ -123,18 +136,18 @@ def add_message_to_current_conversation(role: str, content: str):
     except Exception as e:
         st.error(f"Error adding message: {e}")
 
-def delete_conversation(conversation_id: str):
+async def delete_conversation(conversation_id: str):
     """Delete a conversation and its associated data using Supabase."""
     try:
         if conversation_id in st.session_state.conversations:
             # Get user UUID from legacy user_id
-            user_data = user_service.get_user_by_id(st.session_state.user_id)
+            user_data = await user_service.get_user_by_id(st.session_state.user_id)
             if not user_data:
                 st.error("User not found")
                 return
             
             # Delete conversation from Supabase (this will cascade delete related documents)
-            success = delete_conversation_sync(
+            success = await conversation_service.delete_conversation(
                 user_data['id'],
                 conversation_id
             )
@@ -164,14 +177,14 @@ def delete_conversation(conversation_id: str):
     except Exception as e:
         st.error(f"Error deleting conversation: {e}")
 
-def duplicate_conversation(conversation_id: str):
+async def duplicate_conversation(conversation_id: str):
     """Create a duplicate of an existing conversation using Supabase."""
     try:
         if conversation_id not in st.session_state.conversations:
             return None
         
         # Get user UUID from legacy user_id
-        user_data = user_service.get_user_by_id(st.session_state.user_id)
+        user_data = await user_service.get_user_by_id(st.session_state.user_id)
         if not user_data:
             st.error("User not found")
             return None
@@ -180,7 +193,7 @@ def duplicate_conversation(conversation_id: str):
         new_title = f"Copy of {original_conv['title']}"
         
         # Duplicate conversation in Supabase
-        new_conversation_id = duplicate_conversation_sync(
+        new_conversation_id = await conversation_service.duplicate_conversation(
             user_data['id'],
             conversation_id,
             new_title

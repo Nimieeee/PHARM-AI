@@ -33,6 +33,9 @@ st.set_page_config(
 
 def main():
     """Main application entry point."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info("🚀 App started - main() called.")
     # Check for setup page via query params
     query_params = st.query_params
     if query_params.get("page") == "setup":

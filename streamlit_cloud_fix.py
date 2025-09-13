@@ -43,13 +43,20 @@ def fix_asyncio_for_cloud():
         loop = asyncio.get_event_loop()
         if loop.is_closed():
             raise RuntimeError("Loop is closed")
+        # Don't create new loop if one is already running
+        if not loop.is_running():
+            print("✅ Using existing asyncio event loop")
+        return loop
     except RuntimeError:
         # Create new event loop if none exists or is closed
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        print("✅ New asyncio event loop created")
-    
-    return loop
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            print("✅ New asyncio event loop created")
+            return loop
+        except Exception as e:
+            print(f"⚠️  Could not create event loop: {e}")
+            return None
 
 def apply_all_fixes():
     """Apply all Streamlit Cloud compatibility fixes"""

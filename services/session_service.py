@@ -113,9 +113,11 @@ class SessionService:
             Optional[Dict]: Session data if valid, None if invalid/expired
         """
         if not session_id:
+            logger.info("Validate session called with empty session_id.")
             return None
         
         try:
+            logger.info(f"Attempting to validate session: {session_id}")
             result = self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
@@ -123,14 +125,21 @@ class SessionService:
             )
             
             if not result.data:
+                logger.warning(f"No session found in DB for session_id: {session_id}")
                 return None
             
             session_data = result.data[0]
             
             # Check if session is expired
-            expires_at = datetime.fromisoformat(session_data['expires_at'].replace('Z', '+00:00'))
-            if datetime.now() > expires_at.replace(tzinfo=None):
+            expires_at_str = session_data['expires_at']
+            expires_at = datetime.fromisoformat(expires_at_str.replace('Z', '+00:00'))
+            current_time = datetime.now()
+            
+            logger.info(f"Session {session_id}: expires_at={expires_at}, current_time={current_time}")
+            
+            if current_time > expires_at.replace(tzinfo=None):
                 # Session expired, remove it
+                logger.info(f"Session {session_id} expired. Removing from DB.")
                 self._get_connection_manager().execute_query(
                     table='sessions',
                     operation='delete',
@@ -146,6 +155,7 @@ class SessionService:
                 data={'last_activity': datetime.now().isoformat()},
                 eq={'session_id': session_id}
             )
+            logger.info(f"Session {session_id} is valid and activity updated.")
             
             return session_data
             

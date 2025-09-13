@@ -3,7 +3,7 @@ Sidebar for Authenticated Users
 """
 
 import streamlit as st
-from auth import logout_user
+from auth import logout_current_user
 from utils.conversation_manager import delete_conversation, duplicate_conversation
 from rag_interface_chromadb import get_conversation_document_count, get_all_user_documents_count
 
@@ -15,7 +15,7 @@ def render_sidebar():
         
         # Sign out button
         if st.button("🚪 Sign Out", use_container_width=True, type="secondary"):
-            logout_user()
+            logout_current_user()
             st.session_state.current_page = "homepage"
             st.rerun()
         
@@ -35,8 +35,8 @@ def render_sidebar():
         
         # New conversation button
         if st.button("➕ New Chat", use_container_width=True, type="primary"):
-            from utils.conversation_manager import create_new_conversation
-            create_new_conversation()
+            from utils.conversation_manager import create_new_conversation, run_async
+            run_async(create_new_conversation())
             st.rerun()
         
         # List conversations
@@ -77,7 +77,8 @@ def render_sidebar():
                     with col3:
                         # Delete button
                         if st.button("🗑️", key=f"del_{conv_id}", help="Delete conversation"):
-                            delete_conversation(conv_id)
+                            from utils.conversation_manager import run_async
+                            run_async(delete_conversation(conv_id))
                             st.rerun()
                     
                     # Show options if toggled
@@ -85,7 +86,8 @@ def render_sidebar():
                         with st.expander("Options", expanded=True):
                             # Duplicate conversation
                             if st.button("📋 Duplicate", key=f"duplicate_{conv_id}", use_container_width=True):
-                                new_conv_id = duplicate_conversation(conv_id)
+                                from utils.conversation_manager import run_async
+                                new_conv_id = run_async(duplicate_conversation(conv_id))
                                 if new_conv_id:
                                     st.session_state.current_conversation_id = new_conv_id
                                     st.success("Conversation duplicated!")

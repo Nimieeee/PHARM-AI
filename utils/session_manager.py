@@ -31,6 +31,10 @@ def initialize_session_state():
     logger = logging.getLogger(__name__)
     logger.info(f"🔄 INITIALIZE_SESSION_STATE called - authenticated: {st.session_state.get('authenticated', False)}, session_id: {st.session_state.get('session_id', 'None')}")
     
+    # Initialize conversations to an empty dict if not present
+    if "conversations" not in st.session_state:
+        st.session_state.conversations = {}
+
     # Smart caching - avoid repeated initialization within same session
     cache_key = "last_auth_init_time"
     init_marker = "auth_initialized_this_run"
@@ -63,6 +67,14 @@ def initialize_session_state():
             st.session_state.current_page = "chatbot"
         else:
             st.session_state.current_page = "homepage"
+
+    # Initialize conversation-related state (always)
+    if "current_conversation_id" not in st.session_state:
+        st.session_state.current_conversation_id = None
+    if "conversation_counter" not in st.session_state:
+        st.session_state.conversation_counter = len(st.session_state.conversations)
+    if "search_query" not in st.session_state:
+        st.session_state.search_query = ""
     
     # Only initialize conversation-related state if authenticated
     if st.session_state.authenticated:
@@ -110,10 +122,3 @@ def initialize_session_state():
         # Use cached conversations if available
         elif conversations_cache_key in st.session_state:
             st.session_state.conversations = st.session_state[conversations_cache_key]
-            
-        if "current_conversation_id" not in st.session_state:
-            st.session_state.current_conversation_id = None
-        if "conversation_counter" not in st.session_state:
-            st.session_state.conversation_counter = len(st.session_state.conversations)
-        if "search_query" not in st.session_state:
-            st.session_state.search_query = ""

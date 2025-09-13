@@ -17,13 +17,14 @@ pandas>=2.0.0
 Pillow>=10.0.0
 
 # SQLite upgrade for ChromaDB compatibility on Streamlit Cloud
-pysqlite3-binary>=0.5.0
+pysqlite3-binary>=0.5.0; sys_platform == "linux"
 
 # Minimal utilities
 requests>=2.31.0
+python-dotenv>=1.0.0
 
 # Performance monitoring (optional)
 psutil>=5.9.0
 
 # Database - Supabase (required)
-supabase>=2.0.0
+supabase[async]>=2.0.0

@@ -6,6 +6,17 @@ Test script to diagnose Streamlit Cloud issues
 import streamlit as st
 import sys
 import traceback
+import asyncio
+
+def run_async(coro):
+    """Run async function in Streamlit context."""
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(coro)
 
 st.title("🔧 Streamlit Cloud Diagnostic Test")
 
@@ -24,8 +35,8 @@ except Exception as e:
 
 # Test 2: Supabase import
 try:
-    from supabase import create_client, Client
-    st.success("✅ supabase imported successfully")
+    from supabase.ext.asyncio_client import create_client, AsyncClient as Client
+    st.success("✅ supabase (async) imported successfully")
 except Exception as e:
     st.error(f"❌ supabase import failed: {e}")
     st.code(traceback.format_exc())
@@ -84,10 +95,15 @@ except Exception as e:
 st.write("## Database Connection Test")
 try:
     from supabase_manager import get_supabase_client
-    client = get_supabase_client()
-    if client:
-        # Test a simple query
-        result = client.table('users').select('count').limit(1).execute()
+    async def _test_db():
+        client = await get_supabase_client()
+        if client:
+            # Test a simple query
+            await client.table('users').select('count').limit(1).execute()
+            return True
+        return False
+
+    if run_async(_test_db()):
         st.success("✅ Database connection successful")
     else:
         st.error("❌ Failed to get Supabase client")

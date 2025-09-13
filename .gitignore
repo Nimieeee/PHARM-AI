@@ -162,3 +162,18 @@ Thumbs.db
 *.temp
 temp/
 tmp/
+# Additional deployment exclusions
+test_*.py
+debug_*.py
+diagnose_*.py
+*_SUMMARY.md
+*_SETUP.md
+prepare_deployment.py
+README_DEPLOYMENT.md
+.streamlit/secrets_template.toml
+
+# Keep these excluded
+.env
+.streamlit/secrets.toml
+user_data/
+*.sql

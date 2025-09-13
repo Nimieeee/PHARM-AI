@@ -3,7 +3,7 @@ Sign In Page
 """
 
 import streamlit as st
-from auth import authenticate_user, create_user, get_user_id
+from auth import authenticate_user, create_user, get_user_uuid, get_user_legacy_id
 
 def render_signin_page():
     """Render the sign in page."""
@@ -42,7 +42,7 @@ def render_signin_form():
                     # Set session state
                     st.session_state.authenticated = True
                     st.session_state.username = username
-                    st.session_state.user_id = get_user_id(username)
+                    st.session_state.user_id = get_user_legacy_id(username)
                     st.session_state.current_page = "chatbot"
                     st.success("✅ Successfully signed in!")
                     st.rerun()
@@ -86,7 +86,7 @@ def render_signup_form():
                     # Set session state
                     st.session_state.authenticated = True
                     st.session_state.username = username
-                    st.session_state.user_id = get_user_id(username)
+                    st.session_state.user_id = get_user_legacy_id(username)
                     st.session_state.current_page = "chatbot"
                     st.success("✅ Account created successfully!")
                     st.rerun()

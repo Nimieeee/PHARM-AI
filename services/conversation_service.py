@@ -76,7 +76,7 @@ class ConversationService:
             raise get_supabase_error()("User UUID cannot be null or empty")
         
         # Set user context for RLS policies
-        self._get_connection_manager().set_user_context(user_uuid)
+        await self._get_connection_manager().set_user_context(user_uuid)
         
         conversation_id = self._generate_conversation_id()
         
@@ -94,7 +94,7 @@ class ConversationService:
         logger.debug(f"Conversation data: {conversation_data}")
         
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='insert',
                 data=conversation_data
@@ -132,7 +132,7 @@ class ConversationService:
             if not include_archived:
                 eq_conditions['is_archived'] = False
             
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='select',
                 eq=eq_conditions,
@@ -175,7 +175,7 @@ class ConversationService:
             Optional[Dict]: Conversation data or None if not found
         """
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='select',
                 eq={
@@ -234,7 +234,7 @@ class ConversationService:
             
             safe_data['updated_at'] = datetime.now().isoformat()
             
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='update',
                 data=safe_data,
