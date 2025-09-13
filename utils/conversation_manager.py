@@ -188,3 +188,56 @@ async def delete_conversation(conversation_id: str) -> bool:
     except Exception as e:
         logger.error(f"Error deleting conversation: {e}")
         return False
+
+async def duplicate_conversation(conversation_id: str) -> Optional[str]:
+    """Duplicate a conversation."""
+    try:
+        # Import here to avoid circular imports
+        from services.conversation_service import conversation_service
+        from services.user_service import user_service
+        
+        # Get user UUID
+        user_data = await user_service.get_user_by_id(st.session_state.user_id)
+        if not user_data:
+            return None
+        
+        # Get original conversation
+        if conversation_id not in st.session_state.conversations:
+            logger.error(f"Conversation not found: {conversation_id}")
+            return None
+        
+        original_conv = st.session_state.conversations[conversation_id]
+        
+        # Create new conversation with duplicated title
+        new_title = f"Copy of {original_conv['title']}"
+        new_conversation_id = await conversation_service.create_conversation(
+            user_data['id'], 
+            new_title, 
+            original_conv.get('model', 'meta-llama/llama-4-maverick-17b-128e-instruct')
+        )
+        
+        if not new_conversation_id:
+            return None
+        
+        # Copy messages to new conversation
+        for message in original_conv.get('messages', []):
+            await conversation_service.add_message(
+                user_data['id'],
+                new_conversation_id,
+                message
+            )
+        
+        # Update local session state
+        st.session_state.conversations[new_conversation_id] = {
+            "title": new_title,
+            "messages": original_conv.get('messages', []).copy(),
+            "created_at": datetime.now().isoformat(),
+            "model": original_conv.get('model', 'meta-llama/llama-4-maverick-17b-128e-instruct')
+        }
+        
+        logger.info(f"✅ Conversation duplicated: {new_conversation_id}")
+        return new_conversation_id
+        
+    except Exception as e:
+        logger.error(f"Error duplicating conversation: {e}")
+        return None
