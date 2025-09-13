@@ -265,7 +265,7 @@ class ConversationService:
             bool: Success status
         """
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='delete',
                 eq={
@@ -284,7 +284,7 @@ class ConversationService:
     async def archive_conversation(self, user_uuid: str, conversation_id: str) -> bool:
         """Archive a conversation (soft delete)."""
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='update',
                 data={
@@ -309,7 +309,7 @@ class ConversationService:
     async def unarchive_conversation(self, user_uuid: str, conversation_id: str) -> bool:
         """Unarchive a conversation."""
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='update',
                 data={
@@ -407,7 +407,7 @@ class ConversationService:
     async def update_conversation_title(self, user_uuid: str, conversation_id: str, title: str) -> bool:
         """Update conversation title."""
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='conversations',
                 operation='update',
                 data={

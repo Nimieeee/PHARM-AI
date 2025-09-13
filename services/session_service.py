@@ -85,7 +85,7 @@ class SessionService:
                 'user_agent': user_agent
             }
             
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='insert',
                 data=session_data
@@ -118,7 +118,7 @@ class SessionService:
         
         try:
             logger.info(f"Attempting to validate session: {session_id}")
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='select',
                 eq={'session_id': session_id}
@@ -140,7 +140,7 @@ class SessionService:
             if current_time > expires_at.replace(tzinfo=None):
                 # Session expired, remove it
                 logger.info(f"Session {session_id} expired. Removing from DB.")
-                self._get_connection_manager().execute_query(
+                await self._get_connection_manager().execute_query(
                     table='sessions',
                     operation='delete',
                     eq={'session_id': session_id}
@@ -149,7 +149,7 @@ class SessionService:
                 return None
             
             # Update last activity
-            self._get_connection_manager().execute_query(
+            await self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='update',
                 data={'last_activity': datetime.now().isoformat()},
@@ -176,7 +176,7 @@ class SessionService:
         try:
             new_expiry = self._get_expiry_time()
             
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='update',
                 data={
@@ -198,7 +198,7 @@ class SessionService:
     async def update_last_activity(self, session_id: str) -> bool:
         """Update session's last activity timestamp."""
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='update',
                 data={'last_activity': datetime.now().isoformat()},
@@ -225,7 +225,7 @@ class SessionService:
             return True
         
         try:
-            result = self._get_connection_manager().execute_query(
+            result = await self._get_connection_manager().execute_query(
                 table='sessions',
                 operation='delete',
                 eq={'session_id': session_id}
