@@ -18,16 +18,38 @@ def render_simple_chatbot():
         return
     
     st.title("💊 PharmGPT - Simple Mode")
-    st.caption("Simplified interface for testing")
+    
+    # Show current model status
+    current_mode = st.session_state.get('selected_model_mode', 'normal')
+    mode_emoji = "⚡" if current_mode == "turbo" else "🧠"
+    mode_name = "Turbo Mode" if current_mode == "turbo" else "Normal Mode"
+    streaming_status = "Streaming" if st.session_state.get('use_streaming', True) else "Non-streaming"
+    
+    st.caption(f"🎯 {mode_emoji} {mode_name} • 🌊 {streaming_status}")
     
     # Simple controls
-    col1, col2 = st.columns([3, 1])
+    col1, col2, col3 = st.columns([2, 1, 1])
+    
     with col2:
+        # Initialize model preference
+        if 'selected_model_mode' not in st.session_state:
+            st.session_state.selected_model_mode = "normal"
+        
+        # Model selection toggle
+        is_turbo = st.toggle("⚡ Turbo Mode", 
+                           value=(st.session_state.selected_model_mode == "turbo"),
+                           help="Switch between Normal (Groq Llama) and Turbo (OpenRouter) modes")
+        
+        st.session_state.selected_model_mode = "turbo" if is_turbo else "normal"
+    
+    with col3:
         # Initialize streaming preference
         if 'use_streaming' not in st.session_state:
             st.session_state.use_streaming = True
         
-        use_streaming = st.toggle("🌊 Streaming", value=st.session_state.use_streaming, help="Enable streaming responses")
+        use_streaming = st.toggle("🌊 Streaming", 
+                                value=st.session_state.use_streaming, 
+                                help="Enable streaming responses")
         st.session_state.use_streaming = use_streaming
     
     # Initialize messages in session state
@@ -69,9 +91,16 @@ def render_simple_chatbot():
                     response_placeholder.markdown("❌ No API models available. Please check your API keys.")
                     return
                 
-                # Use first available model
-                model = available_modes[list(available_modes.keys())[0]]["model"]
-                logger.info(f"Using model: {model}")
+                # Use selected model mode
+                selected_mode = st.session_state.selected_model_mode
+                if selected_mode not in available_modes:
+                    # Fallback to first available mode if selected mode is not available
+                    selected_mode = list(available_modes.keys())[0]
+                    st.warning(f"⚠️ Selected mode not available, using {selected_mode} instead")
+                
+                model = available_modes[selected_mode]["model"]
+                model_name = available_modes[selected_mode].get("description", model)
+                logger.info(f"Using {selected_mode} mode: {model}")
                 
                 # Prepare messages for API
                 api_messages = [{"role": "system", "content": pharmacology_system_prompt}]
@@ -80,12 +109,16 @@ def render_simple_chatbot():
                 for msg in st.session_state.chat_messages[-10:]:
                     api_messages.append({"role": msg["role"], "content": msg["content"]})
                 
+                # Show which model is being used
+                mode_emoji = "⚡" if selected_mode == "turbo" else "🧠"
+                mode_name = "Turbo" if selected_mode == "turbo" else "Normal"
+                
                 # Choose streaming or non-streaming based on toggle
                 if st.session_state.use_streaming:
                     # Try streaming
                     try:
-                        response_placeholder.markdown("🔄 Generating response (streaming)...")
-                        logger.info("Starting streaming response...")
+                        response_placeholder.markdown(f"🔄 Generating response ({mode_name} • Streaming)...")
+                        logger.info(f"Starting streaming response with {selected_mode} mode...")
                         
                         stream_worked = False
                         chunk_count = 0
@@ -103,7 +136,7 @@ def render_simple_chatbot():
                         # Final display without cursor
                         if stream_worked and full_response.strip():
                             response_placeholder.markdown(full_response)
-                            logger.info(f"✅ Streaming completed: {len(full_response)} chars, {chunk_count} chunks")
+                            logger.info(f"✅ Streaming completed ({selected_mode}): {len(full_response)} chars, {chunk_count} chunks")
                         else:
                             logger.warning("Streaming failed or empty, trying fallback...")
                             raise Exception("Streaming failed or empty response")
@@ -112,24 +145,24 @@ def render_simple_chatbot():
                         logger.warning(f"Streaming failed: {stream_error}, trying non-streaming...")
                         
                         # Fallback to non-streaming
-                        response_placeholder.markdown("🔄 Generating response (fallback)...")
+                        response_placeholder.markdown(f"🔄 Generating response ({mode_name} • Fallback)...")
                         full_response = chat_completion(model, api_messages)
                         
                         if full_response and not full_response.startswith("Error:"):
                             response_placeholder.markdown(full_response)
-                            logger.info(f"✅ Non-streaming fallback completed: {len(full_response)} chars")
+                            logger.info(f"✅ Non-streaming fallback completed ({selected_mode}): {len(full_response)} chars")
                         else:
                             raise Exception(f"Both streaming and non-streaming failed: {full_response}")
                 else:
                     # Use non-streaming directly
-                    response_placeholder.markdown("🔄 Generating response (non-streaming)...")
-                    logger.info("Using non-streaming response...")
+                    response_placeholder.markdown(f"🔄 Generating response ({mode_name} • Non-streaming)...")
+                    logger.info(f"Using non-streaming response with {selected_mode} mode...")
                     
                     full_response = chat_completion(model, api_messages)
                     
                     if full_response and not full_response.startswith("Error:"):
                         response_placeholder.markdown(full_response)
-                        logger.info(f"✅ Non-streaming completed: {len(full_response)} chars")
+                        logger.info(f"✅ Non-streaming completed ({selected_mode}): {len(full_response)} chars")
                     else:
                         raise Exception(f"Non-streaming failed: {full_response}")
                 
@@ -154,6 +187,7 @@ def render_simple_chatbot():
             st.write(f"• Total messages: {len(st.session_state.chat_messages)}")
             st.write(f"• User: {st.session_state.get('username', 'Unknown')}")
             st.write(f"• Authenticated: {st.session_state.get('authenticated', False)}")
+            st.write(f"• Model mode: {st.session_state.get('selected_model_mode', 'normal')}")
             st.write(f"• Streaming: {st.session_state.get('use_streaming', True)}")
         
         with col2:
@@ -167,6 +201,12 @@ def render_simple_chatbot():
                     from openai_client import get_available_model_modes
                     modes = get_available_model_modes()
                     st.success(f"✅ Available models: {list(modes.keys())}")
+                    
+                    # Show details about each model
+                    for mode, config in modes.items():
+                        emoji = "⚡" if mode == "turbo" else "🧠"
+                        st.write(f"{emoji} **{mode.title()}**: {config.get('description', config['model'])}")
+                        
                 except Exception as e:
                     st.error(f"❌ API test failed: {e}")
         
