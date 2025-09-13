@@ -57,9 +57,8 @@ def render_sidebar():
                         is_active = conv_id == st.session_state.current_conversation_id
                         button_style = "🟢 " if is_active else ""
                         
-                        # Get document count for this conversation
-                        doc_count = get_conversation_document_count(conv_id)
-                        doc_indicator = f" 📚{doc_count}" if doc_count > 0 else ""
+                        # Skip document count for faster loading on Streamlit Cloud
+                        doc_indicator = ""
                         
                         if st.button(
                             f"{button_style}{conv_data['title'][:20]}...{doc_indicator}",
@@ -97,19 +96,8 @@ def render_sidebar():
         
         st.markdown("---")
         
-        # Document count and upload status
-        if st.session_state.current_conversation_id:
-            # Show documents for current conversation
-            conv_doc_count = get_conversation_document_count()
-            if conv_doc_count > 0:
-                st.success(f"📚 {conv_doc_count} documents in this chat")
-            else:
-                st.info("📚 No documents in this chat")
-        
-        # Show total documents across all conversations
-        total_doc_count = get_all_user_documents_count()
-        if total_doc_count > 0:
-            st.info(f"📊 {total_doc_count} total documents across all chats")
+        # Skip document counts for faster loading on Streamlit Cloud
+        st.info("📚 Document features available")
         
         # Upload limit status
         from auth import get_user_upload_count
