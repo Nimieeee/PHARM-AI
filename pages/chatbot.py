@@ -232,7 +232,7 @@ def render_chat_interface():
                         # Show processing message
                         with st.spinner(f"Processing {uploaded_file.name}..."):
                             # Await the async process_uploaded_file
-                            await process_uploaded_file(uploaded_file, custom_prompt)
+                            run_async(process_uploaded_file(uploaded_file, custom_prompt))
                         logger.info(f"✅ File processing completed for: {uploaded_file.name}")
                         
                         # Success message
