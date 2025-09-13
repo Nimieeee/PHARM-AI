@@ -211,8 +211,10 @@ def render_chat_interface():
                 if file_key not in st.session_state:
                     st.session_state[file_key] = True
                     custom_prompt = user_input.strip() if user_input.strip() else None
+                    logger.info(f"🔄 Processing uploaded file: {uploaded_file.name}")
                     run_async(process_uploaded_file(uploaded_file, custom_prompt))
-                    st.rerun()
+                    logger.info(f"✅ File processing completed for: {uploaded_file.name}")
+                    # Don't rerun immediately - let the response generation complete
             else:
                 # Process regular message
                 logger.info(f"🔄 Processing regular message: '{user_input.strip()}'")
@@ -492,6 +494,10 @@ def _process_file_content(file_content: bytes, filename: str, file_type: str):
 
 async def process_uploaded_file(uploaded_file, custom_prompt=None):
     """Process uploaded file with optional custom prompt - optimized for performance."""
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🚀 PROCESS_UPLOADED_FILE started for: {uploaded_file.name}")
+    
     try:
         # Get file content
         file_content = uploaded_file.getvalue()
@@ -562,7 +568,9 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
                             st.markdown(auto_prompt)
 
                         # Generate response asynchronously
+                        logger.info(f"🎯 About to call generate_file_analysis_response with prompt: {auto_prompt[:100]}...")
                         generate_file_analysis_response(auto_prompt)
+                        logger.info(f"🏁 generate_file_analysis_response call completed")
 
                         # Clear uploader (don't rerun immediately - let response complete)
                         st.session_state.upload_counter += 1
@@ -591,7 +599,10 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
             st.error(f"❌ Error initializing document processor: {str(e)}")
 
     except Exception as e:
+        logger.error(f"💥 PROCESS_UPLOADED_FILE failed for {uploaded_file.name}: {str(e)}")
         st.error(f"❌ Error handling file upload: {str(e)}")
+    
+    logger.info(f"🏁 PROCESS_UPLOADED_FILE completed for: {uploaded_file.name}")
 
 def generate_file_analysis_response(auto_prompt: str):
     """Generate AI response for file analysis - optimized for performance."""
