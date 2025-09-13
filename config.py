@@ -5,6 +5,13 @@ Configuration settings for PharmGPT
 import streamlit as st
 import os
 
+# Load environment variables from .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not available, continue with system env vars
+
 # API Configuration - Lazy loading to avoid secrets access outside Streamlit
 def get_api_keys():
     """Get API keys from Streamlit secrets or environment variables."""

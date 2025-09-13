@@ -28,14 +28,28 @@ def get_selected_model(mode_key="model_mode", default_mode="normal"):
 DEFAULT_MODE = "normal"
 
 def run_async(coro):
-    """Run async function in Streamlit context."""
+    """Run async function in Streamlit context with better error handling."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     try:
+        # Try to get existing event loop
         loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            raise RuntimeError("Event loop is closed")
     except RuntimeError:
+        # Create new event loop for Streamlit Cloud compatibility
+        logger.info("Creating new event loop for async operation")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
-    return loop.run_until_complete(coro)
+    
+    try:
+        result = loop.run_until_complete(coro)
+        logger.info(f"✅ Async operation completed successfully")
+        return result
+    except Exception as e:
+        logger.error(f"💥 Async operation failed: {e}")
+        raise
 
 def render_chatbot_page():
     """Render the main chatbot page."""
@@ -203,8 +217,6 @@ def render_chat_interface():
         logger.info(f"🎯 SEND BUTTON CLICKED - Input: '{user_input}', File: {uploaded_file is not None}")
         
         if user_input.strip() or uploaded_file:
-            # Clear the input by resetting session state
-            st.session_state.chat_input_value = ""
             input_processed = True
 
             if uploaded_file:
@@ -225,6 +237,13 @@ def render_chat_interface():
                         # Success message
                         st.success(f"✅ Successfully processed {uploaded_file.name}")
                         
+                        # Clear the input and increment counter for next upload
+                        st.session_state.chat_input_value = ""
+                        st.session_state.upload_counter += 1
+                        
+                        # Rerun to refresh the interface
+                        st.rerun()
+                        
                     except Exception as file_error:
                         logger.error(f"💥 File processing failed for {uploaded_file.name}: {file_error}")
                         st.error(f"❌ Failed to process file: {str(file_error)}")
@@ -234,7 +253,19 @@ def render_chat_interface():
             else:
                 # Process regular message
                 logger.info(f"🔄 Processing regular message: '{user_input.strip()}'")
-                handle_chat_input(user_input.strip())
+                
+                # Clear the input immediately to prevent double processing
+                st.session_state.chat_input_value = ""
+                
+                # Process the message
+                try:
+                    handle_chat_input(user_input.strip())
+                    logger.info(f"✅ Message processing completed")
+                except Exception as msg_error:
+                    logger.error(f"💥 Message processing failed: {msg_error}")
+                    st.error(f"❌ Failed to process message: {str(msg_error)}")
+                
+                # Rerun to refresh the interface
                 st.rerun()
         else:
             st.error("Please enter a message or select a file to upload.")
@@ -269,18 +300,37 @@ def handle_chat_input(prompt):
     logger = logging.getLogger(__name__)
     logger.info(f"🎯 HANDLE_CHAT_INPUT called with prompt: '{prompt}'")
     
-    # Ensure we have a conversation
-    if not st.session_state.current_conversation_id:
-        logger.info("🆕 Creating new conversation for message...")
-        run_async(create_new_conversation())
+    try:
+        # Ensure we have a conversation
+        if not st.session_state.current_conversation_id:
+            logger.info("🆕 Creating new conversation for message...")
+            conversation_id = run_async(create_new_conversation())
+            if not conversation_id:
+                st.error("❌ Failed to create conversation")
+                return
+            logger.info(f"✅ New conversation created: {conversation_id}")
 
-    # Add user message
-    run_async(add_message_to_current_conversation("user", prompt))
+        # Add user message
+        logger.info("📝 Adding user message to conversation...")
+        success = run_async(add_message_to_current_conversation("user", prompt))
+        if not success:
+            st.error("❌ Failed to save user message")
+            return
+        logger.info("✅ User message saved")
 
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(prompt)
+        # Generate and display bot response
+        logger.info("🤖 Generating AI response...")
+        generate_and_display_response(prompt)
+        
+    except Exception as e:
+        logger.error(f"💥 Error in handle_chat_input: {e}")
+        st.error(f"❌ Error processing message: {str(e)}")
 
+def generate_and_display_response(user_prompt):
+    """Generate and display AI response."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     # Generate and display bot response
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
@@ -291,42 +341,38 @@ def handle_chat_input(prompt):
             message_placeholder.markdown("🤔 Thinking...")
 
             # Enhance prompt with RAG if available
-            enhanced_prompt = prompt
+            enhanced_prompt = user_prompt
             try:
                 rag_system = initialize_rag_system(st.session_state.current_conversation_id)
                 if rag_system and len(rag_system.get_documents_list()) > 0:
                     message_placeholder.markdown("🔍 Searching knowledge base...")
-                    enhanced_prompt = get_rag_enhanced_prompt(prompt, rag_system)
-                    if enhanced_prompt != prompt:
+                    enhanced_prompt = get_rag_enhanced_prompt(user_prompt, rag_system)
+                    if enhanced_prompt != user_prompt:
                         message_placeholder.markdown("📚 Found relevant information in documents...")
                     else:
                         message_placeholder.markdown("💭 No relevant documents found, using general knowledge...")
                 else:
                     message_placeholder.markdown("💭 No documents in this conversation...")
             except Exception as rag_error:
+                logger.warning(f"RAG error: {rag_error}")
                 message_placeholder.markdown("⚠️ Document search failed, using general knowledge...")
-                enhanced_prompt = prompt
+                enhanced_prompt = user_prompt
 
             message_placeholder.markdown("🔄 Generating response...")
-
-            messages = get_messages_for_api(enhanced_prompt)
 
             # Get selected model from mode
             selected_model = get_selected_model("model_mode", DEFAULT_MODE)
+            logger.info(f"🤖 Using model: {selected_model}")
 
             # Generate streaming response with optimized updates
-            message_placeholder.markdown("🔄 Generating response...")
             stream_worked = False
             update_counter = 0
 
-            # Debug logging
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info(f"🤖 Starting streaming with model: {selected_model}")
-            logger.info(f"📝 Messages for API: {len(get_messages_for_api(enhanced_prompt))} messages")
-
             try:
-                stream_iterator = chat_completion_stream(selected_model, get_messages_for_api(enhanced_prompt))
+                messages = get_messages_for_api(enhanced_prompt)
+                logger.info(f"📝 Prepared {len(messages)} messages for API")
+                
+                stream_iterator = chat_completion_stream(selected_model, messages)
                 logger.info("📡 Stream iterator created successfully")
                 
                 for chunk in stream_iterator:
@@ -334,14 +380,9 @@ def handle_chat_input(prompt):
                     full_response += chunk
                     update_counter += 1
 
-                    # Debug first few chunks
-                    if update_counter <= 5:
-                        logger.info(f"📡 Chunk {update_counter}: '{chunk}'")
-
                     # Update UI less frequently for better performance
                     if update_counter % 3 == 0:  # Update every 3 chunks
                         message_placeholder.markdown(full_response + "▌")
-                        time.sleep(0.01)  # Reduced sleep time
                         
                     # Safety check - if response is getting too long, break
                     if len(full_response) > 10000:
@@ -350,42 +391,44 @@ def handle_chat_input(prompt):
                         
             except Exception as stream_error:
                 logger.error(f"💥 Stream iteration error: {str(stream_error)}")
-                # Don't re-raise, let it fall through to the non-streaming fallback
-
-            logger.info(f"✅ Streaming completed: {update_counter} chunks, {len(full_response)} chars")
+                stream_worked = False
 
             # Show final response
-            if stream_worked:
+            if stream_worked and full_response:
                 message_placeholder.markdown(full_response)
-                logger.info(f"✅ Final response displayed: {len(full_response)} chars")
+                logger.info(f"✅ Streaming response displayed: {len(full_response)} chars")
             else:
                 # Fallback to non-streaming
                 logger.warning("⚠️ Streaming didn't work, trying non-streaming fallback")
-                full_response = chat_completion(selected_model, get_messages_for_api(enhanced_prompt))
-                message_placeholder.markdown(full_response)
-                logger.info(f"✅ Non-streaming fallback completed: {len(full_response)} chars")
+                try:
+                    messages = get_messages_for_api(enhanced_prompt)
+                    full_response = chat_completion(selected_model, messages)
+                    message_placeholder.markdown(full_response)
+                    logger.info(f"✅ Non-streaming fallback completed: {len(full_response)} chars")
+                except Exception as e2:
+                    logger.error(f"💥 Non-streaming fallback also failed: {str(e2)}")
+                    error_msg = f"❌ Error generating response: {str(e2)}"
+                    message_placeholder.markdown(error_msg)
+                    full_response = error_msg
 
         except Exception as e:
-            # Debug logging for errors
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"💥 Streaming error: {str(e)}")
-            
-            # Error fallback - still use enhanced prompt with RAG
-            try:
-                logger.info("🔄 Trying non-streaming fallback...")
-                selected_model = get_selected_model("model_mode", DEFAULT_MODE)
-                full_response = chat_completion(selected_model, get_messages_for_api(enhanced_prompt))
-                message_placeholder.markdown(full_response)
-                logger.info(f"✅ Non-streaming fallback successful: {len(full_response)} chars")
-            except Exception as e2:
-                logger.error(f"💥 Non-streaming fallback also failed: {str(e2)}")
-                error_msg = f"❌ Error: {str(e2)}"
-                message_placeholder.markdown(error_msg)
-                full_response = error_msg
+            logger.error(f"💥 Response generation error: {str(e)}")
+            error_msg = f"❌ Error generating response: {str(e)}"
+            message_placeholder.markdown(error_msg)
+            full_response = error_msg
 
         # Add bot response to conversation
-        run_async(add_message_to_current_conversation("assistant", full_response))
+        if full_response:
+            try:
+                success = run_async(add_message_to_current_conversation("assistant", full_response))
+                if success:
+                    logger.info("✅ Assistant response saved to conversation")
+                else:
+                    logger.error("❌ Failed to save assistant response")
+            except Exception as save_error:
+                logger.error(f"💥 Error saving assistant response: {save_error}")
+        else:
+            logger.error("❌ No response to save")
 
 def get_messages_for_api(user_input: str) -> list:
     """Get messages formatted for API call."""
@@ -588,17 +631,18 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
                         generate_file_analysis_response(auto_prompt)
                         logger.info(f"🏁 generate_file_analysis_response call completed")
 
-                        # Clear uploader (don't rerun immediately - let response complete)
+                        # Clear uploader and increment counter
                         st.session_state.upload_counter += 1
+                        logger.info(f"🏁 Document processing completed successfully")
 
                     elif result == "duplicate":
                         st.info(f"📚 Document '{uploaded_file.name}' already exists in this conversation's knowledge base.")
                         st.session_state.upload_counter += 1
-                        # Don't rerun for duplicates - just update counter
+                        logger.info(f"ℹ️ Duplicate document handled")
                     else:
                         st.error(f"❌ Failed to process {uploaded_file.name}. The document may be corrupted or in an unsupported format.")
                         st.session_state.upload_counter += 1
-                        # Don't rerun for errors - just update counter
+                        logger.error(f"❌ Document processing failed with result: {result}")
 
                 except Exception as e:
                     progress_placeholder.empty()
