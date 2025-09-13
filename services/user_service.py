@@ -30,17 +30,51 @@ class UserService:
         self._initialized = False
         from supabase_manager import get_connection_manager
         self.connection_manager = get_connection_manager()
+        self._event_loop_id = None
+
+    def _check_event_loop(self):
+        """Check if we're in a different event loop and reset if needed."""
+        import asyncio
+        try:
+            current_loop = asyncio.get_running_loop()
+            current_loop_id = id(current_loop)
+            
+            if self._event_loop_id is not None and self._event_loop_id != current_loop_id:
+                logger.warning("Event loop changed, resetting client")
+                self._initialized = False
+                self.supabase = None
+                from supabase_manager import get_connection_manager
+                self.connection_manager = get_connection_manager()
+            
+            self._event_loop_id = current_loop_id
+        except RuntimeError:
+            # No event loop running
+            pass
 
     async def _ensure_client(self):
         """Ensure Supabase client is initialized."""
-        if not self._initialized:
+        self._check_event_loop()
+        
+        if not self._initialized or self.supabase is None:
             try:
                 from supabase_manager import get_supabase_client as _get_client
                 self.supabase = await _get_client()
                 self._initialized = True
             except Exception as e:
-                logger.error(f"Failed to initialize Supabase client: {e}")
-                self.supabase = None
+                # Handle event loop issues by reinitializing connection manager
+                if "bound to a different event loop" in str(e) or "asyncio" in str(e).lower():
+                    logger.warning(f"AsyncIO event loop issue, reinitializing connection manager")
+                    from supabase_manager import get_connection_manager
+                    self.connection_manager = get_connection_manager()
+                    try:
+                        self.supabase = await _get_client()
+                        self._initialized = True
+                    except Exception as retry_e:
+                        logger.error(f"Failed to reinitialize Supabase client: {retry_e}")
+                        self.supabase = None
+                else:
+                    logger.error(f"Failed to initialize Supabase client: {e}")
+                    self.supabase = None
         return self.supabase
 
     def _hash_password(self, password: str, salt: str = None) -> Tuple[str, str]:
@@ -206,10 +240,12 @@ class UserService:
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """Get user by user_id (legacy compatibility)."""
         try:
-            if not await self._ensure_client():
-                return None
-
-            result = await self.supabase.table('users').select('*').eq('user_id', user_id).execute()
+            # Use connection manager instead of direct client to avoid event loop issues
+            result = await self.connection_manager.execute_query(
+                table='users',
+                operation='select',
+                eq={'user_id': user_id}
+            )
 
             if result.data:
                 return result.data[0]
@@ -217,16 +253,21 @@ class UserService:
 
         except Exception as e:
             # Handle asyncio event loop binding issues
-            if "bound to a different event loop" in str(e):
+            if "bound to a different event loop" in str(e) or "asyncio" in str(e).lower():
                 logger.warning(f"AsyncIO event loop issue for user {user_id}, reinitializing client")
                 self._initialized = False
                 self.supabase = None
-                # Try once more with fresh client
+                # Force connection manager to reinitialize
                 try:
-                    if await self._ensure_client():
-                        result = await self.supabase.table('users').select('*').eq('user_id', user_id).execute()
-                        if result.data:
-                            return result.data[0]
+                    from supabase_manager import get_connection_manager
+                    self.connection_manager = get_connection_manager()
+                    result = await self.connection_manager.execute_query(
+                        table='users',
+                        operation='select',
+                        eq={'user_id': user_id}
+                    )
+                    if result.data:
+                        return result.data[0]
                 except Exception as retry_e:
                     logger.error(f"Retry failed for user {user_id}: {str(retry_e)}")
             else:

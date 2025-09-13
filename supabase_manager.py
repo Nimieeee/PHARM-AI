@@ -77,11 +77,32 @@ class SupabaseConnectionManager:
     def __init__(self):
         if not hasattr(self, 'initialized'):
             self.initialized = True
+            self._event_loop_id = None
             # Don't initialize client here - do it lazily
+
+    def _check_event_loop(self):
+        """Check if we're in a different event loop and reset if needed."""
+        try:
+            current_loop = asyncio.get_running_loop()
+            current_loop_id = id(current_loop)
+            
+            if self._event_loop_id is not None and self._event_loop_id != current_loop_id:
+                logger.warning("Event loop changed in connection manager, resetting client")
+                self._client = None
+                self._initialization_attempted = False
+                self._initialization_successful = False
+            
+            self._event_loop_id = current_loop_id
+        except RuntimeError:
+            # No event loop running
+            pass
 
     async def _initialize_client(self) -> bool:
         """Initialize Supabase client with error handling."""
         logger.info("🚀 SUPABASE._INITIALIZE_CLIENT called")
+        
+        # Check for event loop changes
+        self._check_event_loop()
 
         if not SUPABASE_AVAILABLE:
             logger.error("❌ Supabase library not available")
@@ -125,6 +146,9 @@ class SupabaseConnectionManager:
     async def get_client(self) -> Optional[AsyncClient]:
         """Get Supabase client instance with smart caching."""
         logger.info(f"🔍 SUPABASE.GET_CLIENT called - client exists: {self._client is not None}, init_attempted: {self._initialization_attempted}")
+
+        # Check for event loop changes first
+        self._check_event_loop()
 
         # Only initialize once per session
         if self._client is None and not self._initialization_attempted:
