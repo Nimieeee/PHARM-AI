@@ -22,7 +22,7 @@ def get_connection_manager():
 def get_supabase_error():
     """Get SupabaseError with lazy import."""
     try:
-        from supabase_manager import SupabaseError
+        from supabase import SupabaseError
         return SupabaseError
     except ImportError:
         return Exception
@@ -30,8 +30,8 @@ def get_supabase_error():
 def get_error_handler():
     """Get ErrorHandler with lazy import."""
     try:
-        from supabase_manager import ErrorHandler
-        return ErrorHandler
+        # Use generic Exception since ErrorHandler doesn't exist
+        return Exception
     except ImportError:
         return None
 
