@@ -189,6 +189,11 @@ def render_chat_interface():
 
     # Handle input submission (with or without file)
     if send_clicked:
+        # Debug logging
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"🎯 SEND BUTTON CLICKED - Input: '{user_input}', File: {uploaded_file is not None}")
+        
         if user_input.strip() or uploaded_file:
             # Clear the input by resetting session state
             st.session_state.chat_input_value = ""
@@ -203,6 +208,7 @@ def render_chat_interface():
                     st.rerun()
             else:
                 # Process regular message
+                logger.info(f"🔄 Processing regular message: '{user_input.strip()}'")
                 handle_chat_input(user_input.strip())
                 st.rerun()
         else:
@@ -233,8 +239,14 @@ def display_chat_messages():
 
 def handle_chat_input(prompt):
     """Handle chat input and generate response."""
+    # Debug logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"🎯 HANDLE_CHAT_INPUT called with prompt: '{prompt}'")
+    
     # Ensure we have a conversation
     if not st.session_state.current_conversation_id:
+        logger.info("🆕 Creating new conversation for message...")
         run_async(create_new_conversation())
 
     # Add user message
