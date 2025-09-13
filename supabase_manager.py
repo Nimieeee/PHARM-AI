@@ -73,7 +73,7 @@ class SupabaseConnectionManager:
         self._client = None
         self._initialization_attempted = False
         self._initialization_successful = False
-        # No need for _event_loop_id as the instance itself is cached
+        self._event_loop_id = None # Reintroduce this
 
     # Removed __new__ method as st.session_state handles singleton behavior
 
@@ -135,13 +135,33 @@ class SupabaseConnectionManager:
         """Get Supabase client instance with smart caching."""
         logger.info(f"🔍 SUPABASE.GET_CLIENT called - client exists: {self._client is not None}, init_attempted: {self._initialization_attempted}")
 
+        # Proactively check for event loop changes
+        try:
+            current_loop = asyncio.get_running_loop()
+            current_loop_id = id(current_loop)
+
+            if self._event_loop_id is not None and self._event_loop_id != current_loop_id:
+                logger.warning(f"Event loop changed in get_client (old: {self._event_loop_id}, new: {current_loop_id}), forcing client reset.")
+                self._client = None # Force reset
+                self._initialization_attempted = False
+                self._initialization_successful = False
+            self._event_loop_id = current_loop_id
+        except RuntimeError:
+            # No event loop running, reset everything to be safe
+            if self._event_loop_id is not None:
+                logger.warning("No event loop running in get_client, resetting client state.")
+                self._client = None
+                self._initialization_attempted = False
+                self._initialization_successful = False
+                self._event_loop_id = None
+
         # Initialize if needed
         if self._client is None:
             if not self._initialization_attempted:
                 logger.info("🚀 First initialization attempt...")
             else:
                 logger.info("🔄 Reinitializing client (likely due to event loop change)....")
-            
+
             self._initialization_attempted = True
             success = await self._initialize_client()
             self._initialization_successful = success
@@ -283,7 +303,7 @@ class SupabaseConnectionManager:
             # Handle AsyncIO event loop binding issues
             if "bound to a different event loop" in str(e) or "asyncio" in str(e).lower():
                 logger.warning(f"AsyncIO event loop issue detected, reinitializing client: {str(e)}")
-                # Force client reinitialization
+                # Force complete client reset
                 self._client = None
                 self._initialization_attempted = False
                 self._initialization_successful = False
