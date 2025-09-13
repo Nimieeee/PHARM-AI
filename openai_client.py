@@ -1,14 +1,47 @@
 """
-OpenAI-compatible API client for chat completions
-Supports both Groq and OpenRouter APIs with performance optimizations
+Clean OpenAI-compatible API client for PharmGPT
+Simple, reliable chat completions with Groq and OpenRouter
 """
 
 import openai
+import os
+import logging
 from typing import Iterator, Dict, List
-import streamlit as st
-from config import get_model_configs
-import hashlib
-import json
+
+# Configure logging
+logger = logging.getLogger(__name__)
+
+# Load environment variables
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+def get_api_keys():
+    """Get API keys from environment variables."""
+    groq_key = os.environ.get("GROQ_API_KEY")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+    return groq_key, openrouter_key
+
+def get_model_configs():
+    """Get model configurations with API keys."""
+    groq_key, openrouter_key = get_api_keys()
+    
+    return {
+        "normal": {
+            "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "api_key": groq_key,
+            "base_url": "https://api.groq.com/openai/v1",
+            "description": "Llama 4 Maverick (Balanced)"
+        },
+        "turbo": {
+            "model": "openrouter/sonoma-sky-alpha",
+            "api_key": openrouter_key,
+            "base_url": "https://openrouter.ai/api/v1",
+            "description": "Sonoma Sky Alpha (Fast)"
+        }
+    }
 
 def get_available_model_modes() -> Dict:
     """Get available model modes based on API key availability."""
@@ -21,11 +54,10 @@ def get_available_model_modes() -> Dict:
     
     return available_modes
 
-@st.cache_resource
-def get_client_for_model(model: str) -> openai.OpenAI:
-    """Get OpenAI client for specific model - cached for performance."""
-    # Find which config this model belongs to
+def _get_client_for_model(model: str) -> openai.OpenAI:
+    """Get OpenAI client for specific model."""
     model_configs = get_model_configs()
+    
     for mode, config in model_configs.items():
         if config["model"] == model:
             if not config["api_key"]:
@@ -38,43 +70,10 @@ def get_client_for_model(model: str) -> openai.OpenAI:
     
     raise ValueError(f"Unknown model: {model}")
 
-def _get_messages_hash(messages: List[Dict]) -> str:
-    """Generate hash for message list to enable caching."""
-    # Create a stable hash of the messages
-    messages_str = json.dumps(messages, sort_keys=True)
-    return hashlib.md5(messages_str.encode()).hexdigest()
-
-@st.cache_data(ttl=300)  # Cache for 5 minutes
-def _cached_chat_completion(model: str, messages_hash: str, messages: List[Dict]) -> str:
-    """Cached chat completion for identical requests."""
-    try:
-        client = get_client_for_model(model)
-        
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=0.7,
-            max_tokens=2000
-        )
-        
-        return response.choices[0].message.content
-        
-    except Exception as e:
-        return f"Error: {str(e)}"
-
 def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
-    """
-    Generate streaming chat completion.
-    
-    Args:
-        model: Model name to use
-        messages: List of message dictionaries
-        
-    Yields:
-        str: Chunks of the response
-    """
+    """Generate streaming chat completion."""
     try:
-        client = get_client_for_model(model)
+        client = _get_client_for_model(model)
         
         stream = client.chat.completions.create(
             model=model,
@@ -89,28 +88,31 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                 yield chunk.choices[0].delta.content
                 
     except Exception as e:
-        st.error(f"Streaming error: {str(e)}")
+        logger.error(f"Streaming error: {str(e)}")
         yield f"Error: {str(e)}"
 
 def chat_completion(model: str, messages: List[Dict]) -> str:
-    """
-    Generate non-streaming chat completion with caching.
-    
-    Args:
-        model: Model name to use
-        messages: List of message dictionaries
+    """Generate non-streaming chat completion."""
+    try:
+        client = _get_client_for_model(model)
         
-    Returns:
-        str: Complete response
-    """
-    # Use cached version for identical requests
-    messages_hash = _get_messages_hash(messages)
-    return _cached_chat_completion(model, messages_hash, messages)
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0.7,
+            max_tokens=2000
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        logger.error(f"Chat completion error: {str(e)}")
+        return f"Error: {str(e)}"
 
 def test_api_connection(model: str) -> bool:
     """Test API connection for a specific model."""
     try:
-        client = get_client_for_model(model)
+        client = _get_client_for_model(model)
         
         response = client.chat.completions.create(
             model=model,
@@ -120,5 +122,6 @@ def test_api_connection(model: str) -> bool:
         
         return True
         
-    except Exception:
+    except Exception as e:
+        logger.error(f"API connection test failed for {model}: {e}")
         return False

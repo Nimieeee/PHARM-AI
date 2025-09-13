@@ -1,68 +1,39 @@
 """
-Session State Management - Supabase Version
+Clean Session State Management for PharmGPT
+Simple, reliable session initialization
 """
 
 import streamlit as st
-import asyncio
+import logging
+from datetime import datetime
 
-# Import with error handling for Streamlit Cloud
-try:
-    from auth import load_user_conversations
-except ImportError as e:
-    st.error(f"Failed to import auth module: {e}")
-    st.stop()
-
-# Helper function to run async functions in Streamlit
-def run_async(coro):
-    """Run async function in Streamlit context."""
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    
-    return loop.run_until_complete(coro)
+# Configure logging
+logger = logging.getLogger(__name__)
 
 def initialize_session_state():
-    """Initialize session state variables with Supabase optimizations."""
-    import logging
-    import time
-    
-    logger = logging.getLogger(__name__)
-    logger.info(f"🔄 INITIALIZE_SESSION_STATE called - authenticated: {st.session_state.get('authenticated', False)}, session_id: {st.session_state.get('session_id', 'None')}")
+    """Initialize session state variables."""
+    logger.info("Initializing session state")
     
     # Initialize conversations to an empty dict if not present
     if "conversations" not in st.session_state:
         st.session_state.conversations = {}
-
-    # Smart caching - avoid repeated initialization within same session
-    cache_key = "last_auth_init_time"
-    init_marker = "auth_initialized_this_run"
-    current_time = time.time()
     
-    # Check if we've already initialized auth in this very session run
-    if init_marker in st.session_state:
-        logger.info("💾 Skipping auth initialization (already done this run)")
-        return
+    # Initialize authentication state
+    if "authenticated" not in st.session_state:
+        st.session_state.authenticated = False
     
-    # On Streamlit Cloud, be more aggressive about keeping sessions alive
-    timeout_seconds = 600.0  # 10 minutes for better persistence
+    if "username" not in st.session_state:
+        st.session_state.username = None
     
-    # Only re-initialize auth if it's been more than timeout or not initialized
-    if (cache_key not in st.session_state or
-        current_time - st.session_state.get(cache_key, 0) > timeout_seconds):
-        
-        logger.info("🆕 Running auth initialization (cache miss or timeout)")
-        from auth import initialize_auth_session
-        initialize_auth_session()
-        st.session_state[cache_key] = current_time
-        st.session_state[init_marker] = True
-    else:
-        logger.info("💾 Skipping auth initialization (cached)")
+    if "user_id" not in st.session_state:
+        st.session_state.user_id = None
+    
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = None
     
     # Initialize theme
     if "theme_mode" not in st.session_state:
-        st.session_state.theme_mode = "light"  # Default to light mode
+        st.session_state.theme_mode = "light"
     
     # Page navigation
     if "current_page" not in st.session_state:
@@ -70,63 +41,35 @@ def initialize_session_state():
             st.session_state.current_page = "chatbot"
         else:
             st.session_state.current_page = "homepage"
-
-    # Initialize conversation-related state (always)
+    
+    # Initialize conversation-related state
     if "current_conversation_id" not in st.session_state:
         st.session_state.current_conversation_id = None
+    
     if "conversation_counter" not in st.session_state:
-        st.session_state.conversation_counter = len(st.session_state.conversations)
+        st.session_state.conversation_counter = 0
+    
     if "search_query" not in st.session_state:
         st.session_state.search_query = ""
     
-    # Only initialize conversation-related state if authenticated
-    if st.session_state.authenticated:
-        # Ensure user data isolation
-        privacy_key = f"privacy_verified_{st.session_state.user_id}"
-        if privacy_key not in st.session_state:
-            # Clear any session state that might belong to other users
-            keys_to_clear = []
-            for key in st.session_state.keys():
-                if ('conversation' in key.lower() or 'rag_system' in key.lower()) and st.session_state.user_id not in key:
-                    keys_to_clear.append(key)
-            
-            for key in keys_to_clear:
-                del st.session_state[key]
-                logger.info(f"🔒 Cleared potentially cross-user data: {key}")
-                cleaned = cleanup_orphaned_data()
-                if cleaned:
-                    st.warning(f"🔒 Cleaned up orphaned data for privacy: {len(cleaned)} items removed")
-            st.session_state[privacy_key] = True
-        
-        # Optimize conversation loading with Supabase caching
-        current_user_key = f"conversations_for_{st.session_state.user_id}"
-        conversations_cache_key = f"conversations_cache_{st.session_state.user_id}"
-        
-        # Only reload if user changed or conversations not cached
-        if (st.session_state.get("last_loaded_user_id") != st.session_state.user_id or
-            conversations_cache_key not in st.session_state):
-            
-            # Clear any existing conversation data to prevent cross-contamination
-            keys_to_clear = [k for k in st.session_state.keys() 
-                           if 'conversation' in k.lower() and st.session_state.user_id not in k]
-            for key in keys_to_clear:
-                if key != 'conversation_counter':  # Keep counter
-                    del st.session_state[key]
-            
-            # Load fresh conversations for this user from Supabase (cached)
-            if conversations_cache_key not in st.session_state:
-                try:
-                    conversations = load_user_conversations(st.session_state.user_id)
-                    st.session_state[conversations_cache_key] = conversations
-                except Exception as e:
-                    st.error(f"Error loading conversations: {e}")
-                    st.session_state[conversations_cache_key] = {}
-            
-            st.session_state.conversations = st.session_state[conversations_cache_key]
-            st.session_state[current_user_key] = True
-            st.session_state.last_loaded_user_id = st.session_state.user_id
-            st.session_state.current_conversation_id = None  # Reset current conversation
-            
-        # Use cached conversations if available
-        elif conversations_cache_key in st.session_state:
-            st.session_state.conversations = st.session_state[conversations_cache_key]
+    # Initialize auth if we have session info
+    if st.session_state.authenticated and st.session_state.user_id:
+        try:
+            load_user_conversations()
+        except Exception as e:
+            logger.error(f"Error loading user conversations: {e}")
+
+def load_user_conversations():
+    """Load user conversations from database."""
+    if not st.session_state.authenticated or not st.session_state.user_id:
+        return
+    
+    try:
+        from auth import load_user_conversations as load_conversations
+        conversations = load_conversations(st.session_state.user_id)
+        st.session_state.conversations = conversations
+        st.session_state.conversation_counter = len(conversations)
+        logger.info(f"Loaded {len(conversations)} conversations for user")
+    except Exception as e:
+        logger.error(f"Failed to load conversations: {e}")
+        st.session_state.conversations = {}
