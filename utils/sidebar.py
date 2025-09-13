@@ -5,7 +5,7 @@ Sidebar for Authenticated Users
 import streamlit as st
 from auth import logout_current_user
 from utils.conversation_manager import delete_conversation, duplicate_conversation
-from rag_interface_chromadb import get_conversation_document_count, get_all_user_documents_count
+from rag_interface_supabase import get_conversation_document_count, get_all_user_documents_count
 
 def render_sidebar():
     """Render the sidebar with conversations and settings."""
