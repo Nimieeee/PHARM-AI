@@ -56,7 +56,6 @@ def validate_order_clause(order_clause: str) -> str:
 class SupabaseConnectionManager:
     """Manages Supabase database connections with pooling and error handling."""
 
-    _instance = None
     _client: Optional[AsyncClient] = None
     _initialization_attempted = False
     _initialization_successful = False
@@ -69,50 +68,21 @@ class SupabaseConnectionManager:
         'connection_errors': []
     }
 
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super(SupabaseConnectionManager, cls).__new__(cls)
-        return cls._instance
-
     def __init__(self):
-        if not hasattr(self, 'initialized'):
-            self.initialized = True
-            self._event_loop_id = None
-            # Don't initialize client here - do it lazily
+        # This init will only run once per session due to st.session_state caching
+        self._client = None
+        self._initialization_attempted = False
+        self._initialization_successful = False
+        # No need for _event_loop_id as the instance itself is cached
 
-    def _check_event_loop(self):
-        """Check if we're in a different event loop and reset if needed."""
-        try:
-            current_loop = asyncio.get_running_loop()
-            current_loop_id = id(current_loop)
-            
-            if self._event_loop_id is not None and self._event_loop_id != current_loop_id:
-                logger.warning(f"Event loop changed in connection manager (old: {self._event_loop_id}, new: {current_loop_id}), resetting client")
-                # Force complete reset
-                self._client = None
-                self._initialization_attempted = False
-                self._initialization_successful = False
-                # Clear any cached connection state
-                if hasattr(self, '_connection_pool'):
-                    self._connection_pool = None
-            
-            self._event_loop_id = current_loop_id
-        except RuntimeError:
-            # No event loop running, reset everything to be safe
-            if self._event_loop_id is not None:
-                logger.warning("No event loop running, resetting client state")
-                self._client = None
-                self._initialization_attempted = False
-                self._initialization_successful = False
-                self._event_loop_id = None
+    # Removed __new__ method as st.session_state handles singleton behavior
+
+    # Removed _check_event_loop as it's no longer needed with st.session_state caching
 
     async def _initialize_client(self) -> bool:
         """Initialize Supabase client with error handling."""
         logger.info("🚀 SUPABASE._INITIALIZE_CLIENT called")
         
-        # Check for event loop changes
-        self._check_event_loop()
-
         if not SUPABASE_AVAILABLE:
             logger.error("❌ Supabase library not available")
             return False
@@ -165,15 +135,12 @@ class SupabaseConnectionManager:
         """Get Supabase client instance with smart caching."""
         logger.info(f"🔍 SUPABASE.GET_CLIENT called - client exists: {self._client is not None}, init_attempted: {self._initialization_attempted}")
 
-        # Check for event loop changes first
-        self._check_event_loop()
-
-        # Initialize if needed (including after event loop changes)
+        # Initialize if needed
         if self._client is None:
             if not self._initialization_attempted:
                 logger.info("🚀 First initialization attempt...")
             else:
-                logger.info("🔄 Reinitializing client (likely due to event loop change)...")
+                logger.info("🔄 Reinitializing client (likely due to event loop change)....")
             
             self._initialization_attempted = True
             success = await self._initialize_client()
@@ -183,7 +150,7 @@ class SupabaseConnectionManager:
 
     async def test_connection(self) -> bool:
         """Test database connection health."""
-        logger.info("🧪 SUPABASE.TEST_CONNECTION called")
+        logger.info("🧪 SUPABASE.TEST.CONNECTION called")
 
         if not self._client:
             logger.warning("❌ No client available for connection test")
@@ -231,8 +198,6 @@ class SupabaseConnectionManager:
 
     async def execute_query(self, table: str, operation: str, **kwargs) -> Any:
         """Execute database query with error handling and stats tracking."""
-        # Check event loop before executing query
-        self._check_event_loop()
         
         # Ensure client is available (this will initialize if needed)
         client = await self.get_client()
@@ -393,7 +358,7 @@ class SupabaseConnectionManager:
         self._client = None
         self._initialization_attempted = False
         self._initialization_successful = False
-        self._event_loop_id = None
+        # Removed _event_loop_id reset as it's no longer tracked
         
         # Clear connection stats errors
         if 'connection_errors' in self._connection_stats:
@@ -498,14 +463,14 @@ class ErrorHandler:
                 await asyncio.sleep(delay)
 
 # Global connection manager instance (lazy-loaded)
-_connection_manager = None
+# Use st.session_state to cache the SupabaseConnectionManager instance
+# This ensures it persists across Streamlit reruns
 
 def get_connection_manager():
-    """Get global connection manager instance with lazy loading."""
-    global _connection_manager
-    if _connection_manager is None:
-        _connection_manager = SupabaseConnectionManager()
-    return _connection_manager
+    """Get global connection manager instance with lazy loading and Streamlit session state caching."""
+    if 'supabase_connection_manager' not in st.session_state:
+        st.session_state.supabase_connection_manager = SupabaseConnectionManager()
+    return st.session_state.supabase_connection_manager
 
 # For backward compatibility
 connection_manager = get_connection_manager()
