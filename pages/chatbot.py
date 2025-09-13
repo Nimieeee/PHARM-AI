@@ -126,6 +126,209 @@ def generate_conversation_title():
     # Fallback title
     return f"Chat {datetime.now().strftime('%m/%d %H:%M')}"
 
+def render_conversation_sidebar():
+    """Render conversation management sidebar."""
+    with st.sidebar:
+        st.header("💬 Conversations")
+        
+        # New conversation button
+        if st.button("🆕 New Chat", use_container_width=True, type="primary"):
+            # Save current conversation first
+            if st.session_state.chat_messages:
+                save_conversation()
+            
+            # Clear current conversation
+            st.session_state.chat_messages = []
+            st.session_state.current_conversation_id = None
+            st.success("✅ New conversation started!")
+            st.rerun()
+        
+        st.divider()
+        
+        # Load and display conversations
+        try:
+            if st.session_state.get('authenticated') and st.session_state.get('user_id'):
+                from services.conversation_service import conversation_service
+                from services.user_service import user_service
+                
+                # Get user UUID
+                user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+                if user_data:
+                    # Get user's conversations
+                    conversations = run_async(conversation_service.get_user_conversations(user_data['id']))
+                    
+                    if conversations:
+                        st.subheader("📚 Your Chats")
+                        
+                        # Sort conversations by updated_at (most recent first)
+                        sorted_convs = sorted(
+                            conversations.items(),
+                            key=lambda x: x[1].get('updated_at', x[1].get('created_at', '')),
+                            reverse=True
+                        )
+                        
+                        current_conv_id = st.session_state.get('current_conversation_id')
+                        
+                        for conv_id, conv_data in sorted_convs:
+                            title = conv_data.get('title', 'Untitled Chat')
+                            message_count = len(conv_data.get('messages', []))
+                            created_at = conv_data.get('created_at', '')
+                            
+                            # Truncate long titles
+                            display_title = title[:25] + "..." if len(title) > 25 else title
+                            
+                            # Show current conversation with different styling
+                            is_current = (conv_id == current_conv_id)
+                            
+                            # Create conversation container
+                            with st.container():
+                                # Main conversation button
+                                if st.button(
+                                    f"{'🔸' if is_current else '💬'} {display_title}",
+                                    key=f"conv_{conv_id}",
+                                    use_container_width=True,
+                                    type="primary" if is_current else "secondary",
+                                    disabled=is_current
+                                ):
+                                    # Save current conversation before switching
+                                    if st.session_state.chat_messages and current_conv_id != conv_id:
+                                        save_conversation()
+                                    
+                                    # Load selected conversation
+                                    st.session_state.chat_messages = conv_data.get('messages', [])
+                                    st.session_state.current_conversation_id = conv_id
+                                    st.rerun()
+                                
+                                # Show conversation metadata
+                                col1, col2, col3 = st.columns([2, 1, 1])
+                                with col1:
+                                    # Format date nicely
+                                    try:
+                                        from datetime import datetime
+                                        date_obj = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+                                        date_str = date_obj.strftime('%m/%d')
+                                    except:
+                                        date_str = "Recent"
+                                    st.caption(f"📅 {date_str}")
+                                
+                                with col2:
+                                    st.caption(f"💬 {message_count}")
+                                
+                                with col3:
+                                    if is_current:
+                                        st.caption("🔸 Active")
+                                    else:
+                                        st.caption("")
+                                
+                                # Add some spacing between conversations
+                                if not is_current:
+                                    st.write("")
+                            
+                        # Conversation management
+                        st.divider()
+                        st.subheader("🛠️ Manage")
+                        
+                        # Current conversation actions
+                        if current_conv_id:
+                            # Rename conversation
+                            with st.expander("✏️ Rename Chat"):
+                                current_title = next(
+                                    (conv_data.get('title', 'Untitled Chat') 
+                                     for conv_id, conv_data in conversations.items() 
+                                     if conv_id == current_conv_id), 
+                                    'Untitled Chat'
+                                )
+                                
+                                new_title = st.text_input(
+                                    "New title:",
+                                    value=current_title,
+                                    key="rename_input"
+                                )
+                                
+                                col1, col2 = st.columns(2)
+                                with col1:
+                                    if st.button("💾 Save", use_container_width=True):
+                                        if new_title and new_title != current_title:
+                                            try:
+                                                success = run_async(conversation_service.update_conversation_title(
+                                                    user_data['id'], 
+                                                    current_conv_id,
+                                                    new_title
+                                                ))
+                                                if success:
+                                                    st.success("✅ Title updated!")
+                                                    st.rerun()
+                                                else:
+                                                    st.error("❌ Failed to update title")
+                                            except Exception as e:
+                                                st.error(f"❌ Error: {e}")
+                                        else:
+                                            st.info("No changes to save")
+                                
+                                with col2:
+                                    if st.button("🔄 Auto-title", use_container_width=True):
+                                        # Generate title from first message
+                                        auto_title = generate_conversation_title()
+                                        if auto_title != current_title:
+                                            try:
+                                                success = run_async(conversation_service.update_conversation_title(
+                                                    user_data['id'], 
+                                                    current_conv_id,
+                                                    auto_title
+                                                ))
+                                                if success:
+                                                    st.success("✅ Auto-title applied!")
+                                                    st.rerun()
+                                                else:
+                                                    st.error("❌ Failed to apply auto-title")
+                                            except Exception as e:
+                                                st.error(f"❌ Error: {e}")
+                                        else:
+                                            st.info("Current title is already optimal")
+                            
+                            # Duplicate conversation
+                            if st.button("📋 Duplicate Chat", use_container_width=True):
+                                try:
+                                    new_conv_id = run_async(conversation_service.duplicate_conversation(
+                                        user_data['id'], 
+                                        current_conv_id
+                                    ))
+                                    if new_conv_id:
+                                        st.success("✅ Conversation duplicated!")
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to duplicate conversation")
+                                except Exception as e:
+                                    st.error(f"❌ Error: {e}")
+                            
+                            # Delete conversation
+                            st.write("")  # Add some space
+                            if st.button("🗑️ Delete Current Chat", use_container_width=True, type="secondary"):
+                                try:
+                                    success = run_async(conversation_service.delete_conversation(
+                                        user_data['id'], 
+                                        current_conv_id
+                                    ))
+                                    if success:
+                                        st.session_state.chat_messages = []
+                                        st.session_state.current_conversation_id = None
+                                        st.success("✅ Conversation deleted!")
+                                        st.rerun()
+                                    else:
+                                        st.error("❌ Failed to delete conversation")
+                                except Exception as e:
+                                    st.error(f"❌ Error: {e}")
+                        
+                        else:
+                            st.info("💡 Start chatting to create a conversation, then you can manage it here.")
+                    
+                    else:
+                        st.info("No conversations yet. Start chatting to create your first conversation!")
+                        
+        except Exception as e:
+            st.error(f"❌ Error loading conversations: {e}")
+            logger.error(f"Sidebar conversation loading error: {e}")
+
 def render_simple_chatbot():
     """Render a simple, working chatbot interface."""
     
@@ -134,17 +337,42 @@ def render_simple_chatbot():
         st.error("Please sign in to use the chatbot.")
         return
     
+    # Render conversation sidebar
+    render_conversation_sidebar()
+    
     st.title("💊 PharmGPT")
     
-    # Show current model status and persistence info
+    # Show current conversation info
+    current_conv_id = st.session_state.get('current_conversation_id')
+    if current_conv_id:
+        try:
+            from services.conversation_service import conversation_service
+            from services.user_service import user_service
+            
+            user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+            if user_data:
+                conversations = run_async(conversation_service.get_user_conversations(user_data['id']))
+                current_conv = conversations.get(current_conv_id)
+                
+                if current_conv:
+                    conv_title = current_conv.get('title', 'Untitled Chat')
+                    message_count = len(current_conv.get('messages', []))
+                    
+                    # Show conversation header
+                    st.info(f"💬 **{conv_title}** • {message_count} messages • 💾 Saved")
+                else:
+                    st.warning("⚠️ Current conversation not found in database")
+        except Exception as e:
+            logger.error(f"Error loading conversation info: {e}")
+    else:
+        st.info("📝 **New Conversation** • Start chatting to save it")
+    
+    # Show current model status
     current_mode = st.session_state.get('selected_model_mode', 'normal')
     mode_emoji = "⚡" if current_mode == "turbo" else "🧠"
     mode_name = "Turbo Mode" if current_mode == "turbo" else "Normal Mode"
     
-    # Show conversation status
-    conv_status = "💾 Saved" if st.session_state.get('current_conversation_id') else "📝 New"
-    
-    st.caption(f"🎯 {mode_emoji} {mode_name} • 💫 Fluid Streaming • {conv_status}")
+    st.caption(f"🎯 {mode_emoji} {mode_name} • 💫 Fluid Streaming")
     
     # Simple model selection control
     col1, col2, col3 = st.columns([2, 1, 2])
@@ -327,18 +555,6 @@ def render_simple_chatbot():
                         st.error("❌ Save failed")
                 else:
                     st.info("No messages to save")
-            
-            # Start new conversation
-            if st.button("🆕 New Chat", use_container_width=True):
-                # Save current conversation first
-                if st.session_state.chat_messages:
-                    save_conversation()
-                
-                # Clear current conversation
-                st.session_state.chat_messages = []
-                st.session_state.current_conversation_id = None
-                st.success("✅ New conversation started!")
-                st.rerun()
             
             # Test API
             if st.button("🔧 Test API", use_container_width=True):
