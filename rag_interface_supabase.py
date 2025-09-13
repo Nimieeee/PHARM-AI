@@ -80,8 +80,12 @@ def display_rag_sidebar(conversation_id: str):
                             rag_system = run_async(initialize_rag_system(conversation_id)) # Wrap in run_async
                             if rag_system:
                                 run_async(rag_system.delete_document(doc['document_hash'])) # Wrap in run_async
-                            st.success("Document deleted!")
-                            st.rerun()
+                            # Only rerun if we're not currently generating a response
+                            if not st.session_state.get('generating_response', False):
+                                st.success("Document deleted!")
+                                st.rerun()
+                            else:
+                                st.success("Document deleted! Changes will appear after the current response completes.")
                         else:
                             st.error("Failed to delete document")
             

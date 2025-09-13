@@ -64,9 +64,8 @@ def render_welcome_screen():
             try:
                 conversation_id = run_async(create_new_conversation())
                 if conversation_id:
-                    # Use st.rerun() with a small delay to ensure conversation is created
-                    st.success("✅ New conversation created!")
-                    st.rerun()
+                    # Don't rerun immediately - let the page naturally refresh
+                    st.success("✅ New conversation created! Refresh the page to see it.")
                 else:
                     st.error("Failed to create conversation. Please try again.")
             except Exception as e:

@@ -10,14 +10,21 @@ from rag_interface_supabase import get_conversation_document_count, get_all_user
 def render_sidebar():
     """Render the sidebar with conversations and settings."""
     with st.sidebar:
+        # Initialize response generation flag if not exists
+        if 'generating_response' not in st.session_state:
+            st.session_state.generating_response = False
         # User info and logout
         st.markdown(f"### 👋 Welcome, {st.session_state.username}!")
         
         # Sign out button
         if st.button("🚪 Sign Out", use_container_width=True, type="secondary"):
-            logout_current_user()
-            st.session_state.current_page = "homepage"
-            st.rerun()
+            # Only sign out if we're not generating a response
+            if not st.session_state.get('generating_response', False):
+                logout_current_user()
+                st.session_state.current_page = "homepage"
+                st.rerun()
+            else:
+                st.warning("⚠️ Please wait for the current response to complete before signing out.")
         
         st.markdown("---")
         
@@ -38,8 +45,12 @@ def render_sidebar():
             from utils.conversation_manager import create_new_conversation, run_async
             conversation_id = run_async(create_new_conversation())
             if conversation_id:
-                st.success("✅ New conversation created!")
-                st.rerun()
+                # Only rerun if we're not currently generating a response
+                if not st.session_state.get('generating_response', False):
+                    st.success("✅ New conversation created!")
+                    st.rerun()
+                else:
+                    st.success("✅ New conversation created! It will appear after the current response completes.")
             else:
                 st.error("Failed to create conversation")
         
@@ -69,8 +80,12 @@ def render_sidebar():
                             key=f"conv_{conv_id}",
                             use_container_width=True
                         ):
-                            st.session_state.current_conversation_id = conv_id
-                            st.rerun()
+                            # Only switch conversations if we're not generating a response
+                            if not st.session_state.get('generating_response', False):
+                                st.session_state.current_conversation_id = conv_id
+                                st.rerun()
+                            else:
+                                st.warning("⚠️ Please wait for the current response to complete before switching conversations.")
                     
                     with col2:
                         # More options dropdown
@@ -83,8 +98,12 @@ def render_sidebar():
                             from utils.conversation_manager import run_async
                             success = run_async(delete_conversation(conv_id))
                             if success:
-                                st.success("✅ Conversation deleted!")
-                                st.rerun()
+                                # Only rerun if we're not currently generating a response
+                                if not st.session_state.get('generating_response', False):
+                                    st.success("✅ Conversation deleted!")
+                                    st.rerun()
+                                else:
+                                    st.success("✅ Conversation deleted! Changes will appear after the current response completes.")
                             else:
                                 st.error("Failed to delete conversation")
                     
@@ -97,8 +116,12 @@ def render_sidebar():
                                 new_conv_id = run_async(duplicate_conversation(conv_id))
                                 if new_conv_id:
                                     st.session_state.current_conversation_id = new_conv_id
-                                    st.success("Conversation duplicated!")
-                                    st.rerun()
+                                    # Only rerun if we're not currently generating a response
+                                    if not st.session_state.get('generating_response', False):
+                                        st.success("Conversation duplicated!")
+                                        st.rerun()
+                                    else:
+                                        st.success("Conversation duplicated! It will appear after the current response completes.")
         else:
             st.info("No conversations yet. Click 'New Chat' to start!")
         
@@ -141,8 +164,12 @@ def search_conversations(query: str):
                 key=f"search_{conv_id}",
                 use_container_width=True
             ):
-                st.session_state.current_conversation_id = conv_id
-                st.session_state.search_query = ""  # Clear search
-                st.rerun()
+                # Only switch conversations if we're not generating a response
+                if not st.session_state.get('generating_response', False):
+                    st.session_state.current_conversation_id = conv_id
+                    st.session_state.search_query = ""  # Clear search
+                    st.rerun()
+                else:
+                    st.warning("⚠️ Please wait for the current response to complete before switching conversations.")
     else:
         st.info("No conversations found matching your search.")
