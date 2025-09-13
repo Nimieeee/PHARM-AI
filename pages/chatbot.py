@@ -190,8 +190,7 @@ def render_chat_input():
             # Generate and display AI response
             generate_ai_response(user_input.strip())
             
-            # Rerun to refresh the interface
-            st.rerun()
+            # Don't rerun immediately - let the response complete first
             
         except Exception as e:
             logger.error(f"Error processing message: {e}")
@@ -219,33 +218,46 @@ def generate_ai_response(user_prompt: str):
             # Try streaming first
             try:
                 message_placeholder.markdown("🔄 Generating response...")
+                logger.info(f"Starting streaming with model: {selected_model}")
                 
                 stream_worked = False
                 update_counter = 0
                 
                 for chunk in chat_completion_stream(selected_model, messages):
-                    stream_worked = True
-                    full_response += chunk
-                    update_counter += 1
-                    
-                    # Update UI every few chunks
-                    if update_counter % 3 == 0:
-                        message_placeholder.markdown(full_response + "▌")
+                    if chunk:  # Only process non-empty chunks
+                        stream_worked = True
+                        full_response += chunk
+                        update_counter += 1
+                        
+                        # Update UI every few chunks
+                        if update_counter % 5 == 0:
+                            message_placeholder.markdown(full_response + "▌")
                 
-                if stream_worked and full_response:
+                if stream_worked and full_response.strip():
                     message_placeholder.markdown(full_response)
                     logger.info(f"✅ Streaming response completed: {len(full_response)} chars")
                 else:
+                    logger.warning("Streaming produced empty response, trying fallback")
                     raise Exception("Streaming failed or empty response")
                     
             except Exception as stream_error:
                 logger.warning(f"Streaming failed, trying non-streaming: {stream_error}")
                 
+                # Reset response for fallback
+                full_response = ""
+                
                 # Fallback to non-streaming
                 message_placeholder.markdown("🔄 Generating response (fallback)...")
-                full_response = chat_completion(selected_model, messages)
-                message_placeholder.markdown(full_response)
-                logger.info(f"✅ Non-streaming response completed: {len(full_response)} chars")
+                try:
+                    full_response = chat_completion(selected_model, messages)
+                    if full_response and full_response.strip():
+                        message_placeholder.markdown(full_response)
+                        logger.info(f"✅ Non-streaming response completed: {len(full_response)} chars")
+                    else:
+                        raise Exception("Non-streaming also failed or empty response")
+                except Exception as fallback_error:
+                    logger.error(f"Both streaming and non-streaming failed: {fallback_error}")
+                    raise fallback_error
 
         except Exception as e:
             logger.error(f"Error generating AI response: {e}")
@@ -254,15 +266,19 @@ def generate_ai_response(user_prompt: str):
             full_response = error_msg
 
         # Save AI response to conversation
-        if full_response:
+        if full_response and not full_response.startswith("❌ Error"):
             try:
                 success = run_async(add_message_to_current_conversation("assistant", full_response))
                 if success:
                     logger.info("✅ AI response saved to conversation")
+                    # Trigger a rerun after successful save
+                    st.rerun()
                 else:
                     logger.error("❌ Failed to save AI response")
+                    st.error("Failed to save the response. Please try again.")
             except Exception as save_error:
                 logger.error(f"Error saving AI response: {save_error}")
+                st.error("Error saving the response. Please try again.")
 
 def get_messages_for_api(user_input: str) -> list:
     """Get messages formatted for API call."""
