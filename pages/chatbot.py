@@ -513,6 +513,13 @@ def render_conversation_sidebar():
                         
                         else:
                             st.info("💡 Start chatting to create a conversation, then you can manage it here.")
+                    
+                    else:
+                        st.info("No conversations yet. Start chatting to create your first conversation!")
+                        
+        except Exception as e:
+            st.error(f"❌ Error loading conversations: {e}")
+            logger.error(f"Sidebar conversation loading error: {e}")
         
         # Document Upload Section
         st.divider()
@@ -580,13 +587,9 @@ def render_conversation_sidebar():
                         
             except Exception as e:
                 logger.error(f"Error loading conversation documents: {e}")
-                    
-                    else:
-                        st.info("No conversations yet. Start chatting to create your first conversation!")
-                        
-        except Exception as e:
-            st.error(f"❌ Error loading conversations: {e}")
-            logger.error(f"Sidebar conversation loading error: {e}")
+        
+        # This section was misplaced - it should be part of the main conversation loading
+        # Moving it to the proper location in the conversation sidebar function
 
 def render_simple_chatbot():
     """Render a simple, working chatbot interface."""
