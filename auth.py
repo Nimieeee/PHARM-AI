@@ -50,6 +50,7 @@ _cache_timeout_seconds = 30  # Cache session validation for 30 seconds
 def create_user(username: str, password: str) -> Tuple[bool, str]:
     """Create a new user account using Supabase."""
     try:
+        st.write(type(user_service.create_user(username, password)))
         success, message = run_async(user_service.create_user(username, password))
         return success, message
     except Exception as e:
