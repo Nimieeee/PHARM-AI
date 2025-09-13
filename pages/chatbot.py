@@ -594,11 +594,15 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
 
 def generate_file_analysis_response(auto_prompt: str):
     """Generate AI response for file analysis - optimized for performance."""
+    import logging
+    logger = logging.getLogger(__name__)
+    
     with st.chat_message("assistant"):
         message_placeholder = st.empty()
         full_response = ""
 
         try:
+            logger.info(f"🔍 Starting file analysis for prompt: {auto_prompt[:100]}...")
             message_placeholder.markdown("🔍 Analyzing your uploaded file...")
 
             # Get enhanced prompt (with caching)
@@ -607,11 +611,16 @@ def generate_file_analysis_response(auto_prompt: str):
                 rag_system = initialize_rag_system(st.session_state.current_conversation_id)
                 if rag_system:
                     enhanced_prompt = get_rag_enhanced_prompt(auto_prompt, rag_system)
-            except Exception:
+                    logger.info(f"✅ RAG enhancement successful, enhanced prompt length: {len(enhanced_prompt)}")
+                else:
+                    logger.warning("⚠️ RAG system not available")
+            except Exception as rag_error:
+                logger.error(f"❌ RAG enhancement failed: {rag_error}")
                 pass  # Use original prompt if RAG fails
 
             # Get model config
             selected_model = get_selected_model("model_mode", DEFAULT_MODE)
+            logger.info(f"🤖 Selected model: {selected_model}")
 
             # Generate response with optimized streaming
             message_placeholder.markdown("🔄 Generating analysis...")
@@ -626,15 +635,28 @@ def generate_file_analysis_response(auto_prompt: str):
 
                 message_placeholder.markdown(full_response)
 
-            except Exception:
+            except Exception as stream_error:
                 # Fallback to non-streaming
-                full_response = chat_completion(selected_model, get_messages_for_api(enhanced_prompt))
-                message_placeholder.markdown(full_response)
+                message_placeholder.markdown("🔄 Switching to non-streaming mode...")
+                try:
+                    full_response = chat_completion(selected_model, get_messages_for_api(enhanced_prompt))
+                    message_placeholder.markdown(full_response)
+                except Exception as completion_error:
+                    error_msg = f"❌ Both streaming and non-streaming failed:\nStreaming: {str(stream_error)}\nCompletion: {str(completion_error)}"
+                    message_placeholder.markdown(error_msg)
+                    full_response = error_msg
 
         except Exception as e:
             error_msg = f"❌ Error analyzing file: {str(e)}"
+            logger.error(f"💥 File analysis failed: {e}")
             message_placeholder.markdown(error_msg)
             full_response = error_msg
 
         # Add response to conversation
-        run_async(add_message_to_current_conversation("assistant", full_response))
+        try:
+            logger.info(f"💾 Saving response to conversation: {len(full_response)} characters")
+            run_async(add_message_to_current_conversation("assistant", full_response))
+            logger.info("✅ Response saved successfully")
+        except Exception as save_error:
+            logger.error(f"❌ Failed to save response: {save_error}")
+            st.error(f"Failed to save response: {save_error}")
