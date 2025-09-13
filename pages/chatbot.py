@@ -195,6 +195,7 @@ def render_chat_interface():
         st.info(f"📎 File selected: {uploaded_file.name} (ready to upload with your message)")
 
     # Handle input submission (with or without file)
+    input_processed = False
     if send_clicked:
         # Debug logging
         import logging
@@ -204,6 +205,7 @@ def render_chat_interface():
         if user_input.strip() or uploaded_file:
             # Clear the input by resetting session state
             st.session_state.chat_input_value = ""
+            input_processed = True
 
             if uploaded_file:
                 # Process file with custom message
@@ -237,8 +239,8 @@ def render_chat_interface():
         else:
             st.error("Please enter a message or select a file to upload.")
 
-    # Update session state if user typed something
-    if user_input != st.session_state.chat_input_value:
+    # Update session state if user typed something (but not if we just processed input)
+    if not input_processed and user_input != st.session_state.chat_input_value:
         st.session_state.chat_input_value = user_input
 
 def display_chat_messages():
