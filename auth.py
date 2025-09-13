@@ -44,7 +44,7 @@ def run_async(coro):
 
 # Session validation cache to prevent duplicate validation
 _session_cache = {}
-_cache_timeout_seconds = 30  # Cache session validation for 30 seconds
+_cache_timeout_seconds = 120  # Cache session validation for 2 minutes (longer for Streamlit Cloud)
 
 
 def create_user(username: str, password: str) -> Tuple[bool, str]:

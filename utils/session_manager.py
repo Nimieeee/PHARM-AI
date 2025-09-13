@@ -45,9 +45,12 @@ def initialize_session_state():
         logger.info("💾 Skipping auth initialization (already done this run)")
         return
     
-    # Only re-initialize auth if it's been more than 10 seconds or not initialized
+    # On Streamlit Cloud, be more aggressive about keeping sessions alive
+    timeout_seconds = 300.0  # 5 minutes instead of 10 seconds
+    
+    # Only re-initialize auth if it's been more than timeout or not initialized
     if (cache_key not in st.session_state or
-        current_time - st.session_state.get(cache_key, 0) > 10.0):
+        current_time - st.session_state.get(cache_key, 0) > timeout_seconds):
         
         logger.info("🆕 Running auth initialization (cache miss or timeout)")
         from auth import initialize_auth_session
