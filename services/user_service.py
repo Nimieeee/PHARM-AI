@@ -261,6 +261,8 @@ class UserService:
                 try:
                     from supabase_manager import get_connection_manager
                     self.connection_manager = get_connection_manager()
+                    # Force complete reset
+                    self.connection_manager.force_client_reset()
                     result = await self.connection_manager.execute_query(
                         table='users',
                         operation='select',

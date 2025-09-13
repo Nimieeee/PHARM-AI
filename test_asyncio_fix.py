@@ -30,16 +30,30 @@ async def test_user_service():
     # Test 2: Try to trigger event loop change
     logger.info("🔄 Testing event loop resilience...")
     
-    # Create a new event loop context
+    # Simulate multiple calls that might trigger event loop issues
+    for i in range(3):
+        try:
+            logger.info(f"🔄 Test iteration {i+1}")
+            user = await user_service.get_user_by_id(test_user_id)
+            logger.info(f"✅ Iteration {i+1} successful")
+        except Exception as e:
+            if "bound to a different event loop" in str(e):
+                logger.error(f"❌ AsyncIO event loop issue still present in iteration {i+1}")
+            else:
+                logger.info(f"ℹ️ Other error in iteration {i+1} (may be expected): {e}")
+    
+    # Test 3: Test connection manager directly
+    logger.info("🔧 Testing connection manager directly...")
     try:
-        # This should work without AsyncIO errors
-        user = await user_service.get_user_by_id(test_user_id)
-        logger.info("✅ Event loop handling working correctly")
+        from supabase_manager import get_connection_manager
+        conn_mgr = get_connection_manager()
+        
+        # Force event loop check
+        conn_mgr._check_event_loop()
+        logger.info("✅ Connection manager event loop check passed")
+        
     except Exception as e:
-        if "bound to a different event loop" in str(e):
-            logger.error("❌ AsyncIO event loop issue still present")
-        else:
-            logger.info(f"ℹ️ Other error (expected): {e}")
+        logger.error(f"❌ Connection manager test failed: {e}")
 
 def main():
     """Main test function."""

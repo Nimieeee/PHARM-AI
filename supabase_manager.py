@@ -87,15 +87,24 @@ class SupabaseConnectionManager:
             current_loop_id = id(current_loop)
             
             if self._event_loop_id is not None and self._event_loop_id != current_loop_id:
-                logger.warning("Event loop changed in connection manager, resetting client")
+                logger.warning(f"Event loop changed in connection manager (old: {self._event_loop_id}, new: {current_loop_id}), resetting client")
+                # Force complete reset
                 self._client = None
                 self._initialization_attempted = False
                 self._initialization_successful = False
+                # Clear any cached connection state
+                if hasattr(self, '_connection_pool'):
+                    self._connection_pool = None
             
             self._event_loop_id = current_loop_id
         except RuntimeError:
-            # No event loop running
-            pass
+            # No event loop running, reset everything to be safe
+            if self._event_loop_id is not None:
+                logger.warning("No event loop running, resetting client state")
+                self._client = None
+                self._initialization_attempted = False
+                self._initialization_successful = False
+                self._event_loop_id = None
 
     async def _initialize_client(self) -> bool:
         """Initialize Supabase client with error handling."""
@@ -127,7 +136,16 @@ class SupabaseConnectionManager:
 
             # Create client with connection pooling
             logger.info("🔧 Creating Supabase client")
-            self._client = await create_async_client(supabase_url, supabase_key)
+            try:
+                self._client = await create_async_client(supabase_url, supabase_key)
+            except Exception as client_error:
+                if "bound to a different event loop" in str(client_error):
+                    logger.warning("AsyncIO issue during client creation, retrying...")
+                    # Wait a moment and try again
+                    await asyncio.sleep(0.1)
+                    self._client = await create_async_client(supabase_url, supabase_key)
+                else:
+                    raise client_error
 
             # Test connection
             logger.info("🧪 Testing connection during initialization")
@@ -150,14 +168,16 @@ class SupabaseConnectionManager:
         # Check for event loop changes first
         self._check_event_loop()
 
-        # Only initialize once per session
-        if self._client is None and not self._initialization_attempted:
-            logger.info("🚀 First initialization attempt...")
+        # Initialize if needed (including after event loop changes)
+        if self._client is None:
+            if not self._initialization_attempted:
+                logger.info("🚀 First initialization attempt...")
+            else:
+                logger.info("🔄 Reinitializing client (likely due to event loop change)...")
+            
             self._initialization_attempted = True
             success = await self._initialize_client()
             self._initialization_successful = success
-        elif self._client is None and self._initialization_attempted:
-            logger.info("⚠️ Skipping duplicate initialization attempt")
 
         return self._client
 
@@ -211,6 +231,9 @@ class SupabaseConnectionManager:
 
     async def execute_query(self, table: str, operation: str, **kwargs) -> Any:
         """Execute database query with error handling and stats tracking."""
+        # Check event loop before executing query
+        self._check_event_loop()
+        
         if not self._client:
             raise ConnectionError("Supabase client not initialized")
 
@@ -289,6 +312,63 @@ class SupabaseConnectionManager:
 
         except Exception as e:
             self._connection_stats['failed_queries'] += 1
+            
+            # Handle AsyncIO event loop binding issues
+            if "bound to a different event loop" in str(e) or "asyncio" in str(e).lower():
+                logger.warning(f"AsyncIO event loop issue detected, reinitializing client: {str(e)}")
+                # Force client reinitialization
+                self._client = None
+                self._initialization_attempted = False
+                self._initialization_successful = False
+                
+                # Try to reinitialize and retry the query once
+                try:
+                    if await self._initialize_client():
+                        logger.info("Client reinitialized, retrying query...")
+                        # Retry the query with fresh client
+                        table_ref = self._client.table(table)
+                        
+                        if operation == 'select':
+                            columns = kwargs.get('columns', '*')
+                            result = table_ref.select(columns)
+                            
+                            if 'eq' in kwargs:
+                                for column, value in kwargs['eq'].items():
+                                    result = result.eq(column, value)
+                            
+                            if 'limit' in kwargs:
+                                result = result.limit(kwargs['limit'])
+                                
+                            return await result.execute()
+                        
+                        # Add other operations as needed
+                        elif operation == 'insert':
+                            data = kwargs.get('data', {})
+                            return await table_ref.insert(data).execute()
+                        
+                        elif operation == 'update':
+                            data = kwargs.get('data', {})
+                            result = table_ref.update(data)
+                            if 'eq' in kwargs:
+                                for column, value in kwargs['eq'].items():
+                                    result = result.eq(column, value)
+                            return await result.execute()
+                        
+                        elif operation == 'delete':
+                            result = table_ref.delete()
+                            if 'eq' in kwargs:
+                                for column, value in kwargs['eq'].items():
+                                    result = result.eq(column, value)
+                            return await result.execute()
+                        
+                        elif operation == 'upsert':
+                            data = kwargs.get('data', {})
+                            return await table_ref.upsert(data).execute()
+                            
+                except Exception as retry_e:
+                    logger.error(f"Retry after client reinitialization failed: {str(retry_e)}")
+                    raise retry_e
+            
             logger.error(f"Query failed: {operation} on {table} - {str(e)}")
             raise
 
@@ -303,6 +383,18 @@ class SupabaseConnectionManager:
             self._connection_stats['avg_response_time'] = (
                 (current_avg * (total_successful - 1) + response_time) / total_successful
             )
+
+    def force_client_reset(self):
+        """Force complete client reset - useful for event loop issues."""
+        logger.warning("🔄 Forcing complete client reset")
+        self._client = None
+        self._initialization_attempted = False
+        self._initialization_successful = False
+        self._event_loop_id = None
+        
+        # Clear connection stats errors
+        if 'connection_errors' in self._connection_stats:
+            self._connection_stats['connection_errors'].clear()
 
     async def execute_raw_sql(self, query: str, params: Dict = None) -> Any:
         """Execute raw SQL query."""
