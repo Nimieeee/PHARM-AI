@@ -50,7 +50,7 @@ _cache_timeout_seconds = 30  # Cache session validation for 30 seconds
 def create_user(username: str, password: str) -> Tuple[bool, str]:
     """Create a new user account using Supabase."""
     try:
-        success, message = user_service.create_user(username, password)
+        success, message = run_async(user_service.create_user(username, password))
         return success, message
     except Exception as e:
         return False, f"Error creating account: {str(e)}"
@@ -58,7 +58,7 @@ def create_user(username: str, password: str) -> Tuple[bool, str]:
 def authenticate_user(username: str, password: str) -> Tuple[bool, str]:
     """Authenticate user credentials using Supabase."""
     try:
-        success, message, user_data = user_service.authenticate_user(username, password)
+        success, message, user_data = run_async(user_service.authenticate_user(username, password))
         return success, message
     except Exception as e:
         return False, f"Authentication error: {str(e)}"
@@ -67,7 +67,7 @@ def create_session(username: str) -> str:
     """Create a new session for user using Supabase."""
     try:
         # Get user data first
-        user_data = user_service.get_user_by_username(username)
+        user_data = run_async(user_service.get_user_by_username(username))
         if not user_data:
             raise Exception("User not found")
         
@@ -123,7 +123,7 @@ def logout_user(session_id: str):
 def get_user_id(username: str) -> Optional[str]:
     """Get user ID for username using Supabase."""
     try:
-        user_data = user_service.get_user_by_username(username)
+        user_data = run_async(user_service.get_user_by_username(username))
         if user_data:
             return user_data['user_id']  # Legacy user_id field
         return None
@@ -208,7 +208,7 @@ def load_user_conversations(user_id: str) -> Dict:
     """Load conversations for a specific user using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = user_service.get_user_by_id(user_id)
+        user_data = run_async(user_service.get_user_by_id(user_id))
         if not user_data:
             return {}
         
@@ -222,7 +222,7 @@ def save_user_conversations(user_id: str, conversations: Dict):
     """Save conversations for a specific user using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = user_service.get_user_by_id(user_id)
+        user_data = run_async(user_service.get_user_by_id(user_id))
         if not user_data:
             st.error(f"User not found: {user_id}")
             return
@@ -246,7 +246,7 @@ def can_user_upload(user_id: str) -> Tuple[bool, str]:
     
     try:
         # Get user UUID from legacy user_id
-        user_data = user_service.get_user_by_id(user_id)
+        user_data = run_async(user_service.get_user_by_id(user_id))
         if not user_data:
             return False, "User not found"
         
@@ -274,7 +274,7 @@ def record_user_upload(user_id: str, filename: str, file_size: int):
     """Record a user upload using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = user_service.get_user_by_id(user_id)
+        user_data = run_async(user_service.get_user_by_id(user_id))
         if not user_data:
             st.error(f"User not found: {user_id}")
             return
@@ -323,7 +323,7 @@ def get_user_upload_count(user_id: str) -> int:
     """Get the number of uploads for a user in the last 24 hours using Supabase."""
     try:
         # Get user UUID from legacy user_id
-        user_data = user_service.get_user_by_id(user_id)
+        user_data = run_async(user_service.get_user_by_id(user_id))
         if not user_data:
             return 0
         

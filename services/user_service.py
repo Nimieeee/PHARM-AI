@@ -61,7 +61,7 @@ class UserService:
         """Generate unique user ID from username."""
         return hashlib.md5(username.encode()).hexdigest()
     
-    def create_user(self, username: str, password: str, email: str = None) -> Tuple[bool, str]:
+    async def create_user(self, username: str, password: str, email: str = None) -> Tuple[bool, str]:
         """
         Create a new user account.
         
@@ -85,7 +85,7 @@ class UserService:
                 return False, "Password must be at least 6 characters long"
             
             # Check if username already exists
-            existing_user = self.get_user_by_username(username)
+            existing_user = await self.get_user_by_username(username)
             if existing_user:
                 return False, "Username already exists"
             
@@ -106,7 +106,7 @@ class UserService:
             if email:
                 user_data['email'] = email
             
-            result = self.supabase.table('users').insert(user_data).execute()
+            result = await self.supabase.table('users').insert(user_data).execute()
             
             if result.data:
                 logger.info(f"User created successfully: {username}")
@@ -121,7 +121,7 @@ class UserService:
                 return False, "Username already exists"
             return False, f"Error creating account: {str(e)}"
     
-    def authenticate_user(self, username: str, password: str) -> Tuple[bool, str, Optional[Dict]]:
+    async def authenticate_user(self, username: str, password: str) -> Tuple[bool, str, Optional[Dict]]:
         """
         Authenticate user credentials.
         
@@ -141,7 +141,7 @@ class UserService:
                 
             # Get user by username
             logger.info(f"👤 Fetching user data for: {username}")
-            user = self.get_user_by_username(username)
+            user = await self.get_user_by_username(username)
             if not user:
                 logger.warning(f"👤 User not found: {username}")
                 return False, "Username not found", None
@@ -157,7 +157,7 @@ class UserService:
             if password_hash == user['password_hash']:
                 # Update last login
                 logger.info(f"🔄 Updating last login for: {username}")
-                self.update_last_login(user['id'])
+                await self.update_last_login(user['id'])
                 
                 logger.info(f"✅ User authenticated successfully: {username}")
                 return True, "Authentication successful", user
@@ -169,7 +169,7 @@ class UserService:
             logger.error(f"💥 Error authenticating user {username}: {str(e)}")
             return False, f"Authentication error: {str(e)}", None
     
-    def get_user_by_username(self, username: str) -> Optional[Dict]:
+    async def get_user_by_username(self, username: str) -> Optional[Dict]:
         """Get user by username with caching."""
         import time
         
@@ -193,7 +193,7 @@ class UserService:
                 logger.error("❌ No Supabase client available")
                 return None
                 
-            result = self.supabase.table('users').select('*').eq('username', username).execute()
+            result = await self.supabase.table('users').select('*').eq('username', username).execute()
             
             if result.data:
                 user_data = result.data[0]
@@ -208,13 +208,13 @@ class UserService:
             logger.error(f"💥 Error getting user by username {username}: {str(e)}")
             return None
     
-    def get_user_by_id(self, user_id: str) -> Optional[Dict]:
+    async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """Get user by user_id (legacy compatibility)."""
         try:
             if not self.supabase:
                 return None
                 
-            result = self.supabase.table('users').select('*').eq('user_id', user_id).execute()
+            result = await self.supabase.table('users').select('*').eq('user_id', user_id).execute()
             
             if result.data:
                 return result.data[0]
@@ -329,13 +329,13 @@ class UserService:
             logger.error(f"Error updating password for user {user_id}: {str(e)}")
             return False, "Error updating password"
     
-    def update_last_login(self, uuid_id: str) -> bool:
+    async def update_last_login(self, uuid_id: str) -> bool:
         """Update user's last login timestamp."""
         try:
             if not self.supabase:
                 return False
                 
-            result = self.supabase.table('users').update({
+            result = await self.supabase.table('users').update({
                 'last_login': datetime.now().isoformat()
             }).eq('id', uuid_id).execute()
             
@@ -458,14 +458,14 @@ class UserService:
 user_service = UserService()
 
 # Convenience functions for backward compatibility
-def create_user(username: str, password: str, email: str = None) -> Tuple[bool, str]:
+async def create_user(username: str, password: str, email: str = None) -> Tuple[bool, str]:
     """Create user account."""
-    return user_service.create_user(username, password, email)
+    return await user_service.create_user(username, password, email)
 
-def authenticate_user(username: str, password: str) -> Tuple[bool, str, Optional[Dict]]:
+async def authenticate_user(username: str, password: str) -> Tuple[bool, str, Optional[Dict]]:
     """Authenticate user."""
-    return user_service.authenticate_user(username, password)
+    return await user_service.authenticate_user(username, password)
 
-def get_user_by_id(user_id: str) -> Optional[Dict]:
+async def get_user_by_id(user_id: str) -> Optional[Dict]:
     """Get user by ID."""
-    return user_service.get_user_by_id(user_id)
+    return await user_service.get_user_by_id(user_id)
