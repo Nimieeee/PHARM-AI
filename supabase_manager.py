@@ -53,12 +53,47 @@ def validate_order_clause(order_clause: str) -> str:
     return order_clause
 
 
-class SupabaseConnectionManager:
-    """Manages Supabase database connections with pooling and error handling."""
+@st.cache_resource
+async def _get_supabase_async_client() -> Optional[AsyncClient]:
+    """Initializes and caches the Supabase AsyncClient using st.cache_resource."""
+    logger.info("🚀 _get_supabase_async_client called - (re)initializing client")
 
-    _client: Optional[AsyncClient] = None
-    _initialization_attempted = False
-    _initialization_successful = False
+    if not SUPABASE_AVAILABLE:
+        logger.error("❌ Supabase library not available")
+        st.error("❌ Supabase library not available. Please install with: pip install supabase")
+        return None
+
+    try:
+        # Get credentials from Streamlit secrets or environment variables
+        if 'STREAMLIT_CLOUD' in os.environ or '.streamlit.app' in os.environ.get('HOSTNAME', ''):
+            supabase_url = st.secrets.get("SUPABASE_URL")
+            supabase_key = st.secrets.get("SUPABASE_ANON_KEY")
+        else:
+            from dotenv import load_dotenv
+            load_dotenv()
+            supabase_url = os.environ.get("SUPABASE_URL")
+            supabase_key = os.environ.get("SUPABASE_ANON_KEY")
+            logger.info(f"Loaded from .env: URL found: {bool(supabase_url)}, Key found: {bool(supabase_key)}")
+
+        if not supabase_url or not supabase_key:
+            logger.error("❌ Supabase credentials not found")
+            st.error("❌ Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY.")
+            return None
+
+        # Create client
+        client = create_async_client(supabase_url, supabase_key)
+        logger.info("✅ Supabase AsyncClient created.")
+        return client
+
+    except Exception as e:
+        logger.error(f"💥 Failed to initialize Supabase AsyncClient: {e}")
+        st.error(f"❌ Failed to connect to Supabase: {str(e)}")
+        return None
+
+
+class SupabaseConnectionManager:
+    """Manages Supabase database operations and statistics using the cached client."""
+
     _connection_stats = {
         'total_queries': 0,
         'successful_queries': 0,
@@ -69,110 +104,19 @@ class SupabaseConnectionManager:
     }
 
     def __init__(self):
-        # This init will only run once per session due to st.session_state caching
-        self._client = None
-        self._initialization_attempted = False
-        self._initialization_successful = False
-        self._event_loop_id = None # Reintroduce this
-
-    # Removed __new__ method as st.session_state handles singleton behavior
-
-    # Removed _check_event_loop as it's no longer needed with st.session_state caching
-
-    async def _initialize_client(self) -> bool:
-        """Initialize Supabase client with error handling."""
-        logger.info("🚀 SUPABASE._INITIALIZE_CLIENT called")
-        
-        if not SUPABASE_AVAILABLE:
-            logger.error("❌ Supabase library not available")
-            return False
-
-        try:
-            # Get credentials from Streamlit secrets or environment variables
-            if 'STREAMLIT_CLOUD' in os.environ or '.streamlit.app' in os.environ.get('HOSTNAME', ''):
-                supabase_url = st.secrets.get("SUPABASE_URL")
-                supabase_key = st.secrets.get("SUPABASE_ANON_KEY")
-            else:
-                from dotenv import load_dotenv
-                load_dotenv()
-                supabase_url = os.environ.get("SUPABASE_URL")
-                supabase_key = os.environ.get("SUPABASE_ANON_KEY")
-                logger.info(f"Loaded from .env: URL found: {bool(supabase_url)}, Key found: {bool(supabase_key)}")
-
-            if not supabase_url or not supabase_key:
-                logger.error("❌ Supabase credentials not found")
-                st.error("❌ Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_ANON_KEY.")
-                return False
-
-            # Create client with connection pooling
-            logger.info("🔧 Creating Supabase client")
-            try:
-                self._client = await create_async_client(supabase_url, supabase_key)
-            except Exception as client_error:
-                if "bound to a different event loop" in str(client_error):
-                    logger.warning("AsyncIO issue during client creation, retrying...")
-                    # Wait a moment and try again
-                    await asyncio.sleep(0.1)
-                    self._client = await create_async_client(supabase_url, supabase_key)
-                else:
-                    raise client_error
-
-            # Test connection
-            logger.info("🧪 Testing connection during initialization")
-            if await self.test_connection():
-                logger.info("✅ Supabase client initialized successfully")
-                return True
-            else:
-                logger.error("❌ Supabase connection test failed")
-                return False
-
-        except Exception as e:
-            logger.error(f"💥 Failed to initialize Supabase client: {e}")
-            st.error(f"❌ Failed to connect to Supabase: {str(e)}")
-            return False
+        # The client is now managed by _get_supabase_async_client and st.cache_resource
+        pass
 
     async def get_client(self) -> Optional[AsyncClient]:
-        """Get Supabase client instance with smart caching."""
-        logger.info(f"🔍 SUPABASE.GET_CLIENT called - client exists: {self._client is not None}, init_attempted: {self._initialization_attempted}")
-
-        # Proactively check for event loop changes
-        try:
-            current_loop = asyncio.get_running_loop()
-            current_loop_id = id(current_loop)
-
-            if self._event_loop_id is not None and self._event_loop_id != current_loop_id:
-                logger.warning(f"Event loop changed in get_client (old: {self._event_loop_id}, new: {current_loop_id}), forcing client reset.")
-                self._client = None # Force reset
-                self._initialization_attempted = False
-                self._initialization_successful = False
-            self._event_loop_id = current_loop_id
-        except RuntimeError:
-            # No event loop running, reset everything to be safe
-            if self._event_loop_id is not None:
-                logger.warning("No event loop running in get_client, resetting client state.")
-                self._client = None
-                self._initialization_attempted = False
-                self._initialization_successful = False
-                self._event_loop_id = None
-
-        # Initialize if needed
-        if self._client is None:
-            if not self._initialization_attempted:
-                logger.info("🚀 First initialization attempt...")
-            else:
-                logger.info("🔄 Reinitializing client (likely due to event loop change)....")
-
-            self._initialization_attempted = True
-            success = await self._initialize_client()
-            self._initialization_successful = success
-
-        return self._client
+        """Get the cached Supabase client instance."""
+        return await _get_supabase_async_client()
 
     async def test_connection(self) -> bool:
         """Test database connection health."""
         logger.info("🧪 SUPABASE.TEST.CONNECTION called")
 
-        if not self._client:
+        client = await self.get_client()
+        if not client:
             logger.warning("❌ No client available for connection test")
             return False
 
@@ -181,7 +125,7 @@ class SupabaseConnectionManager:
 
             # Simple query to test connection
             logger.info("📊 Executing connection test query")
-            result = await self._client.table('users').select('count').limit(1).execute()
+            result = await client.table('users').select('count').limit(1).execute()
 
             response_time = time.time() - start_time
             self._connection_stats['last_connection_test'] = datetime.now()
@@ -200,14 +144,16 @@ class SupabaseConnectionManager:
 
     async def set_user_context(self, user_id: str) -> bool:
         """Set user context for RLS policies."""
+        client = await self.get_client()
+        if not client:
+            return False
         try:
-            if self._client:
-                # Use the custom set_user_context function defined in the database
-                await self._client.rpc('set_user_context', {
+            # Use the custom set_user_context function defined in the database
+            await client.rpc('set_user_context', {
                     'user_identifier': user_id
                 }).execute()
-                logger.info(f"User context set for RLS: {user_id}")
-                return True
+            logger.info(f"User context set for RLS: {user_id}")
+            return True
         except Exception as e:
             # This is optional functionality - don't fail if the function doesn't exist
             if "PGRST202" in str(e) or "not found" in str(e).lower():
@@ -304,9 +250,8 @@ class SupabaseConnectionManager:
             if "bound to a different event loop" in str(e) or "asyncio" in str(e).lower():
                 logger.warning(f"AsyncIO event loop issue detected, reinitializing client: {str(e)}")
                 # Force complete client reset
-                self._client = None
-                self._initialization_attempted = False
-                self._initialization_successful = False
+                # This will trigger st.cache_resource to re-run _get_supabase_async_client
+                _get_supabase_async_client.clear()
                 
                 # Try to reinitialize and retry the query once
                 try:
@@ -375,10 +320,7 @@ class SupabaseConnectionManager:
     def force_client_reset(self):
         """Force complete client reset - useful for event loop issues."""
         logger.warning("🔄 Forcing complete client reset")
-        self._client = None
-        self._initialization_attempted = False
-        self._initialization_successful = False
-        # Removed _event_loop_id reset as it's no longer tracked
+        _get_supabase_async_client.clear() # Clear the cached client
         
         # Clear connection stats errors
         if 'connection_errors' in self._connection_stats:
@@ -386,11 +328,12 @@ class SupabaseConnectionManager:
 
     async def execute_raw_sql(self, query: str, params: Dict = None) -> Any:
         """Execute raw SQL query."""
-        if not self._client:
+        client = await self.get_client()
+        if not client:
             raise ConnectionError("Supabase client not initialized")
 
         try:
-            return await self._client.rpc('execute_sql', {'query': query, 'params': params or {}}).execute()
+            return await client.rpc('execute_sql', {'query': query, 'params': params or {}}).execute()
         except Exception as e:
             logger.error(f"Raw SQL query failed: {str(e)}")
             raise
@@ -414,7 +357,7 @@ class SupabaseConnectionManager:
         """Close database connections."""
         # Supabase client doesn't require explicit connection closing
         # But we can reset the client if needed
-        self._client = None
+        _get_supabase_async_client.clear() # Clear the cached client
         logger.info("Supabase connections closed")
 
 class SupabaseError(Exception):
@@ -497,15 +440,25 @@ connection_manager = get_connection_manager()
 
 async def get_supabase_client() -> Optional[AsyncClient]:
     """Get global Supabase client instance."""
-    return await get_connection_manager().get_client()
+    return await _get_supabase_async_client()
 
 async def test_supabase_connection() -> bool:
     """Test Supabase connection."""
-    return await get_connection_manager().test_connection()
+    client = await _get_supabase_async_client()
+    if not client:
+        return False
+    try:
+        # Simple query to test connection
+        await client.table('users').select('count').limit(1).execute()
+        return True
+    except Exception as e:
+        logger.error(f"Connection test failed: {e}")
+        return False
 
 def get_connection_stats() -> Dict:
     """Get connection statistics."""
-    return get_connection_manager().get_connection_stats()
+    # This will now get stats from the manager, which uses the cached client
+    return get_connection_manager()._connection_stats.copy()
 
 # Health check function for monitoring
 async def health_check() -> Dict[str, Any]:
@@ -513,12 +466,14 @@ async def health_check() -> Dict[str, Any]:
     health_status = {
         'timestamp': datetime.now().isoformat(),
         'supabase_available': SUPABASE_AVAILABLE,
-        'client_initialized': connection_manager._client is not None,
+        'client_initialized': False, # Will be checked by test_supabase_connection
         'connection_test': False,
-        'stats': connection_manager.get_connection_stats()
+        'stats': get_connection_manager()._connection_stats.copy() # Get stats from manager
     }
 
-    if health_status['client_initialized']:
-        health_status['connection_test'] = await connection_manager.test_connection()
+    client = await _get_supabase_async_client()
+    if client:
+        health_status['client_initialized'] = True
+        health_status['connection_test'] = await test_supabase_connection()
 
     return health_status
