@@ -1,88 +1,30 @@
 """
-User Service for PharmGPT
-Handles all user account management operations with Supabase
+Clean User Service for PharmGPT
+Simple, reliable user account management using the clean supabase manager
 """
 
 import hashlib
 import secrets
-import uuid
+import logging
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
-import streamlit as st
-import logging
 
-try:
-    from supabase import AsyncClient
-except ImportError:
-    AsyncClient = type("AsyncClient", (), {})
-
+# Configure logging
 logger = logging.getLogger(__name__)
 
-# User data cache to prevent duplicate database calls
-_user_cache = {}
-_user_cache_timeout = 60  # Cache user data for 60 seconds
-
 class UserService:
-    """Service class for user account management operations."""
+    """Simple user service using the clean supabase manager."""
 
     def __init__(self):
-        self.supabase: Optional[AsyncClient] = None  # Initialize lazily
-        self._initialized = False
-        from supabase_manager import get_connection_manager
-        self.connection_manager = get_connection_manager()
-        self._event_loop_id = None
-
-    def _check_event_loop(self):
-        """Check if we're in a different event loop and reset if needed."""
-        import asyncio
-        try:
-            current_loop = asyncio.get_running_loop()
-            current_loop_id = id(current_loop)
-            
-            if self._event_loop_id is not None and self._event_loop_id != current_loop_id:
-                logger.warning("Event loop changed, resetting client")
-                self._initialized = False
-                self.supabase = None
-                from supabase_manager import get_connection_manager
-                self.connection_manager = get_connection_manager()
-            
-            self._event_loop_id = current_loop_id
-        except RuntimeError:
-            # No event loop running
-            pass
-
-    async def _ensure_client(self):
-        """Ensure Supabase client is initialized."""
-        self._check_event_loop()
-        
-        if not self._initialized or self.supabase is None:
-            try:
-                from supabase_manager import get_supabase_client as _get_client
-                self.supabase = await _get_client()
-                self._initialized = True
-            except Exception as e:
-                # Handle event loop issues by reinitializing connection manager
-                if "bound to a different event loop" in str(e) or "asyncio" in str(e).lower():
-                    logger.warning(f"AsyncIO event loop issue, reinitializing connection manager")
-                    from supabase_manager import get_connection_manager
-                    self.connection_manager = get_connection_manager()
-                    try:
-                        self.supabase = await _get_client()
-                        self._initialized = True
-                    except Exception as retry_e:
-                        logger.error(f"Failed to reinitialize Supabase client: {retry_e}")
-                        self.supabase = None
-                else:
-                    logger.error(f"Failed to initialize Supabase client: {e}")
-                    self.supabase = None
-        return self.supabase
+        # Import here to avoid circular imports
+        from supabase_manager import connection_manager
+        self.db = connection_manager
 
     def _hash_password(self, password: str, salt: str = None) -> Tuple[str, str]:
         """Hash password with salt for secure storage."""
         if salt is None:
             salt = secrets.token_hex(32)
-
-        # Use SHA-256 with salt for password hashing
+        
         password_hash = hashlib.sha256((password + salt).encode()).hexdigest()
         return password_hash, salt
 
@@ -91,21 +33,8 @@ class UserService:
         return hashlib.md5(username.encode()).hexdigest()
 
     async def create_user(self, username: str, password: str, email: str = None) -> Tuple[bool, str]:
-        """
-        Create a new user account.
-
-        Args:
-            username: Unique username
-            password: Plain text password (will be hashed)
-            email: Optional email address
-
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
+        """Create a new user account."""
         try:
-            if not await self._ensure_client():
-                return False, "Database connection not available"
-
             # Validate input
             if not username or len(username) < 3:
                 return False, "Username must be at least 3 characters long"
@@ -131,11 +60,11 @@ class UserService:
                 'is_active': True
             }
 
-            # Only add email if provided (optional field)
+            # Only add email if provided
             if email:
                 user_data['email'] = email
 
-            result = await self.supabase.table('users').insert(user_data).execute()
+            result = await self.db.execute_query('users', 'insert', data=user_data)
 
             if result.data:
                 logger.info(f"User created successfully: {username}")
@@ -151,33 +80,19 @@ class UserService:
             return False, f"Error creating account: {str(e)}"
 
     async def authenticate_user(self, username: str, password: str) -> Tuple[bool, str, Optional[Dict]]:
-        """
-        Authenticate user credentials.
-
-        Args:
-            username: Username to authenticate
-            password: Plain text password
-
-        Returns:
-            Tuple of (success: bool, message: str, user_data: Optional[Dict])
-        """
-        logger.info(f"🔐 USER_SERVICE.AUTHENTICATE_USER called for user: {username}")
+        """Authenticate user credentials."""
+        logger.info(f"Authenticating user: {username}")
 
         try:
-            if not await self._ensure_client():
-                logger.error("❌ No Supabase client available")
-                return False, "Database connection not available", None
-
             # Get user by username
-            logger.info(f"👤 Fetching user data for: {username}")
             user = await self.get_user_by_username(username)
             if not user:
-                logger.warning(f"👤 User not found: {username}")
+                logger.warning(f"User not found: {username}")
                 return False, "Username not found", None
 
             # Check if user is active
             if not user.get('is_active', True):
-                logger.warning(f"🚫 User account disabled: {username}")
+                logger.warning(f"User account disabled: {username}")
                 return False, "Account is disabled", None
 
             # Verify password
@@ -185,65 +100,46 @@ class UserService:
 
             if password_hash == user['password_hash']:
                 # Update last login
-                logger.info(f"🔄 Updating last login for: {username}")
                 await self.update_last_login(user['id'])
-
-                logger.info(f"✅ User authenticated successfully: {username}")
+                logger.info(f"User authenticated successfully: {username}")
                 return True, "Authentication successful", user
             else:
-                logger.warning(f"❌ Invalid password for user: {username}")
+                logger.warning(f"Invalid password for user: {username}")
                 return False, "Invalid password", None
 
         except Exception as e:
-            logger.error(f"💥 Error authenticating user {username}: {str(e)}")
+            logger.error(f"Error authenticating user {username}: {str(e)}")
             return False, f"Authentication error: {str(e)}", None
 
     async def get_user_by_username(self, username: str) -> Optional[Dict]:
-        """Get user by username with caching."""
-        import time
-
-        logger.info(f"🔍 GET_USER_BY_USERNAME called for: {username}")
-
-        # Check cache first
-        cache_key = f"user_{username}"
-        current_time = time.time()
-
-        if cache_key in _user_cache:
-            user_data, timestamp = _user_cache[cache_key]
-            if current_time - timestamp < _user_cache_timeout:
-                logger.info(f"💾 Using cached user data for: {username}")
-                return user_data
-            else:
-                logger.info("⏰ User cache expired, fetching fresh...")
-                del _user_cache[cache_key]
+        """Get user by username."""
+        logger.info(f"Getting user by username: {username}")
 
         try:
-            if not await self._ensure_client():
-                logger.error("❌ No Supabase client available")
-                return None
-
-            result = await self.supabase.table('users').select('*').eq('username', username).execute()
+            result = await self.db.execute_query(
+                'users', 
+                'select', 
+                eq={'username': username}
+            )
 
             if result.data:
                 user_data = result.data[0]
-                # Cache the user data
-                _user_cache[cache_key] = (user_data, current_time)
-                logger.info(f"✅ User found and cached: {username}")
+                logger.info(f"User found: {username}")
                 return user_data
-            logger.info(f"❌ User not found: {username}")
+            
+            logger.info(f"User not found: {username}")
             return None
 
         except Exception as e:
-            logger.error(f"💥 Error getting user by username {username}: {str(e)}")
+            logger.error(f"Error getting user by username {username}: {str(e)}")
             return None
 
     async def get_user_by_id(self, user_id: str) -> Optional[Dict]:
         """Get user by user_id (legacy compatibility)."""
         try:
-            # Use connection manager instead of direct client to avoid event loop issues
-            result = await self.connection_manager.execute_query(
-                table='users',
-                operation='select',
+            result = await self.db.execute_query(
+                'users',
+                'select',
                 eq={'user_id': user_id}
             )
 
@@ -253,15 +149,14 @@ class UserService:
 
         except Exception as e:
             logger.error(f"Error getting user by ID {user_id}: {str(e)}")
-            # The connection manager should handle AsyncIO issues automatically now
             return None
 
     async def get_user_by_uuid(self, uuid_id: str) -> Optional[Dict]:
         """Get user by UUID (primary key)."""
         try:
-            result = await self.connection_manager.execute_query(
-                table='users',
-                operation='select',
+            result = await self.db.execute_query(
+                'users',
+                'select',
                 eq={'id': uuid_id}
             )
 
@@ -273,16 +168,24 @@ class UserService:
             logger.error(f"Error getting user by UUID {uuid_id}: {str(e)}")
             return None
 
+    async def update_last_login(self, uuid_id: str) -> bool:
+        """Update user's last login timestamp."""
+        try:
+            result = await self.db.execute_query(
+                'users',
+                'update',
+                data={'last_login': datetime.now().isoformat()},
+                eq={'id': uuid_id}
+            )
+
+            return bool(result.data)
+
+        except Exception as e:
+            logger.error(f"Error updating last login for user {uuid_id}: {str(e)}")
+            return False
+
     async def update_user_profile(self, user_id: str, data: Dict) -> bool:
-        """Update user profile information.
-
-        Args:
-            user_id: User ID to update
-            data: Dictionary of fields to update
-
-        Returns:
-            bool: Success status
-        """
+        """Update user profile information."""
         try:
             # Remove sensitive fields that shouldn't be updated directly
             safe_data = {k: v for k, v in data.items()
@@ -293,9 +196,9 @@ class UserService:
 
             safe_data['updated_at'] = datetime.now().isoformat()
 
-            result = await self.connection_manager.execute_query(
-                table='users',
-                operation='update',
+            result = await self.db.execute_query(
+                'users',
+                'update',
                 data=safe_data,
                 eq={'user_id': user_id}
             )
@@ -310,17 +213,7 @@ class UserService:
             return False
 
     async def update_password(self, user_id: str, old_password: str, new_password: str) -> Tuple[bool, str]:
-        """
-        Update user password.
-
-        Args:
-            user_id: User ID
-            old_password: Current password for verification
-            new_password: New password
-
-        Returns:
-            Tuple of (success: bool, message: str)
-        """
+        """Update user password."""
         try:
             # Get user data
             user = await self.get_user_by_id(user_id)
@@ -340,9 +233,9 @@ class UserService:
             new_hash, new_salt = self._hash_password(new_password)
 
             # Update password
-            result = await self.connection_manager.execute_query(
-                table='users',
-                operation='update',
+            result = await self.db.execute_query(
+                'users',
+                'update',
                 data={
                     'password_hash': new_hash,
                     'salt': new_salt,
@@ -360,28 +253,12 @@ class UserService:
             logger.error(f"Error updating password for user {user_id}: {str(e)}")
             return False, "Error updating password"
 
-    async def update_last_login(self, uuid_id: str) -> bool:
-        """Update user's last login timestamp."""
-        try:
-            if not await self._ensure_client():
-                return False
-
-            result = await self.supabase.table('users').update({
-                'last_login': datetime.now().isoformat()
-            }).eq('id', uuid_id).execute()
-
-            return bool(result.data)
-
-        except Exception as e:
-            logger.error(f"Error updating last login for user {uuid_id}: {str(e)}")
-            return False
-
     async def deactivate_user(self, user_id: str) -> bool:
         """Deactivate user account (soft delete)."""
         try:
-            result = await self.connection_manager.execute_query(
-                table='users',
-                operation='update',
+            result = await self.db.execute_query(
+                'users',
+                'update',
                 data={
                     'is_active': False,
                     'updated_at': datetime.now().isoformat()
@@ -399,14 +276,11 @@ class UserService:
             return False
 
     async def delete_user(self, user_id: str) -> bool:
-        """Permanently delete user account and all associated data.
-        WARNING: This is irreversible!
-        """
+        """Permanently delete user account and all associated data."""
         try:
-            # This will cascade delete all related data due to foreign key constraints
-            result = await self.connection_manager.execute_query(
-                table='users',
-                operation='delete',
+            result = await self.db.execute_query(
+                'users',
+                'delete',
                 eq={'user_id': user_id}
             )
 
@@ -418,71 +292,6 @@ class UserService:
         except Exception as e:
             logger.error(f"Error deleting user {user_id}: {str(e)}")
             return False
-
-    async def get_user_stats(self, user_id: str) -> Optional[Dict]:
-        """Get user statistics from the user_stats view."""
-        try:
-            # First get the user's UUID
-            user = await self.get_user_by_id(user_id)
-            if not user:
-                return None
-
-            result = await self.connection_manager.execute_query(
-                table='user_stats',
-                operation='select',
-                eq={'id': user['id']}
-            )
-
-            if result.data:
-                return result.data[0]
-            return None
-
-        except Exception as e:
-            logger.error(f"Error getting user stats for {user_id}: {str(e)}")
-            return False
-
-    async def list_users(self, limit: int = 50, offset: int = 0) -> List[Dict]:
-        """List all users (admin function)."""
-        try:
-            result = await self.connection_manager.execute_query(
-                table='users',
-                operation='select',
-                columns='id,username,email,created_at,last_login,is_active',
-                limit=limit
-            )
-
-            return result.data or []
-
-        except Exception as e:
-            logger.error(f"Error listing users: {str(e)}")
-            return []
-
-    async def search_users(self, query: str, limit: int = 20) -> List[Dict]:
-        """Search users by username or email."""
-        try:
-            # This would require a more complex query with ILIKE
-            # For now, we'll do a simple filter
-            result = await self.connection_manager.execute_query(
-                table='users',
-                operation='select',
-                columns='id,username,email,created_at,is_active',
-                limit=limit
-            )
-
-            if result.data:
-                # Filter results client-side (not ideal for large datasets)
-                filtered = [
-                    user for user in result.data
-                    if query.lower() in user.get('username', '').lower() or
-                       query.lower() in user.get('email', '').lower()
-                ]
-                return filtered
-
-            return []
-
-        except Exception as e:
-            logger.error(f"Error searching users: {str(e)}")
-            return []
 
 # Global user service instance
 user_service = UserService()
