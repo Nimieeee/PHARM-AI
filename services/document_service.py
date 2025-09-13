@@ -54,7 +54,7 @@ class DocumentService:
         hash_input = f"{conversation_id}_{filename}_{content}"
         return hashlib.md5(hash_input.encode()).hexdigest()
     
-    async def save_document_metadata(self, user_uuid: str, conversation_id: str, doc_data: Dict) -> bool:
+    async def save_document_metadata(self, user_uuid: str, conversation_id: str, doc_data: Dict, embedding: Optional[List[float]] = None) -> bool:
         """
         Save document metadata to Supabase.
         
@@ -79,9 +79,10 @@ class DocumentService:
                 'conversation_id': conversation_id,
                 'document_id': doc_data['document_hash'],  # Use existing document_id field
                 'filename': doc_data['filename'],
-                'file_type': doc_data['file_type'],
+                'file_type': doc['file_type'],
                 'file_size': doc_data['file_size'],
                 'content': doc_data.get('content', ''),
+                'embedding': embedding,
                 'metadata': json.dumps({
                     'chunk_count': doc_data['chunk_count'],
                     'processing_method': doc_data.get('processing_method', 'unknown'),
@@ -143,6 +144,7 @@ class DocumentService:
                         'chunk_count': doc['chunk_count'],
                         'added_at': doc['added_at'],
                         'metadata': metadata,
+                        'embedding': doc.get('embedding'),
                         'is_processed': doc.get('is_processed', True),
                         'processing_error': doc.get('processing_error')
                     })
@@ -188,6 +190,7 @@ class DocumentService:
                         'chunk_count': doc['chunk_count'],
                         'added_at': doc['added_at'],
                         'metadata': metadata,
+                        'embedding': doc.get('embedding'),
                         'is_processed': doc.get('is_processed', True),
                         'processing_error': doc.get('processing_error')
                     })
@@ -233,6 +236,7 @@ class DocumentService:
                     'chunk_count': doc['chunk_count'],
                     'added_at': doc['added_at'],
                     'metadata': metadata,
+                    'embedding': doc.get('embedding'),
                     'is_processed': doc.get('is_processed', True),
                     'processing_error': doc.get('processing_error')
                 }
@@ -437,7 +441,8 @@ class DocumentService:
             return []
     
     async def get_document_stats(self, user_uuid: str) -> Dict:
-        """Get document statistics for a user."""
+        """
+        Get document statistics for a user."""
         try:
             result = await self._get_connection_manager().execute_query(
                 table='documents',
@@ -492,7 +497,8 @@ class DocumentService:
             return {}
     
     async def get_conversation_document_count(self, user_uuid: str, conversation_id: str) -> int:
-        """Get document count for a specific conversation."""
+        """
+        Get document count for a specific conversation."""
         try:
             result = await self._get_connection_manager().execute_query(
                 table='documents',
@@ -510,7 +516,8 @@ class DocumentService:
             return 0
     
     async def check_document_exists(self, user_uuid: str, document_hash: str, conversation_id: str) -> bool:
-        """Check if a document already exists in a conversation."""
+        """
+        Check if a document already exists in a conversation."""
         try:
             result = await self._get_connection_manager().execute_query(
                 table='documents',
@@ -530,7 +537,8 @@ class DocumentService:
             return False
     
     async def update_document_metadata(self, user_uuid: str, document_hash: str, metadata: Dict) -> bool:
-        """Update document metadata."""
+        """
+        Update document metadata."""
         try:
             result = await self._get_connection_manager().execute_query(
                 table='documents',
@@ -586,10 +594,10 @@ class DocumentService:
 document_service = DocumentService()
 
 # Sync wrapper methods for Streamlit compatibility
-def save_document_metadata_sync(user_uuid: str, conversation_id: str, doc_data: Dict) -> bool:
+def save_document_metadata_sync(user_uuid: str, conversation_id: str, doc_data: Dict, embedding: Optional[List[float]] = None) -> bool:
     """Save document metadata (sync wrapper)."""
     from utils.conversation_manager import run_async
-    return run_async(document_service.save_document_metadata(user_uuid, conversation_id, doc_data))
+    return run_async(document_service.save_document_metadata(user_uuid, conversation_id, doc_data, embedding))
 
 def get_conversation_documents_sync(user_uuid: str, conversation_id: str) -> List[Dict]:
     """Get conversation documents (sync wrapper)."""

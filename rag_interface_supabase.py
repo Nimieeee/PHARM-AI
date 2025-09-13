@@ -1,11 +1,11 @@
 """
-RAG Interface for ChromaDB integration with Streamlit - Supabase Version
+RAG Interface for Supabase pgvector integration with Streamlit
 """
 
 from typing import Optional
 import streamlit as st
 import asyncio
-from rag_system_chromadb import initialize_rag_system, ConversationRAGSystem
+from rag_system_supabase import initialize_rag_system, ConversationRAGSystem
 from prompts import get_rag_enhanced_prompt
 from services.document_service import document_service
 from services.user_service import user_service
@@ -71,15 +71,15 @@ def display_rag_sidebar(conversation_id: str):
                     # Delete button
                     if st.button(f"🗑️ Delete", key=f"delete_{doc['document_hash']}", help="Delete this document"):
                         from services.document_service import delete_document_sync
-                        success = delete_document_sync(
+                        success = run_async(delete_document_sync( # Wrap in run_async
                             user_data['id'], 
                             doc['document_hash']
-                        )
+                        ))
                         if success:
-                            # Also delete from ChromaDB
-                            rag_system = initialize_rag_system(conversation_id)
+                            # Also delete from Supabase document_chunks table
+                            rag_system = run_async(initialize_rag_system(conversation_id)) # Wrap in run_async
                             if rag_system:
-                                rag_system.delete_document(doc['document_hash'])
+                                run_async(rag_system.delete_document(doc['document_hash'])) # Wrap in run_async
                             st.success("Document deleted!")
                             st.rerun()
                         else:
@@ -121,12 +121,12 @@ def get_rag_status(conversation_id: str) -> dict:
     if not st.session_state.authenticated:
         return {"available": False, "reason": "Not authenticated"}
     
-    rag_system = initialize_rag_system(conversation_id)
+    rag_system = run_async(initialize_rag_system(conversation_id)) # Wrap in run_async
     
     if not rag_system:
         return {"available": False, "reason": "RAG system unavailable"}
     
-    documents = rag_system.get_documents_list()
+    documents = run_async(rag_system.get_documents_list()) # Wrap in run_async
     
     return {
         "available": True,

@@ -1,5 +1,5 @@
 """
-RAG System using ChromaDB for conversation-specific document storage
+RAG System using Supabase pgvector for conversation-specific document storage
 """
 
 import os
@@ -9,6 +9,12 @@ import tempfile
 from typing import List, Dict, Optional, Tuple
 from datetime import datetime
 import streamlit as st
+import sys
+import logging
+
+from supabase_manager import get_supabase_client
+
+logger = logging.getLogger(__name__)
 
 # Import Supabase services (only when in Streamlit context)
 def _get_supabase_services():
@@ -63,17 +69,6 @@ except ImportError:
     DOCX_AVAILABLE = False
     docx = None
 
-# SQLite upgrade for Streamlit Cloud compatibility
-import sys
-try:
-    import pysqlite3
-    sys.modules['sqlite3'] = pysqlite3
-except ImportError:
-    pass
-
-# Import sqlite3 after potential replacement
-import sqlite3
-
 # Lazy import flag - dependencies loaded only when needed
 DEPENDENCIES_AVAILABLE = None
 
@@ -82,13 +77,11 @@ def _check_dependencies():
     global DEPENDENCIES_AVAILABLE
     if DEPENDENCIES_AVAILABLE is None:
         try:
-            import chromadb
-            from chromadb.config import Settings
+            from sentence_transformers import SentenceTransformer
             import PyPDF2
             import docx
             import pandas as pd
             from PIL import Image
-            from sentence_transformers import SentenceTransformer
             DEPENDENCIES_AVAILABLE = True
         except ImportError as e:
             DEPENDENCIES_AVAILABLE = False
@@ -158,26 +151,18 @@ def run_async(coro):
     
     return loop.run_until_complete(coro)
 
-# Default user data directory for RAG system
+# Default user data directory for RAG system (no longer used for ChromaDB)
 USER_DATA_DIR = "user_data"
 
 class ConversationRAGSystem:
-    """RAG system for conversation-specific document storage and retrieval."""
+    """RAG system for conversation-specific document storage and retrieval using Supabase pgvector."""
     
     def __init__(self, user_id: str, conversation_id: str):
         self.user_id = user_id
         self.conversation_id = conversation_id
-        self.rag_dir = os.path.join(USER_DATA_DIR, f"rag_{user_id}", f"conversation_{conversation_id}")
-        self.chroma_dir = os.path.join(self.rag_dir, "chroma_db")
-        self.metadata_file = os.path.join(self.rag_dir, "documents_metadata.json")
-        
-        # Ensure directories exist
-        os.makedirs(self.rag_dir, exist_ok=True)
-        os.makedirs(self.chroma_dir, exist_ok=True)
         
         # Initialize components lazily
-        self.client = None
-        self.collection = None
+        self.supabase = None
         self.embeddings_model = None
         self.text_splitter = None
         self._initialized = False
@@ -185,16 +170,15 @@ class ConversationRAGSystem:
         # Cache key for session state
         self._cache_key = f"rag_system_{user_id}_{conversation_id}"
     
-    def _initialize_components(self):
-        """Initialize ChromaDB and other components lazily."""
+    async def _initialize_components(self):
+        """Initialize Supabase client and other components lazily."""
         if self._initialized:
             return True
             
         # Check if already cached in session state
         if self._cache_key in st.session_state:
             cached = st.session_state[self._cache_key]
-            self.client = cached.get('client')
-            self.collection = cached.get('collection')
+            self.supabase = cached.get('supabase')
             self.embeddings_model = cached.get('embeddings_model')
             self.text_splitter = cached.get('text_splitter')
             self._initialized = True
@@ -202,35 +186,9 @@ class ConversationRAGSystem:
             
         try:
             # Import dependencies here to catch specific errors
-            import chromadb
-            from chromadb.config import Settings
             from sentence_transformers import SentenceTransformer
             
-            # Initialize ChromaDB client with fallback
-            try:
-                self.client = chromadb.PersistentClient(
-                    path=self.chroma_dir,
-                    settings=Settings(
-                        anonymized_telemetry=False,
-                        allow_reset=True
-                    )
-                )
-            except Exception as chroma_error:
-                # Fallback: try in-memory client for Streamlit Cloud
-                st.warning("⚠️ Using temporary document storage (files will be lost on restart)")
-                self.client = chromadb.Client(
-                    settings=Settings(
-                        anonymized_telemetry=False,
-                        allow_reset=True
-                    )
-                )
-            
-            # Get or create collection
-            collection_name = f"conv_{self.conversation_id}"
-            try:
-                self.collection = self.client.get_collection(collection_name)
-            except:
-                self.collection = self.client.create_collection(collection_name)
+            self.supabase = await get_supabase_client()
             
             # Initialize embeddings model (cached globally)
             if 'global_embeddings_model' not in st.session_state:
@@ -248,8 +206,7 @@ class ConversationRAGSystem:
             
             # Cache in session state
             st.session_state[self._cache_key] = {
-                'client': self.client,
-                'collection': self.collection,
+                'supabase': self.supabase,
                 'embeddings_model': self.embeddings_model,
                 'text_splitter': self.text_splitter
             }
@@ -263,34 +220,14 @@ class ConversationRAGSystem:
             return False
         except Exception as e:
             st.error(f"❌ Error initializing RAG system: {e}")
-            self.client = None
-            self.collection = None
+            self.supabase = None
             return False
-    
-    def _load_metadata(self) -> Dict:
-        """Load document metadata."""
-        try:
-            if os.path.exists(self.metadata_file):
-                with open(self.metadata_file, 'r') as f:
-                    return json.load(f)
-        except Exception as e:
-            st.error(f"Error loading metadata: {e}")
-        return {}
-    
-    def _save_metadata(self, metadata: Dict):
-        """Save document metadata."""
-        try:
-            with open(self.metadata_file, 'w') as f:
-                json.dump(metadata, f, indent=2)
-        except Exception as e:
-            st.error(f"Error saving metadata: {e}")
     
     async def _get_conversation_db_id(self, user_uuid: str, conversation_id: str) -> Optional[str]:
         """Get the actual database ID for a conversation from its conversation_id field."""
         try:
             # Only try if we're in Streamlit context
             if 'streamlit' in sys.modules:
-                from supabase_manager import get_supabase_client
                 supabase = await get_supabase_client()
                 
                 # Query conversations table to find the actual ID
@@ -397,7 +334,7 @@ class ConversationRAGSystem:
         if not _check_dependencies():
             return False
             
-        if not self._initialize_components():
+        if not await self._initialize_components(): # Await the async init
             return False
         
         try:
@@ -422,9 +359,27 @@ class ConversationRAGSystem:
             # Generate document hash
             doc_hash = self._generate_document_hash(text, filename)
             
-            # Check if document already exists in this conversation
-            metadata = self._load_metadata()
-            if doc_hash in metadata:
+            # Get user UUID from legacy user_id
+            document_service, user_service, supabase_available = _get_supabase_services()
+            if not supabase_available:
+                st.error("Supabase services not available for document processing.")
+                return False
+            
+            user_data = await user_service.get_user_by_id(self.user_id)
+            if not user_data:
+                st.error("User not found for document processing.")
+                return False
+            user_uuid = user_data['id']
+
+            # Get the actual conversation database ID from conversation_id
+            actual_conversation_id = await self._get_conversation_db_id(user_uuid, self.conversation_id)
+            if not actual_conversation_id:
+                st.warning(f"Could not find conversation {self.conversation_id} in database for document processing.")
+                return False
+
+            # Check if document already exists in this conversation (using Supabase)
+            existing_doc = await document_service.check_document_exists(user_uuid, doc_hash, actual_conversation_id)
+            if existing_doc:
                 return "duplicate"
             
             # Split text into chunks
@@ -434,83 +389,67 @@ class ConversationRAGSystem:
                 st.error("Document could not be split into chunks")
                 return False
             
-            # Generate embeddings and add to ChromaDB
-            chunk_ids = []
-            chunk_texts = []
-            chunk_metadatas = []
-            
+            # Generate embeddings and add to Supabase document_chunks table
+            chunks_to_insert = []
             for i, chunk in enumerate(chunks):
-                chunk_id = f"{doc_hash}_chunk_{i}"
-                chunk_ids.append(chunk_id)
-                chunk_texts.append(chunk)
-                chunk_metadatas.append({
-                    "filename": filename,
-                    "chunk_index": i,
+                embedding = self.embeddings_model.encode(chunk).tolist() # Convert numpy array to list
+                chunks_to_insert.append({
+                    "user_uuid": user_uuid,
+                    "conversation_id": actual_conversation_id,
                     "document_hash": doc_hash,
-                    "file_type": file_type,
-                    "conversation_id": self.conversation_id
+                    "chunk_index": i,
+                    "content": chunk,
+                    "embedding": embedding,
+                    "metadata": {
+                        "filename": filename,
+                        "file_type": file_type,
+                        "original_file_size": len(file_content)
+                    }
                 })
             
-            # Add to ChromaDB
-            self.collection.add(
-                ids=chunk_ids,
-                documents=chunk_texts,
-                metadatas=chunk_metadatas
-            )
-            
-            # Update metadata
-            metadata[doc_hash] = {
+            # Insert chunks into Supabase
+            insert_result = await self.supabase.table('document_chunks').insert(chunks_to_insert).execute()
+            if insert_result.data is None:
+                logger.error(f"Failed to insert document chunks into Supabase: {insert_result.error}")
+                st.error(f"Failed to store document chunks: {insert_result.error}")
+                return False
+
+            # Save high-level document metadata to the 'documents' table
+            doc_data = {
+                "document_hash": doc_hash,
                 "filename": filename,
                 "file_type": file_type,
+                "file_size": len(file_content),
+                "content": text[:10000],  # Store first 10k chars as preview
                 "chunk_count": len(chunks),
-                "added_at": datetime.now().isoformat(),
-                "conversation_id": self.conversation_id
+                "processing_method": "supabase_pgvector_rag",
+                "is_processed": True
             }
-            self._save_metadata(metadata)
             
-            # Save document to Supabase (only in Streamlit context)
-            document_service, user_service, supabase_available = _get_supabase_services()
-            if supabase_available:
-                try:
-                    # Get user UUID from legacy user_id
-                    user_data = await user_service.get_user_by_id(self.user_id)
-                    if user_data:
-                        # Get the actual conversation database ID from conversation_id
-                        actual_conversation_id = await self._get_conversation_db_id(user_data['id'], self.conversation_id)
-                        if actual_conversation_id:
-                            # Save document to Supabase
-                            doc_data = {
-                                "document_hash": doc_hash,
-                                "filename": filename,
-                                "file_type": file_type,
-                                "file_size": len(file_content),
-                                "content": text[:10000],  # Store first 10k chars as preview
-                                "chunk_count": len(chunks),
-                                "processing_method": "chromadb_rag",
-                                "is_processed": True
-                            }
-                            from services.document_service import save_document_metadata_sync
-                            save_document_metadata_sync(
-                                user_uuid=user_data['id'],
-                                conversation_id=actual_conversation_id,
-                                doc_data=doc_data
-                            )
-                        else:
-                            if 'streamlit' in sys.modules:
-                                st.warning(f"Could not find conversation {self.conversation_id} in database")
-                except Exception as e:
-                    if 'streamlit' in sys.modules:
-                        st.warning(f"Document saved locally but failed to sync with database: {e}")
+            # Generate embedding for the entire document (or its preview)
+            document_embedding = self.embeddings_model.encode(text[:10000]).tolist()
+
+            from services.document_service import save_document_metadata_sync
+            save_document_metadata_sync(
+                user_uuid=user_uuid,
+                conversation_id=actual_conversation_id,
+                doc_data=doc_data,
+                embedding=document_embedding
+            )
             
             return True
             
         except Exception as e:
+            logger.error(f"Error adding document: {e}")
             st.error(f"Error adding document: {e}")
             return False
     
     async def add_image(self, image, filename: str) -> bool:
         """Add image to the RAG system using OCR."""
         if not _check_dependencies():
+            return False
+        
+        if not await self._initialize_components(): # Await the async init
             return False
         
         try:
@@ -524,9 +463,27 @@ class ConversationRAGSystem:
             # Generate document hash
             doc_hash = self._generate_document_hash(text, filename)
             
-            # Check if document already exists in this conversation
-            metadata = self._load_metadata()
-            if doc_hash in metadata:
+            # Get user UUID from legacy user_id
+            document_service, user_service, supabase_available = _get_supabase_services()
+            if not supabase_available:
+                st.error("Supabase services not available for image processing.")
+                return False
+            
+            user_data = await user_service.get_user_by_id(self.user_id)
+            if not user_data:
+                st.error("User not found for image processing.")
+                return False
+            user_uuid = user_data['id']
+
+            # Get the actual conversation database ID from conversation_id
+            actual_conversation_id = await self._get_conversation_db_id(user_uuid, self.conversation_id)
+            if not actual_conversation_id:
+                st.warning(f"Could not find conversation {self.conversation_id} in database for image processing.")
+                return False
+
+            # Check if document already exists in this conversation (using Supabase)
+            existing_doc = await document_service.check_document_exists(user_uuid, doc_hash, actual_conversation_id)
+            if existing_doc:
                 return "duplicate"
             
             # Split text into chunks
@@ -536,162 +493,236 @@ class ConversationRAGSystem:
                 st.error("Image text could not be split into chunks")
                 return False
             
-            # Generate embeddings and add to ChromaDB
-            chunk_ids = []
-            chunk_texts = []
-            chunk_metadatas = []
-            
+            # Generate embeddings and add to Supabase document_chunks table
+            chunks_to_insert = []
             for i, chunk in enumerate(chunks):
-                chunk_id = f"{doc_hash}_chunk_{i}"
-                chunk_ids.append(chunk_id)
-                chunk_texts.append(chunk)
-                chunk_metadatas.append({
-                    "filename": filename,
-                    "chunk_index": i,
+                embedding = self.embeddings_model.encode(chunk).tolist() # Convert numpy array to list
+                chunks_to_insert.append({
+                    "user_uuid": user_uuid,
+                    "conversation_id": actual_conversation_id,
                     "document_hash": doc_hash,
-                    "file_type": "image/ocr",
-                    "conversation_id": self.conversation_id
+                    "chunk_index": i,
+                    "content": chunk,
+                    "embedding": embedding,
+                    "metadata": {
+                        "filename": filename,
+                        "file_type": "image/ocr",
+                        "original_file_size": 0 # Image size not available here
+                    }
                 })
             
-            # Add to ChromaDB
-            self.collection.add(
-                ids=chunk_ids,
-                documents=chunk_texts,
-                metadatas=chunk_metadatas
-            )
-            
-            # Update metadata
-            metadata[doc_hash] = {
+            # Insert chunks into Supabase
+            insert_result = await self.supabase.table('document_chunks').insert(chunks_to_insert).execute()
+            if insert_result.data is None:
+                logger.error(f"Failed to insert image chunks into Supabase: {insert_result.error}")
+                st.error(f"Failed to store image chunks: {insert_result.error}")
+                return False
+
+            # Save high-level document metadata to the 'documents' table
+            doc_data = {
+                "document_hash": doc_hash,
                 "filename": filename,
                 "file_type": "image/ocr",
+                "file_size": 0,  # Image size not available here
+                "content": text[:10000],  # Store first 10k chars as preview
                 "chunk_count": len(chunks),
-                "added_at": datetime.now().isoformat(),
-                "conversation_id": self.conversation_id
+                "processing_method": "supabase_pgvector_rag",
+                "is_processed": True
             }
-            self._save_metadata(metadata)
             
-            # Save image document to Supabase (only in Streamlit context)
-            document_service, user_service, supabase_available = _get_supabase_services()
-            if supabase_available:
-                try:
-                    # Get user UUID from legacy user_id
-                    user_data = await user_service.get_user_by_id(self.user_id)
-                    if user_data:
-                        # Get the actual conversation database ID from conversation_id
-                        actual_conversation_id = await self._get_conversation_db_id(user_data['id'], self.conversation_id)
-                        if actual_conversation_id:
-                            # Save document to Supabase
-                            doc_data = {
-                                "document_hash": doc_hash,
-                                "filename": filename,
-                                "file_type": "image/ocr",
-                                "file_size": 0,  # Image size not available here
-                                "content": text[:10000],  # Store first 10k chars as preview
-                                "chunk_count": len(chunks),
-                                "processing_method": "ocr_chromadb_rag",
-                                "is_processed": True
-                            }
-                            from services.document_service import save_document_metadata_sync
-                            save_document_metadata_sync(
-                                user_uuid=user_data['id'],
-                                conversation_id=actual_conversation_id,
-                                doc_data=doc_data
-                            )
-                        else:
-                            if 'streamlit' in sys.modules:
-                                st.warning(f"Could not find conversation {self.conversation_id} in database")
-                except Exception as e:
-                    if 'streamlit' in sys.modules:
-                        st.warning(f"Image saved locally but failed to sync with database: {e}")
+            # Generate embedding for the entire document (or its preview)
+            document_embedding = self.embeddings_model.encode(text[:10000]).tolist()
+
+            from services.document_service import save_document_metadata_sync
+            save_document_metadata_sync(
+                user_uuid=user_uuid,
+                conversation_id=actual_conversation_id,
+                doc_data=doc_data,
+                embedding=document_embedding
+            )
             
             return True
             
         except Exception as e:
+            logger.error(f"Error adding image: {e}")
             st.error(f"Error adding image: {e}")
             return False
     
-    def search_documents(self, query: str, max_results: int = MAX_SEARCH_RESULTS) -> List[Dict]:
-        """Search documents for relevant content."""
+    async def search_documents(self, query: str, max_results: int = MAX_SEARCH_RESULTS) -> List[Dict]:
+        """Search documents for relevant content using Supabase pgvector."""
         if not _check_dependencies():
             return []
             
-        if not self._initialize_components():
+        if not await self._initialize_components(): # Await the async init
             return []
         
         try:
-            # Query ChromaDB
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=max_results
-            )
+            query_embedding = self.embeddings_model.encode(query).tolist()
             
-            search_results = []
-            if results['documents'] and results['documents'][0]:
-                for i, (doc, metadata, distance) in enumerate(zip(
-                    results['documents'][0],
-                    results['metadatas'][0],
-                    results['distances'][0]
-                )):
-                    search_results.append({
-                        "content": doc,
-                        "filename": metadata.get("filename", "Unknown"),
-                        "chunk_index": metadata.get("chunk_index", 0),
-                        "relevance_score": 1 - distance,  # Convert distance to similarity
-                        "file_type": metadata.get("file_type", "Unknown")
-                    })
+            # Perform vector similarity search using Supabase RPC function
+            # This assumes you have a Supabase function named 'match_documents'
+            # that takes query_embedding, match_threshold, match_count, user_id, and conversation_id
+            # and returns relevant document chunks.
             
-            return search_results
+            # Example of the SQL function in Supabase:
+            # CREATE OR REPLACE FUNCTION match_documents(
+            #   query_embedding vector(1536), -- Adjust dimension based on your model
+            #   match_threshold float,
+            #   match_count int,
+            #   user_id uuid,
+            #   conversation_id uuid
+            # )
+            # RETURNS TABLE (
+            #   id bigint,
+            #   document_hash text,
+            #   content text,
+            #   similarity float
+            # ) 
+            # LANGUAGE plpgsql
+            # AS $$
+            # BEGIN
+            #   RETURN QUERY
+            #   SELECT
+            #     document_chunks.id,
+            #     document_chunks.document_hash,
+            #     document_chunks.content,
+            #     (document_chunks.embedding <#> query_embedding) * -1 AS similarity
+            #   FROM document_chunks
+            #   WHERE document_chunks.user_uuid = user_id
+            #     AND document_chunks.conversation_id = conversation_id
+            #     AND (document_chunks.embedding <#> query_embedding) * -1 > match_threshold
+            #   ORDER BY similarity DESC
+            #   LIMIT match_count;
+            # END;
+            # $$
+
+            # Call the Supabase RPC function
+            rpc_result = await self.supabase.rpc('match_documents', {
+                'query_embedding': query_embedding,
+                'match_threshold': 0.7, # Adjust threshold as needed
+                'match_count': max_results,
+                'user_id': self.user_id,
+                'conversation_id': self.conversation_id
+            }).execute()
+
+            if rpc_result.data:
+                # Fetch full document metadata for the matched chunks
+                # This is a simplified approach. In a real app, you might join tables in the RPC function.
+                matched_document_hashes = list(set([item['document_hash'] for item in rpc_result.data]))
+                
+                document_service, _, supabase_available = _get_supabase_services()
+                if not supabase_available:
+                    st.error("Supabase services not available for document search.")
+                    return []
+
+                # Get full document details for the matched hashes
+                # This assumes document_service has a method to get documents by hash list
+                # For now, we'll iterate and get them one by one (less efficient but works)
+                full_documents = []
+                for doc_hash in matched_document_hashes:
+                    doc = await document_service.get_document_by_hash(self.user_id, doc_hash)
+                    if doc:
+                        # Add the content from the matched chunk to the document for context
+                        for chunk_data in rpc_result.data:
+                            if chunk_data['document_hash'] == doc_hash:
+                                doc['content'] = chunk_data['content'] # Override with chunk content
+                                doc['similarity'] = chunk_data['similarity'] # Add similarity score
+                                break
+                        full_documents.append(doc)
+                
+                # Sort by similarity (highest first)
+                full_documents.sort(key=lambda x: x.get('similarity', 0), reverse=True)
+
+                return full_documents
+            else:
+                logger.info("No matching documents found for query.")
+                return []
             
         except Exception as e:
+            logger.error(f"Error searching documents with Supabase pgvector: {e}")
             st.error(f"Error searching documents: {e}")
             return []
     
-    def get_documents_list(self) -> List[Dict]:
-        """Get list of all documents in this conversation."""
-        metadata = self._load_metadata()
-        documents = []
+    async def get_documents_list(self) -> List[Dict]:
+        """Get list of all documents in this conversation from Supabase 'documents' table."""
+        if not await self._initialize_components():
+            return []
         
-        for doc_hash, doc_info in metadata.items():
-            documents.append({
-                "filename": doc_info["filename"],
-                "file_type": doc_info["file_type"],
-                "chunk_count": doc_info["chunk_count"],
-                "added_at": doc_info["added_at"],
-                "document_hash": doc_hash
-            })
+        document_service, user_service, supabase_available = _get_supabase_services()
+        if not supabase_available:
+            st.error("Supabase services not available to get document list.")
+            return []
         
+        user_data = await user_service.get_user_by_id(self.user_id)
+        if not user_data:
+            st.error("User not found to get document list.")
+            return []
+        user_uuid = user_data['id']
+
+        actual_conversation_id = await self._get_conversation_db_id(user_uuid, self.conversation_id)
+        if not actual_conversation_id:
+            return []
+
+        documents = await document_service.get_conversation_documents(user_uuid, actual_conversation_id)
         return documents
     
-    def delete_document(self, document_hash: str) -> bool:
-        """Delete a document from the RAG system."""
-        if not _check_dependencies():
+    async def delete_document(self, document_hash: str) -> bool:
+        """Delete a document from the RAG system (Supabase 'documents' and 'document_chunks')."""
+        if not await self._initialize_components():
             return False
         
+        document_service, user_service, supabase_available = _get_supabase_services()
+        if not supabase_available:
+            st.error("Supabase services not available to delete document.")
+            return False
+        
+        user_data = await user_service.get_user_by_id(self.user_id)
+        if not user_data:
+            st.error("User not found to delete document.")
+            return False
+        user_uuid = user_data['id']
+
+        actual_conversation_id = await self._get_conversation_db_id(user_uuid, self.conversation_id)
+        if not actual_conversation_id:
+            st.warning(f"Could not find conversation {self.conversation_id} in database to delete document.")
+            return False
+
         try:
-            # Get document metadata
-            metadata = self._load_metadata()
-            if document_hash not in metadata:
+            # Delete from document_chunks table
+            delete_chunks_result = await self.supabase.table('document_chunks').delete().filter(
+                'user_uuid', 'eq', user_uuid
+            ).filter(
+                'conversation_id', 'eq', actual_conversation_id
+            ).filter(
+                'document_hash', 'eq', document_hash
+            ).execute()
+
+            if delete_chunks_result.data is None:
+                logger.error(f"Failed to delete document chunks for hash {document_hash}: {delete_chunks_result.error}")
+                st.error(f"Failed to delete document chunks: {delete_chunks_result.error}")
+                return False
+
+            # Delete from documents table (high-level metadata)
+            success = await document_service.delete_document(user_uuid, document_hash)
+            
+            if success:
+                logger.info(f"Document {document_hash} and its chunks deleted from Supabase.")
+                return True
+            else:
+                logger.error(f"Failed to delete high-level document metadata for hash {document_hash}.")
                 return False
             
-            # Delete chunks from ChromaDB
-            chunk_count = metadata[document_hash]["chunk_count"]
-            chunk_ids = [f"{document_hash}_chunk_{i}" for i in range(chunk_count)]
-            
-            self.collection.delete(ids=chunk_ids)
-            
-            # Remove from metadata
-            del metadata[document_hash]
-            self._save_metadata(metadata)
-            
-            return True
-            
         except Exception as e:
+            logger.error(f"Error deleting document {document_hash}: {e}")
             st.error(f"Error deleting document: {e}")
             return False
     
     def get_context_for_query(self, query: str) -> str:
         """Get relevant context for a query."""
-        search_results = self.search_documents(query)
+        # This method needs to be async now because search_documents is async
+        # For now, we'll make it a synchronous call to the async search_documents
+        # This is not ideal but works within Streamlit's synchronous flow for now.
+        search_results = run_async(self.search_documents(query))
         
         if not search_results:
             return ""
@@ -702,7 +733,7 @@ class ConversationRAGSystem:
         
         return "\n\n".join(context_parts)
 
-def initialize_rag_system(conversation_id: str) -> Optional[ConversationRAGSystem]:
+async def initialize_rag_system(conversation_id: str) -> Optional[ConversationRAGSystem]:
     """Initialize RAG system for a conversation."""
     if not st.session_state.authenticated or not st.session_state.user_id:
         return None
@@ -712,7 +743,9 @@ def initialize_rag_system(conversation_id: str) -> Optional[ConversationRAGSyste
     
     try:
         rag_system = ConversationRAGSystem(st.session_state.user_id, conversation_id)
-        return rag_system
+        if await rag_system._initialize_components(): # Await the async init
+            return rag_system
+        return None
     except Exception as e:
         st.error(f"Error initializing RAG system: {e}")
         return None

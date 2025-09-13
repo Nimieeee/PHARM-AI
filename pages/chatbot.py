@@ -13,7 +13,7 @@ from utils.conversation_manager import (
 )
 from openai_client import chat_completion_stream, chat_completion, get_available_model_modes
 from prompts import pharmacology_system_prompt
-from rag_interface_chromadb import initialize_rag_system, get_rag_enhanced_prompt
+from rag_interface_supabase import initialize_rag_system, get_rag_enhanced_prompt # Changed import
 from auth import can_user_upload, record_user_upload
 from config import get_model_configs
 
@@ -231,7 +231,8 @@ def render_chat_interface():
                     try:
                         # Show processing message
                         with st.spinner(f"Processing {uploaded_file.name}..."):
-                            run_async(process_uploaded_file(uploaded_file, custom_prompt))
+                            # Await the async process_uploaded_file
+                            await process_uploaded_file(uploaded_file, custom_prompt)
                         logger.info(f"✅ File processing completed for: {uploaded_file.name}")
                         
                         # Success message
@@ -282,7 +283,8 @@ def display_chat_messages():
             st.markdown(message["content"])
 
             # Add regenerate button after the last assistant message
-            if (message["role"] == "assistant" and
+            if (
+                message["role"] == "assistant" and
                 i == len(messages) - 1 and
                 len(messages) >= 2):  # At least one user message and one assistant response
 
@@ -343,8 +345,8 @@ def generate_and_display_response(user_prompt):
             # Enhance prompt with RAG if available
             enhanced_prompt = user_prompt
             try:
-                rag_system = initialize_rag_system(st.session_state.current_conversation_id)
-                if rag_system and len(rag_system.get_documents_list()) > 0:
+                rag_system = run_async(initialize_rag_system(st.session_state.current_conversation_id))
+                if rag_system and len(run_async(rag_system.get_documents_list())) > 0:
                     message_placeholder.markdown("🔍 Searching knowledge base...")
                     enhanced_prompt = get_rag_enhanced_prompt(user_prompt, rag_system)
                     if enhanced_prompt != user_prompt:
@@ -476,9 +478,9 @@ def regenerate_last_response():
         save_user_conversations(st.session_state.user_id, st.session_state.conversations)
 
     # Generate new response using the same logic as handle_chat_input but without adding user message
-    generate_assistant_response(last_user_message)
+    run_async(generate_assistant_response(last_user_message)) # Wrap in run_async
 
-def generate_assistant_response(user_prompt: str):
+async def generate_assistant_response(user_prompt: str):
     """Generate assistant response for a given user prompt."""
     # Display the regeneration in progress
     with st.chat_message("assistant"):
@@ -491,8 +493,8 @@ def generate_assistant_response(user_prompt: str):
             # Enhance prompt with RAG if available
             enhanced_prompt = user_prompt
             try:
-                rag_system = initialize_rag_system(st.session_state.current_conversation_id)
-                if rag_system and len(rag_system.get_documents_list()) > 0:
+                rag_system = run_async(initialize_rag_system(st.session_state.current_conversation_id))
+                if rag_system and len(await rag_system.get_documents_list()) > 0: # Await here
                     message_placeholder.markdown("🔍 Searching knowledge base...")
                     enhanced_prompt = get_rag_enhanced_prompt(user_prompt, rag_system)
                     if enhanced_prompt != user_prompt:
@@ -551,7 +553,7 @@ def _process_file_content(file_content: bytes, filename: str, file_type: str):
     """Cached file content processing to avoid reprocessing same files."""
     return len(file_content), file_type.startswith('image/')
 
-async def process_uploaded_file(uploaded_file, custom_prompt=None):
+def process_uploaded_file(uploaded_file, custom_prompt=None):
     """Process uploaded file with optional custom prompt - optimized for performance."""
     import logging
     logger = logging.getLogger(__name__)
@@ -588,7 +590,7 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
         
         try:
             progress_placeholder.markdown("🔄 Initializing document processor...")
-            rag_system = initialize_rag_system(st.session_state.current_conversation_id)
+            rag_system = run_async(initialize_rag_system(st.session_state.current_conversation_id))
 
             if rag_system:
                 # Process file in background
@@ -598,10 +600,10 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
                     if is_image:
                         progress_placeholder.markdown("🖼️ Extracting text from image...")
                         image = Image.open(io.BytesIO(file_content))
-                        result = await rag_system.add_image(image, uploaded_file.name)
+                        result = run_async(rag_system.add_image(image, uploaded_file.name))
                     else:
                         progress_placeholder.markdown("📝 Extracting and processing text...")
-                        result = await rag_system.add_document(file_content, uploaded_file.name, uploaded_file.type)
+                        result = run_async(rag_system.add_document(file_content, uploaded_file.name, uploaded_file.type))
 
                     progress_placeholder.empty()
 
@@ -628,7 +630,7 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
 
                         # Generate response asynchronously
                         logger.info(f"🎯 About to call generate_file_analysis_response with prompt: {auto_prompt[:100]}...")
-                        generate_file_analysis_response(auto_prompt)
+                        run_async(generate_file_analysis_response(auto_prompt))
                         logger.info(f"🏁 generate_file_analysis_response call completed")
 
                         # Clear uploader and increment counter
@@ -680,7 +682,7 @@ def generate_file_analysis_response(auto_prompt: str):
             # Get enhanced prompt (with caching)
             enhanced_prompt = auto_prompt
             try:
-                rag_system = initialize_rag_system(st.session_state.current_conversation_id)
+                rag_system = run_async(initialize_rag_system(st.session_state.current_conversation_id))
                 if rag_system:
                     enhanced_prompt = get_rag_enhanced_prompt(auto_prompt, rag_system)
                     logger.info(f"✅ RAG enhancement successful, enhanced prompt length: {len(enhanced_prompt)}")
