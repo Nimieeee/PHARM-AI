@@ -17,26 +17,17 @@ def render_simple_chatbot():
         st.error("Please sign in to use the chatbot.")
         return
     
-    st.title("💊 PharmGPT - Simple Mode")
+    st.title("💊 PharmGPT")
     
     # Show current model status
     current_mode = st.session_state.get('selected_model_mode', 'normal')
     mode_emoji = "⚡" if current_mode == "turbo" else "🧠"
     mode_name = "Turbo Mode" if current_mode == "turbo" else "Normal Mode"
     
-    # Enhanced streaming status
-    if st.session_state.get('use_streaming', True):
-        if st.session_state.get('fluid_streaming', True):
-            streaming_status = "💫 Fluid Streaming"
-        else:
-            streaming_status = "🌊 Standard Streaming"
-    else:
-        streaming_status = "📄 Non-streaming"
+    st.caption(f"🎯 {mode_emoji} {mode_name} • 💫 Fluid Streaming")
     
-    st.caption(f"🎯 {mode_emoji} {mode_name} • {streaming_status}")
-    
-    # Simple controls
-    col1, col2, col3, col4 = st.columns([1, 1, 1, 1])
+    # Simple model selection control
+    col1, col2, col3 = st.columns([2, 1, 2])
     
     with col2:
         # Initialize model preference
@@ -50,25 +41,9 @@ def render_simple_chatbot():
         
         st.session_state.selected_model_mode = "turbo" if is_turbo else "normal"
     
-    with col3:
-        # Initialize streaming preference
-        if 'use_streaming' not in st.session_state:
-            st.session_state.use_streaming = True
-        
-        use_streaming = st.toggle("🌊 Streaming", 
-                                value=st.session_state.use_streaming, 
-                                help="Enable streaming responses")
-        st.session_state.use_streaming = use_streaming
-    
-    with col4:
-        # Initialize streaming quality preference
-        if 'fluid_streaming' not in st.session_state:
-            st.session_state.fluid_streaming = True
-        
-        fluid_streaming = st.toggle("💫 Fluid", 
-                                   value=st.session_state.fluid_streaming,
-                                   help="Enable ultra-smooth streaming (more updates)")
-        st.session_state.fluid_streaming = fluid_streaming
+    # Set streaming defaults (always enabled, always fluid)
+    st.session_state.use_streaming = True
+    st.session_state.fluid_streaming = True
     
     # Initialize messages in session state
     if 'chat_messages' not in st.session_state:
@@ -131,74 +106,45 @@ def render_simple_chatbot():
                 mode_emoji = "⚡" if selected_mode == "turbo" else "🧠"
                 mode_name = "Turbo" if selected_mode == "turbo" else "Normal"
                 
-                # Choose streaming or non-streaming based on toggle
-                if st.session_state.use_streaming:
-                    # Try streaming with enhanced fluidity
-                    try:
-                        # Show initial streaming message with mode info
-                        streaming_type = "Fluid" if st.session_state.fluid_streaming else "Standard"
-                        response_placeholder.markdown(f"🔄 Generating response ({mode_name} • {streaming_type} Streaming)...")
-                        logger.info(f"Starting {streaming_type.lower()} streaming response with {selected_mode} mode...")
-                        
-                        stream_worked = False
-                        chunk_count = 0
-                        last_update_length = 0
-                        
-                        for chunk in chat_completion_stream(model, api_messages):
-                            if chunk:  # Only process non-empty chunks
-                                stream_worked = True
-                                full_response += chunk
-                                chunk_count += 1
-                                
-                                # Adaptive streaming based on fluid setting
-                                current_length = len(full_response)
-                                
-                                if st.session_state.fluid_streaming:
-                                    # Ultra-fluid: Update every chunk for maximum smoothness
-                                    cursor_styles = ["▌", "█", "▎", "▊", "▋", "▍"]
-                                    cursor = cursor_styles[chunk_count % len(cursor_styles)]
-                                    response_placeholder.markdown(full_response + cursor)
-                                    last_update_length = current_length
-                                else:
-                                    # Standard: Update every few chunks for balanced performance
-                                    if (current_length - last_update_length >= 8) or (chunk_count % 3 == 0):
-                                        cursor_styles = ["▌", "█"]
-                                        cursor = cursor_styles[chunk_count % len(cursor_styles)]
-                                        response_placeholder.markdown(full_response + cursor)
-                                        last_update_length = current_length
-                        
-                        # Final display without cursor - clean finish
-                        if stream_worked and full_response.strip():
-                            response_placeholder.markdown(full_response)
-                            logger.info(f"✅ Fluid streaming completed ({selected_mode}): {len(full_response)} chars, {chunk_count} chunks")
-                        else:
-                            logger.warning("Streaming failed or empty, trying fallback...")
-                            raise Exception("Streaming failed or empty response")
-                            
-                    except Exception as stream_error:
-                        logger.warning(f"Streaming failed: {stream_error}, trying non-streaming...")
-                        
-                        # Fallback to non-streaming
-                        response_placeholder.markdown(f"🔄 Generating response ({mode_name} • Fallback)...")
-                        full_response = chat_completion(model, api_messages)
-                        
-                        if full_response and not full_response.startswith("Error:"):
-                            response_placeholder.markdown(full_response)
-                            logger.info(f"✅ Non-streaming fallback completed ({selected_mode}): {len(full_response)} chars")
-                        else:
-                            raise Exception(f"Both streaming and non-streaming failed: {full_response}")
-                else:
-                    # Use non-streaming directly
-                    response_placeholder.markdown(f"🔄 Generating response ({mode_name} • Non-streaming)...")
-                    logger.info(f"Using non-streaming response with {selected_mode} mode...")
+                # Always use fluid streaming for the best experience
+                try:
+                    response_placeholder.markdown(f"🔄 Generating response ({mode_name} • Fluid Streaming)...")
+                    logger.info(f"Starting fluid streaming response with {selected_mode} mode...")
                     
+                    stream_worked = False
+                    chunk_count = 0
+                    
+                    for chunk in chat_completion_stream(model, api_messages):
+                        if chunk:  # Only process non-empty chunks
+                            stream_worked = True
+                            full_response += chunk
+                            chunk_count += 1
+                            
+                            # Ultra-fluid streaming: Update every chunk for maximum smoothness
+                            cursor_styles = ["▌", "█", "▎", "▊", "▋", "▍"]
+                            cursor = cursor_styles[chunk_count % len(cursor_styles)]
+                            response_placeholder.markdown(full_response + cursor)
+                    
+                    # Final display without cursor - clean finish
+                    if stream_worked and full_response.strip():
+                        response_placeholder.markdown(full_response)
+                        logger.info(f"✅ Fluid streaming completed ({selected_mode}): {len(full_response)} chars, {chunk_count} chunks")
+                    else:
+                        logger.warning("Streaming failed or empty, trying fallback...")
+                        raise Exception("Streaming failed or empty response")
+                        
+                except Exception as stream_error:
+                    logger.warning(f"Streaming failed: {stream_error}, trying non-streaming fallback...")
+                    
+                    # Fallback to non-streaming
+                    response_placeholder.markdown(f"🔄 Generating response ({mode_name} • Fallback)...")
                     full_response = chat_completion(model, api_messages)
                     
                     if full_response and not full_response.startswith("Error:"):
                         response_placeholder.markdown(full_response)
-                        logger.info(f"✅ Non-streaming completed ({selected_mode}): {len(full_response)} chars")
+                        logger.info(f"✅ Non-streaming fallback completed ({selected_mode}): {len(full_response)} chars")
                     else:
-                        raise Exception(f"Non-streaming failed: {full_response}")
+                        raise Exception(f"Both streaming and non-streaming failed: {full_response}")
                 
                 # Add assistant response to chat if successful
                 if full_response and not full_response.startswith("Error:") and not full_response.startswith("❌"):
@@ -222,8 +168,7 @@ def render_simple_chatbot():
             st.write(f"• User: {st.session_state.get('username', 'Unknown')}")
             st.write(f"• Authenticated: {st.session_state.get('authenticated', False)}")
             st.write(f"• Model mode: {st.session_state.get('selected_model_mode', 'normal')}")
-            st.write(f"• Streaming: {st.session_state.get('use_streaming', True)}")
-            st.write(f"• Fluid mode: {st.session_state.get('fluid_streaming', True)}")
+            st.write("• Streaming: 💫 Fluid (Always On)")
         
         with col2:
             st.write("**Actions:**")
