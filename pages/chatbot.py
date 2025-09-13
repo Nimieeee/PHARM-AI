@@ -564,16 +564,17 @@ async def process_uploaded_file(uploaded_file, custom_prompt=None):
                         # Generate response asynchronously
                         generate_file_analysis_response(auto_prompt)
 
-                        # Clear uploader
+                        # Clear uploader (don't rerun immediately - let response complete)
                         st.session_state.upload_counter += 1
-                        st.rerun()
 
                     elif result == "duplicate":
                         st.info(f"📚 Document '{uploaded_file.name}' already exists in this conversation's knowledge base.")
                         st.session_state.upload_counter += 1
+                        # Don't rerun for duplicates - just update counter
                     else:
                         st.error(f"❌ Failed to process {uploaded_file.name}. The document may be corrupted or in an unsupported format.")
                         st.session_state.upload_counter += 1
+                        # Don't rerun for errors - just update counter
 
                 except Exception as e:
                     progress_placeholder.empty()
