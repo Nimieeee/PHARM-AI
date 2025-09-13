@@ -212,9 +212,23 @@ def render_chat_interface():
                     st.session_state[file_key] = True
                     custom_prompt = user_input.strip() if user_input.strip() else None
                     logger.info(f"🔄 Processing uploaded file: {uploaded_file.name}")
-                    run_async(process_uploaded_file(uploaded_file, custom_prompt))
-                    logger.info(f"✅ File processing completed for: {uploaded_file.name}")
-                    # Don't rerun immediately - let the response generation complete
+                    
+                    # Process file immediately and handle any errors
+                    try:
+                        # Show processing message
+                        with st.spinner(f"Processing {uploaded_file.name}..."):
+                            run_async(process_uploaded_file(uploaded_file, custom_prompt))
+                        logger.info(f"✅ File processing completed for: {uploaded_file.name}")
+                        
+                        # Force a rerun to show the results
+                        st.rerun()
+                        
+                    except Exception as file_error:
+                        logger.error(f"💥 File processing failed for {uploaded_file.name}: {file_error}")
+                        st.error(f"❌ Failed to process file: {str(file_error)}")
+                        # Clear the processing flag so user can try again
+                        if file_key in st.session_state:
+                            del st.session_state[file_key]
             else:
                 # Process regular message
                 logger.info(f"🔄 Processing regular message: '{user_input.strip()}'")
