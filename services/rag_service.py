@@ -25,10 +25,18 @@ class RAGService:
     """Advanced RAG service with LangChain and pgvector."""
     
     def __init__(self):
-        # Initialize embeddings model (384 dimensions)
-        self.embeddings = SentenceTransformerEmbeddings(
-            model_name="all-MiniLM-L6-v2"
-        )
+        # Initialize embeddings model (384 dimensions) - using new import
+        try:
+            from langchain_huggingface import HuggingFaceEmbeddings
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2"
+            )
+        except ImportError:
+            # Fallback to old import for compatibility
+            from langchain_community.embeddings import HuggingFaceEmbeddings as SentenceTransformerEmbeddings
+            self.embeddings = SentenceTransformerEmbeddings(
+                model_name="all-MiniLM-L6-v2"
+            )
         
         # Initialize text splitter
         self.text_splitter = RecursiveCharacterTextSplitter(
