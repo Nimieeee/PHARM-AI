@@ -1,15 +1,71 @@
 """
-Sign In Page
+Sign In Page for PharmGPT - Multipage Version
+Clean, simple authentication interface
 """
 
 import streamlit as st
-from auth import authenticate_user, create_user, get_user_uuid, get_user_legacy_id
+from auth import authenticate_user, create_user, get_user_uuid, get_user_legacy_id, initialize_auth_session
 
-def render_signin_page():
-    """Render the sign in page."""
-    st.markdown("# 💊 PharmGPT")
-    st.markdown("### Sign In to Your Account")
-    st.markdown("---")
+# Page configuration
+st.set_page_config(
+    page_title="Sign In - PharmGPT",
+    page_icon="🔐",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+def main():
+    """Main sign in page entry point."""
+    # Initialize auth session
+    initialize_auth_session()
+    
+    # If already authenticated, redirect to chatbot
+    if st.session_state.get('authenticated'):
+        st.success(f"Welcome back, {st.session_state.username}!")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("Continue to Chatbot", use_container_width=True, type="primary"):
+                st.switch_page("pages/3_💬_Chatbot.py")
+            if st.button("← Back to Home", use_container_width=True):
+                st.switch_page("app.py")
+        return
+    
+    # Custom CSS for sign in page
+    st.markdown("""
+    <style>
+    .auth-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 2rem;
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        margin-top: 2rem;
+    }
+    .auth-header {
+        text-align: center;
+        margin-bottom: 2rem;
+        color: #333;
+    }
+    .back-button {
+        margin-bottom: 1rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Back to home button
+    if st.button("← Back to Home", key="back_home"):
+        st.switch_page("app.py")
+    
+    # Main authentication container
+    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="auth-header">
+        <h1>🔐 PharmGPT Authentication</h1>
+        <p>Sign in to access your AI pharmacology assistant</p>
+    </div>
+    """, unsafe_allow_html=True)
     
     # Create tabs for Sign In and Sign Up
     tab1, tab2 = st.tabs(["🔐 Sign In", "📝 Sign Up"])
@@ -19,6 +75,8 @@ def render_signin_page():
     
     with tab2:
         render_signup_form()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
 
 def render_signin_form():
     """Render the sign in form."""
@@ -43,12 +101,9 @@ def render_signin_form():
                     st.session_state.authenticated = True
                     st.session_state.username = username
                     st.session_state.user_id = get_user_legacy_id(username)
-                    st.session_state.current_page = "chatbot"
                     st.success("✅ Successfully signed in!")
-                    try:
-                        st.switch_page("pages/3_💬_Chatbot.py")
-                    except:
-                        st.rerun()
+                    st.balloons()
+                    st.switch_page("pages/3_💬_Chatbot.py")
                 else:
                     st.error(f"❌ {message}")
     
@@ -90,12 +145,9 @@ def render_signup_form():
                     st.session_state.authenticated = True
                     st.session_state.username = username
                     st.session_state.user_id = get_user_legacy_id(username)
-                    st.session_state.current_page = "chatbot"
                     st.success("✅ Account created successfully!")
-                    try:
-                        st.switch_page("pages/3_💬_Chatbot.py")
-                    except:
-                        st.rerun()
+                    st.balloons()
+                    st.switch_page("pages/3_💬_Chatbot.py")
                 else:
                     st.error(f"❌ {message}")
     
@@ -111,3 +163,6 @@ def render_signup_form():
         - Can contain letters, numbers, and underscores
         - No spaces allowed
         """)
+
+if __name__ == "__main__":
+    main()
