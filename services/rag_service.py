@@ -38,12 +38,12 @@ class RAGService:
                 model_name="all-MiniLM-L6-v2"
             )
         
-        # Initialize text splitter
+        # Initialize text splitter with better parameters for thorough analysis
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,  # Smaller chunks for better precision
-            chunk_overlap=50,  # Some overlap to maintain context
+            chunk_size=800,  # Larger chunks for more context
+            chunk_overlap=200,  # More overlap to maintain context
             length_function=len,
-            separators=["\n\n", "\n", ". ", " ", ""]
+            separators=["\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""]
         )
         
         # Import Supabase connection
@@ -150,8 +150,8 @@ class RAGService:
         query: str,
         conversation_id: str,
         user_uuid: str,
-        similarity_threshold: float = 0.7,
-        max_chunks: int = 5
+        similarity_threshold: float = 0.5,  # Lower threshold for more results
+        max_chunks: int = 10  # More chunks for thorough analysis
     ) -> List[Dict]:
         """Search for similar document chunks using semantic similarity."""
         try:
@@ -193,14 +193,33 @@ class RAGService:
         query: str,
         conversation_id: str,
         user_uuid: str,
-        max_context_length: int = 2000
+        max_context_length: int = 4000  # Increased for more thorough context
     ) -> str:
         """Get relevant context from conversation documents for a query."""
         try:
-            # Search for relevant chunks
-            similar_chunks = await self.search_similar_chunks(
-                query, conversation_id, user_uuid, similarity_threshold=0.6, max_chunks=8
+            # Search for relevant chunks with multiple strategies
+            # Strategy 1: High similarity chunks
+            high_sim_chunks = await self.search_similar_chunks(
+                query, conversation_id, user_uuid, similarity_threshold=0.7, max_chunks=5
             )
+            
+            # Strategy 2: Medium similarity chunks for broader context
+            med_sim_chunks = await self.search_similar_chunks(
+                query, conversation_id, user_uuid, similarity_threshold=0.5, max_chunks=10
+            )
+            
+            # Combine and deduplicate
+            seen_chunks = set()
+            similar_chunks = []
+            
+            for chunk in high_sim_chunks + med_sim_chunks:
+                chunk_id = f"{chunk['document_uuid']}_{chunk['chunk_index']}"
+                if chunk_id not in seen_chunks:
+                    seen_chunks.add(chunk_id)
+                    similar_chunks.append(chunk)
+            
+            # Sort by similarity score
+            similar_chunks.sort(key=lambda x: x.get('similarity', 0), reverse=True)
             
             if not similar_chunks:
                 return ""

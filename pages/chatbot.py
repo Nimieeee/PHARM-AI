@@ -157,13 +157,14 @@ def process_uploaded_document(uploaded_file):
         return None
 
 def save_document_to_conversation(uploaded_file, content):
-    """Save document to conversation knowledge base."""
+    """Save document to conversation knowledge base with advanced RAG processing."""
     try:
         if not st.session_state.get('current_conversation_id'):
             return False
         
-        # Initialize conversation documents if not exists
         conv_id = st.session_state.current_conversation_id
+        
+        # Save to session state for immediate access
         if 'conversation_documents' not in st.session_state:
             st.session_state.conversation_documents = {}
         
@@ -179,6 +180,41 @@ def save_document_to_conversation(uploaded_file, content):
         }
         
         st.session_state.conversation_documents[conv_id].append(document_info)
+        
+        # Process with advanced RAG (async in background)
+        try:
+            from services.rag_service import RAGService
+            from services.user_service import user_service
+            import uuid
+            
+            # Get user UUID
+            user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+            if user_data:
+                rag_service = RAGService()
+                document_id = str(uuid.uuid4())
+                
+                # Process document for semantic search
+                success = run_async(rag_service.process_document(
+                    content, 
+                    document_id, 
+                    conv_id, 
+                    user_data['id'],
+                    metadata={
+                        'filename': uploaded_file.name,
+                        'file_size': len(uploaded_file.getvalue()),
+                        'uploaded_at': datetime.now().isoformat()
+                    }
+                ))
+                
+                if success:
+                    logger.info(f"✅ Document processed with advanced RAG: {uploaded_file.name}")
+                else:
+                    logger.warning(f"⚠️ RAG processing failed for: {uploaded_file.name}")
+            
+        except Exception as rag_error:
+            logger.warning(f"Advanced RAG processing failed: {rag_error}")
+            # Continue with basic storage
+        
         logger.info(f"Document saved to conversation {conv_id}: {uploaded_file.name}")
         return True
         
@@ -186,26 +222,159 @@ def save_document_to_conversation(uploaded_file, content):
         logger.error(f"Error saving document to conversation: {e}")
         return False
 
-def get_conversation_context():
-    """Get document context for current conversation."""
+def get_conversation_context(user_query=""):
+    """Get enhanced document context for current conversation using multi-strategy RAG."""
     try:
         conv_id = st.session_state.get('current_conversation_id')
-        if not conv_id or 'conversation_documents' not in st.session_state:
+        if not conv_id:
             return ""
         
-        documents = st.session_state.conversation_documents.get(conv_id, [])
-        if not documents:
-            return ""
+        # Try advanced RAG search first
+        if user_query:
+            try:
+                from services.rag_service import RAGService
+                from services.user_service import user_service
+                
+                # Get user UUID
+                user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+                if user_data:
+                    rag_service = RAGService()
+                    
+                    # Multi-query strategy for thorough search
+                    contexts = []
+                    
+                    # Original query
+                    context1 = run_async(rag_service.get_conversation_context(
+                        user_query, conv_id, user_data['id'], max_context_length=2000
+                    ))
+                    if context1:
+                        contexts.append(context1)
+                    
+                    # Extract key terms for additional searches
+                    key_terms = extract_key_terms(user_query)
+                    for term in key_terms[:2]:  # Limit to 2 additional searches
+                        context_term = run_async(rag_service.get_conversation_context(
+                            term, conv_id, user_data['id'], max_context_length=1500
+                        ))
+                        if context_term and context_term not in contexts:
+                            contexts.append(context_term)
+                    
+                    # Combine contexts
+                    if contexts:
+                        combined_context = "\n\n".join(contexts)
+                        logger.info(f"✅ Retrieved multi-strategy RAG context: {len(combined_context)} chars")
+                        return f"\n\n--- RELEVANT DOCUMENT EXCERPTS ---\n{combined_context}\n"
+                    
+            except Exception as rag_error:
+                logger.warning(f"RAG search failed, falling back to simple context: {rag_error}")
         
-        context = "\n\n--- CONVERSATION DOCUMENTS ---\n"
-        for doc in documents:
-            context += f"\n[Document: {doc['filename']}]\n{doc['content'][:1000]}...\n"
+        # Fallback to session-based documents (enhanced)
+        if 'conversation_documents' in st.session_state:
+            documents = st.session_state.conversation_documents.get(conv_id, [])
+            if documents:
+                context = "\n\n--- CONVERSATION DOCUMENTS ---\n"
+                for doc in documents:
+                    # Use more content and better formatting
+                    content = doc['content']
+                    if len(content) > 2000:
+                        # For long documents, try to find relevant sections
+                        if user_query:
+                            relevant_section = find_relevant_section(content, user_query)
+                            context += f"\n[Document: {doc['filename']}]\n{relevant_section}\n"
+                        else:
+                            # Show beginning and end for context
+                            context += f"\n[Document: {doc['filename']}]\n{content[:1500]}...\n[End excerpt: ...{content[-500:]}]\n"
+                    else:
+                        context += f"\n[Document: {doc['filename']}]\n{content}\n"
+                
+                return context
         
-        return context
+        return ""
         
     except Exception as e:
         logger.error(f"Error getting conversation context: {e}")
         return ""
+
+def extract_key_terms(query, max_terms=3):
+    """Extract key terms from user query for multi-query RAG."""
+    try:
+        import re
+        
+        # Remove common stop words
+        stop_words = {
+            'what', 'how', 'why', 'when', 'where', 'who', 'which', 'is', 'are', 'was', 'were',
+            'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with',
+            'by', 'from', 'up', 'about', 'into', 'through', 'during', 'before', 'after',
+            'above', 'below', 'can', 'could', 'should', 'would', 'will', 'shall', 'may', 'might',
+            'do', 'does', 'did', 'have', 'has', 'had', 'be', 'been', 'being', 'this', 'that',
+            'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her',
+            'us', 'them', 'my', 'your', 'his', 'her', 'its', 'our', 'their'
+        }
+        
+        # Extract words (3+ characters, not stop words)
+        words = re.findall(r'\b[a-zA-Z]{3,}\b', query.lower())
+        key_terms = [word for word in words if word not in stop_words]
+        
+        # Return unique terms, prioritizing longer ones
+        unique_terms = list(dict.fromkeys(key_terms))  # Preserve order, remove duplicates
+        unique_terms.sort(key=len, reverse=True)  # Longer terms first
+        
+        return unique_terms[:max_terms]
+        
+    except Exception as e:
+        logger.error(f"Error extracting key terms: {e}")
+        return []
+
+def find_relevant_section(content, query, section_size=1500):
+    """Find the most relevant section of a document based on query."""
+    try:
+        query_words = query.lower().split()
+        content_lower = content.lower()
+        
+        # Find positions of query words
+        word_positions = []
+        for word in query_words:
+            pos = content_lower.find(word)
+            if pos != -1:
+                word_positions.append(pos)
+        
+        if not word_positions:
+            # No matches found, return beginning
+            return content[:section_size] + "..." if len(content) > section_size else content
+        
+        # Find the center of query word cluster
+        center_pos = sum(word_positions) // len(word_positions)
+        
+        # Extract section around the center
+        start_pos = max(0, center_pos - section_size // 2)
+        end_pos = min(len(content), start_pos + section_size)
+        
+        # Adjust to word boundaries
+        if start_pos > 0:
+            # Find previous sentence or paragraph break
+            for i in range(start_pos, max(0, start_pos - 100), -1):
+                if content[i] in '.!?\n':
+                    start_pos = i + 1
+                    break
+        
+        if end_pos < len(content):
+            # Find next sentence or paragraph break
+            for i in range(end_pos, min(len(content), end_pos + 100)):
+                if content[i] in '.!?\n':
+                    end_pos = i + 1
+                    break
+        
+        section = content[start_pos:end_pos].strip()
+        
+        # Add context indicators
+        prefix = "..." if start_pos > 0 else ""
+        suffix = "..." if end_pos < len(content) else ""
+        
+        return f"{prefix}{section}{suffix}"
+        
+    except Exception as e:
+        logger.error(f"Error finding relevant section: {e}")
+        return content[:section_size] + "..." if len(content) > section_size else content
 
 def render_simple_chatbot():
     """Render a simple, clean chatbot interface."""
@@ -354,13 +523,13 @@ def render_simple_chatbot():
                 model = available_modes[selected_mode]["model"]
                 logger.info(f"Using {selected_mode} mode: {model}")
                 
-                # Get document context for this conversation
-                document_context = get_conversation_context()
+                # Get enhanced document context for this conversation
+                document_context = get_conversation_context(prompt)
                 
-                # Prepare system prompt with document context
+                # Prepare system prompt with enhanced document context
                 system_prompt = pharmacology_system_prompt
                 if document_context:
-                    system_prompt += f"\n\n{document_context}\n\nUse the above documents as additional context when relevant to the user's questions."
+                    system_prompt += f"\n\n{document_context}\n\nIMPORTANT: Use the above document excerpts as primary sources when answering questions. Reference specific information from the documents when relevant. If the user's question relates to the uploaded documents, prioritize information from those documents over general knowledge."
                 
                 # Prepare messages for API
                 api_messages = [{"role": "system", "content": system_prompt}]
