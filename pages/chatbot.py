@@ -351,27 +351,116 @@ def process_document_for_prompt(uploaded_file):
                 text_content = f"[PDF Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed]"
         
         elif uploaded_file.name.endswith('.docx'):
-            # Enhanced DOCX processing
+            # Enhanced DOCX processing with multiple fallbacks
             try:
-                from langchain_community.document_loaders import Docx2txtLoader
+                # Try docx2txt first (lightweight)
+                import docx2txt
                 import tempfile
                 import os
                 
-                # Save to temporary file for Docx2txtLoader
+                # Save to temporary file
                 with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
                     tmp_file.write(file_content)
                     tmp_path = tmp_file.name
                 
                 try:
-                    loader = Docx2txtLoader(tmp_path)
-                    docs = loader.load()
-                    text_content = "\n\n".join([doc.page_content for doc in docs])
+                    text_content = docx2txt.process(tmp_path)
+                    if not text_content.strip():
+                        raise Exception("No text extracted")
                 finally:
                     os.unlink(tmp_path)  # Clean up temp file
                     
             except Exception as docx_error:
-                logger.warning(f"DOCX processing failed, using fallback: {docx_error}")
-                text_content = f"[DOCX Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed]"
+                logger.warning(f"docx2txt failed: {docx_error}, trying python-docx...")
+                try:
+                    # Fallback to python-docx
+                    from docx import Document
+                    import tempfile
+                    import os
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_file:
+                        tmp_file.write(file_content)
+                        tmp_path = tmp_file.name
+                    
+                    try:
+                        doc = Document(tmp_path)
+                        paragraphs = [paragraph.text for paragraph in doc.paragraphs if paragraph.text.strip()]
+                        text_content = "\n\n".join(paragraphs)
+                        
+                        if not text_content.strip():
+                            raise Exception("No text extracted from paragraphs")
+                            
+                    finally:
+                        os.unlink(tmp_path)
+                        
+                except Exception as docx_error2:
+                    logger.warning(f"python-docx also failed: {docx_error2}")
+                    text_content = f"[DOCX Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed]"
+        
+        elif uploaded_file.name.endswith('.pptx'):
+            # PowerPoint processing
+            try:
+                from pptx import Presentation
+                import tempfile
+                import os
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as tmp_file:
+                    tmp_file.write(file_content)
+                    tmp_path = tmp_file.name
+                
+                try:
+                    prs = Presentation(tmp_path)
+                    slides_text = []
+                    
+                    for i, slide in enumerate(prs.slides, 1):
+                        slide_text = f"Slide {i}:\n"
+                        for shape in slide.shapes:
+                            if hasattr(shape, "text") and shape.text.strip():
+                                slide_text += f"- {shape.text.strip()}\n"
+                        
+                        if slide_text != f"Slide {i}:\n":
+                            slides_text.append(slide_text)
+                    
+                    text_content = "\n\n".join(slides_text)
+                    
+                    if not text_content.strip():
+                        raise Exception("No text extracted from slides")
+                        
+                finally:
+                    os.unlink(tmp_path)
+                    
+            except Exception as pptx_error:
+                logger.warning(f"PPTX processing failed: {pptx_error}")
+                text_content = f"[PPTX Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed]"
+        
+        elif uploaded_file.type.startswith('image/') or uploaded_file.name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff')):
+            # Image processing with OCR
+            try:
+                import pytesseract
+                from PIL import Image
+                import tempfile
+                import os
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                    tmp_file.write(file_content)
+                    tmp_path = tmp_file.name
+                
+                try:
+                    # Open image and extract text using OCR
+                    image = Image.open(tmp_path)
+                    extracted_text = pytesseract.image_to_string(image)
+                    
+                    if extracted_text.strip():
+                        text_content = f"[Image OCR Text from {uploaded_file.name}]\n\n{extracted_text}"
+                    else:
+                        text_content = f"[Image: {uploaded_file.name} - {len(file_content)} bytes - No text detected]"
+                        
+                finally:
+                    os.unlink(tmp_path)
+                    
+            except Exception as ocr_error:
+                logger.warning(f"Image OCR failed: {ocr_error}")
+                text_content = f"[Image: {uploaded_file.name} - {len(file_content)} bytes - OCR not available]"
         
         else:
             text_content = f"[Document: {uploaded_file.name} - {len(file_content)} bytes - Unsupported format]"
@@ -552,10 +641,11 @@ def render_conversation_sidebar():
                             
                             # Create conversation container
                             with st.container():
-                                # Main conversation button
+                                # Main conversation button with unique key
+                                button_key = f"conv_btn_{conv_id}_{hash(conv_id) % 10000}"
                                 if st.button(
                                     f"{'🔸' if is_current else '💬'} {display_title}",
-                                    key=f"conv_{conv_id}",
+                                    key=button_key,
                                     use_container_width=True,
                                     type="primary" if is_current else "secondary",
                                     disabled=is_current
@@ -927,15 +1017,28 @@ def render_simple_chatbot():
     # Document upload area (beside message input)
     st.write("---")
     
+    # Clear document state when switching conversations
+    current_conv_id = st.session_state.get('current_conversation_id')
+    if 'last_conversation_id' not in st.session_state:
+        st.session_state.last_conversation_id = current_conv_id
+    
+    if st.session_state.last_conversation_id != current_conv_id:
+        # Conversation changed, clear document state
+        if 'document_full_content' in st.session_state:
+            st.session_state.document_full_content = {}
+        st.session_state.last_conversation_id = current_conv_id
+    
     # Upload area with file info
     col1, col2 = st.columns([3, 1])
     
     with col1:
+        # Create unique key based on conversation to prevent document lingering
+        uploader_key = f"file_uploader_{current_conv_id}" if current_conv_id else "file_uploader_new"
         uploaded_file = st.file_uploader(
             "📎 Upload document (optional)",
-            type=['txt', 'pdf', 'docx', 'md'],
+            type=['txt', 'pdf', 'docx', 'md', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff'],
             help="Upload a document to include in your conversation (10MB max, 5 per day)",
-            key="main_file_uploader"
+            key=uploader_key
         )
     
     with col2:

@@ -12,7 +12,10 @@ import json
 # LangChain imports
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
-from langchain_community.embeddings import SentenceTransformerEmbeddings
+try:
+    from langchain_huggingface import HuggingFaceEmbeddings as SentenceTransformerEmbeddings
+except ImportError:
+    from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain.docstore.document import Document as LangChainDocument
 
 # Configure logging

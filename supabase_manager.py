@@ -60,6 +60,13 @@ class SimpleSupabaseManager:
         """Execute a database query with a fresh client."""
         self.stats['total_queries'] += 1
         
+        # Set user context for RLS if user_uuid is provided in data
+        user_uuid = None
+        if 'data' in kwargs and isinstance(kwargs['data'], dict):
+            user_uuid = kwargs['data'].get('user_uuid')
+        elif 'eq' in kwargs and isinstance(kwargs['eq'], dict):
+            user_uuid = kwargs['eq'].get('user_uuid')
+        
         try:
             # Create fresh client for this operation
             client = await self._create_client()
