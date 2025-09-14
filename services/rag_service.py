@@ -95,7 +95,7 @@ class RAGService:
         user_uuid: str,
         start_index: int
     ):
-        """Process a batch of chunks."""
+        """Process a batch of chunks with enhanced error handling."""
         try:
             # Extract text content from chunks
             texts = [chunk.page_content for chunk in chunks]
@@ -104,30 +104,84 @@ class RAGService:
             embeddings = await self._generate_embeddings(texts)
             
             # Store chunks with embeddings
+            successful_inserts = 0
             for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-                chunk_data = {
-                    'document_uuid': document_id,
-                    'conversation_id': conversation_id,
-                    'user_uuid': user_uuid,
-                    'chunk_index': start_index + idx,
-                    'content': chunk.page_content,
-                    'embedding': embedding,
-                    'metadata': json.dumps(chunk.metadata)
-                }
-                
-                # Insert into database
+                try:
+                    chunk_data = {
+                        'document_uuid': document_id,
+                        'conversation_id': conversation_id,
+                        'user_uuid': user_uuid,
+                        'chunk_index': start_index + idx,
+                        'content': chunk.page_content,
+                        'embedding': embedding,
+                        'metadata': json.dumps(chunk.metadata)
+                    }
+                    
+                    # Insert into database with retry logic
+                    result = await self._insert_chunk_with_retry(chunk_data)
+                    
+                    if result:
+                        successful_inserts += 1
+                    else:
+                        logger.warning(f"Failed to insert chunk {start_index + idx}")
+                        
+                except Exception as chunk_error:
+                    logger.error(f"Error inserting chunk {start_index + idx}: {chunk_error}")
+                    # Continue with other chunks
+            
+            logger.info(f"Successfully inserted {successful_inserts}/{len(chunks)} chunks")
+            
+        except Exception as e:
+            logger.error(f"Error processing chunk batch: {e}")
+            raise
+    
+    async def _insert_chunk_with_retry(self, chunk_data: dict, max_retries: int = 3) -> bool:
+        """Insert chunk with retry logic for RLS issues."""
+        for attempt in range(max_retries):
+            try:
                 result = await self.db.execute_query(
                     'document_chunks',
                     'insert',
                     data=chunk_data
                 )
                 
-                if not result.data:
-                    logger.warning(f"Failed to insert chunk {start_index + idx}")
-            
-        except Exception as e:
-            logger.error(f"Error processing chunk batch: {e}")
-            raise
+                if result.data:
+                    return True
+                else:
+                    logger.warning(f"Insert attempt {attempt + 1} failed - no data returned")
+                    
+            except Exception as e:
+                error_msg = str(e)
+                
+                # Check for RLS policy violation
+                if "row-level security policy" in error_msg.lower():
+                    logger.error(f"RLS policy violation on attempt {attempt + 1}: {error_msg}")
+                    
+                    # Try to fix user_uuid format
+                    if attempt < max_retries - 1:
+                        # Ensure user_uuid is properly formatted
+                        if isinstance(chunk_data['user_uuid'], str):
+                            try:
+                                import uuid
+                                # Validate and reformat UUID
+                                uuid_obj = uuid.UUID(chunk_data['user_uuid'])
+                                chunk_data['user_uuid'] = str(uuid_obj)
+                                logger.info(f"Reformatted user_uuid for retry {attempt + 2}")
+                                continue
+                            except ValueError:
+                                logger.error(f"Invalid UUID format: {chunk_data['user_uuid']}")
+                                break
+                else:
+                    logger.error(f"Insert attempt {attempt + 1} failed: {error_msg}")
+                
+                if attempt == max_retries - 1:
+                    logger.error(f"All {max_retries} insert attempts failed for chunk")
+                    return False
+                    
+                # Wait before retry
+                await asyncio.sleep(0.5 * (attempt + 1))
+        
+        return False
     
     async def _generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for a list of texts."""
