@@ -22,9 +22,9 @@ from langchain.docstore.document import Document as LangChainDocument
 logger = logging.getLogger(__name__)
 
 class RAGService:
-    """Advanced RAG service with LangChain and pgvector."""
+    """Advanced RAG service with LangChain and pgvector - Full Document Processing by Default."""
     
-    def __init__(self):
+    def __init__(self, default_full_document_mode: bool = True):
         # Initialize embeddings model (384 dimensions) - using new import
         try:
             from langchain_huggingface import HuggingFaceEmbeddings
@@ -54,6 +54,10 @@ class RAGService:
             separators=["\n\n\n", "\n\n", "\n", ". ", "! ", "? "]
         )
         
+        # Set default processing mode
+        self.default_full_document_mode = default_full_document_mode
+        logger.info(f"RAG Service initialized with full document mode: {default_full_document_mode}")
+        
         # Import Supabase connection
         from supabase_manager import connection_manager
         self.db = connection_manager
@@ -64,21 +68,49 @@ class RAGService:
         document_id: str,
         conversation_id: str,
         user_uuid: str,
-        metadata: Dict = None
+        metadata: Dict = None,
+        use_full_document_mode: bool = True  # Default to full document processing
     ) -> bool:
-        """Process document into chunks and store embeddings."""
+        """Process document for full knowledge base (default) or similarity search."""
         try:
-            logger.info(f"Processing document {document_id} for RAG")
+            logger.info(f"Processing document {document_id} for full document knowledge base")
             
-            # Create LangChain document
+            # Create LangChain document with enhanced metadata
+            enhanced_metadata = metadata or {}
+            enhanced_metadata.update({
+                'processing_mode': 'full_document_knowledge_base',
+                'processed_at': datetime.now().isoformat(),
+                'document_id': document_id,
+                'conversation_id': conversation_id
+            })
+            
             doc = LangChainDocument(
                 page_content=document_content,
-                metadata=metadata or {}
+                metadata=enhanced_metadata
             )
             
+            # Choose splitter based on document size and mode
+            doc_length = len(document_content)
+            
+            if use_full_document_mode:
+                if doc_length > 10000:  # Large documents get very large chunks
+                    splitter = self.large_doc_splitter
+                    logger.info(f"Using large document splitter for {doc_length} character document")
+                else:
+                    splitter = self.text_splitter
+                    logger.info(f"Using standard splitter for {doc_length} character document")
+            else:
+                # Fallback to smaller chunks for similarity search
+                splitter = RecursiveCharacterTextSplitter(
+                    chunk_size=800,
+                    chunk_overlap=200,
+                    length_function=len,
+                    separators=["\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""]
+                )
+            
             # Split document into chunks
-            chunks = self.text_splitter.split_documents([doc])
-            logger.info(f"Split document into {len(chunks)} chunks")
+            chunks = splitter.split_documents([doc])
+            logger.info(f"Split document into {len(chunks)} chunks using full document mode")
             
             # Process chunks in batches
             batch_size = 10
@@ -88,7 +120,7 @@ class RAGService:
                     batch, document_id, conversation_id, user_uuid, i
                 )
             
-            logger.info(f"✅ Successfully processed {len(chunks)} chunks for document {document_id}")
+            logger.info(f"✅ Successfully processed {len(chunks)} chunks for full document knowledge base")
             return True
             
         except Exception as e:

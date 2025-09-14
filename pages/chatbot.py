@@ -319,7 +319,7 @@ def save_document_to_conversation(uploaded_file, content):
                 rag_service = RAGService()
                 document_id = str(uuid.uuid4())
                 
-                # Process document for full knowledge base (larger chunks for complete context)
+                # Always process document for full knowledge base (default behavior)
                 success = run_async(rag_service.process_document(
                     content, 
                     document_id, 
@@ -329,8 +329,9 @@ def save_document_to_conversation(uploaded_file, content):
                         'filename': uploaded_file.name,
                         'file_size': len(uploaded_file.getvalue()),
                         'uploaded_at': datetime.now().isoformat(),
-                        'processing_mode': 'full_document_knowledge_base'
-                    }
+                        'processing_mode': 'full_document_knowledge_base_default'
+                    },
+                    use_full_document_mode=True  # Explicitly set to True as default
                 ))
                 
                 if success:
@@ -356,7 +357,7 @@ def get_conversation_context(user_query=""):
         if not conv_id:
             return ""
         
-        # Try full document RAG first (entire documents as knowledge base)
+        # Always use full document RAG as primary method (default behavior)
         try:
             from services.rag_service import RAGService
             from services.user_service import user_service
@@ -366,24 +367,25 @@ def get_conversation_context(user_query=""):
             if user_data:
                 rag_service = RAGService()
                 
-                # Get FULL document context (entire documents)
+                # ALWAYS try full document context first (default behavior)
                 full_context = run_async(rag_service.get_full_document_context(
-                    conv_id, user_data['id'], max_context_length=15000
+                    conv_id, user_data['id'], max_context_length=20000  # Increased for more complete context
                 ))
                 
                 if full_context:
-                    logger.info(f"✅ Retrieved full document context: {len(full_context)} chars")
-                    return f"\n\n--- COMPLETE DOCUMENT KNOWLEDGE BASE ---\n{full_context}\n"
+                    logger.info(f"✅ Retrieved complete document knowledge base: {len(full_context)} chars")
+                    return f"\n\n--- COMPLETE DOCUMENT KNOWLEDGE BASE (DEFAULT) ---\n{full_context}\n"
                 
-                # Fallback to similarity search if no full context
+                # Only use similarity search as last resort
                 if user_query:
+                    logger.info("Full document context not available, trying similarity search as fallback")
                     similarity_context = run_async(rag_service.get_conversation_context(
-                        user_query, conv_id, user_data['id'], max_context_length=8000
+                        user_query, conv_id, user_data['id'], max_context_length=10000
                     ))
                     
                     if similarity_context:
-                        logger.info(f"✅ Retrieved similarity-based context: {len(similarity_context)} chars")
-                        return f"\n\n--- RELEVANT DOCUMENT EXCERPTS ---\n{similarity_context}\n"
+                        logger.info(f"✅ Retrieved similarity-based fallback context: {len(similarity_context)} chars")
+                        return f"\n\n--- DOCUMENT EXCERPTS (FALLBACK) ---\n{similarity_context}\n"
                     
         except Exception as rag_error:
             logger.warning(f"Full document RAG failed, falling back to session context: {rag_error}")
@@ -553,8 +555,8 @@ def render_simple_chatbot():
             if len(doc_names) > 3:
                 doc_list += f" and {len(doc_names) - 3} more"
             
-            st.info(f"📚 **Full Knowledge Base Active**: {doc_count} document{'s' if doc_count != 1 else ''} ({total_chars:,} characters)\n📄 Documents: {doc_list}")
-            st.caption("💡 The AI has access to the complete content of all uploaded documents")
+            st.success(f"📚 **Complete Knowledge Base (Default)**: {doc_count} document{'s' if doc_count != 1 else ''} ({total_chars:,} characters)\n📄 Documents: {doc_list}")
+            st.caption("🎯 **Full Document Processing Active**: AI has complete access to all document content by default")
     
     # Display chat messages with regenerate button
     for i, message in enumerate(st.session_state.chat_messages):
@@ -655,10 +657,10 @@ def render_simple_chatbot():
                 # Get enhanced document context for this conversation
                 document_context = get_conversation_context(prompt)
                 
-                # Prepare system prompt with full document context
+                # Prepare system prompt with complete document knowledge base (default behavior)
                 system_prompt = pharmacology_system_prompt
                 if document_context:
-                    system_prompt += f"\n\n{document_context}\n\nIMPORTANT: The above contains the COMPLETE CONTENT of all documents uploaded to this conversation. Treat this as your primary knowledge base for this conversation. When answering questions:\n\n1. ALWAYS check if the answer exists in the uploaded documents first\n2. Quote specific sections from the documents when relevant\n3. If information is in the documents, prioritize it over your general knowledge\n4. Reference the document name when citing information\n5. If the user asks about something not in the documents, clearly state that and then provide general knowledge\n\nThe documents contain the complete, authoritative information for this conversation."
+                    system_prompt += f"\n\n{document_context}\n\n🎯 FULL DOCUMENT KNOWLEDGE BASE (DEFAULT MODE): The above contains the COMPLETE, UNFILTERED CONTENT of all documents uploaded to this conversation. This is your PRIMARY and AUTHORITATIVE knowledge source. Default behavior:\n\n1. ✅ ALWAYS search the complete document content FIRST before using general knowledge\n2. ✅ Quote specific sections, page numbers, or document names when referencing information\n3. ✅ Prioritize document information over your training data when conflicts arise\n4. ✅ Cross-reference information across different parts of the same document\n5. ✅ If information exists in the documents, use it as the definitive source\n6. ✅ Only use general knowledge when the documents don't contain relevant information\n7. ✅ Clearly distinguish between document-based answers and general knowledge\n\n📚 You have COMPLETE ACCESS to all uploaded document content by default - use this comprehensive knowledge base to provide thorough, accurate responses."
                 
                 # Prepare messages for API
                 api_messages = [{"role": "system", "content": system_prompt}]
