@@ -4,10 +4,14 @@ Main Homepage - Multipage Streamlit Application
 """
 
 import streamlit as st
+import logging
 from utils.session_manager import initialize_session_state
 from utils.theme import apply_theme
 from auth import initialize_auth_session
 from config import APP_TITLE, APP_ICON
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Page configuration
 st.set_page_config(
@@ -28,6 +32,70 @@ def main():
     
     # Render homepage
     render_homepage()
+
+def get_user_stats():
+    """Get user statistics for the homepage."""
+    try:
+        if not st.session_state.get('authenticated'):
+            return {}
+        
+        from utils.conversation_manager import get_conversation_stats
+        stats = get_conversation_stats()
+        
+        # Add document count
+        total_documents = 0
+        if 'conversation_documents' in st.session_state:
+            for conv_docs in st.session_state.conversation_documents.values():
+                total_documents += len(conv_docs)
+        
+        stats['total_documents'] = total_documents
+        stats['last_active'] = 'Today'  # Simplified for now
+        
+        return stats
+        
+    except Exception as e:
+        logger.error(f"Error getting user stats: {e}")
+        return {}
+
+def get_recent_conversations():
+    """Get recent conversations for the homepage."""
+    try:
+        conversations = st.session_state.get('conversations', {})
+        
+        # Sort by updated_at (most recent first)
+        sorted_conversations = sorted(
+            conversations.items(),
+            key=lambda x: x[1].get('updated_at', x[1].get('created_at', '')),
+            reverse=True
+        )
+        
+        recent = []
+        for conv_id, conv_data in sorted_conversations:
+            # Format last updated time
+            try:
+                from datetime import datetime
+                updated_at = datetime.fromisoformat(conv_data.get('updated_at', conv_data.get('created_at', '')))
+                last_updated = updated_at.strftime('%m/%d %H:%M')
+            except:
+                last_updated = 'Recently'
+            
+            # Get model icon
+            model = conv_data.get('model', 'normal')
+            model_icon = "⚡" if model == "turbo" else "🧠"
+            
+            recent.append({
+                'id': conv_id,
+                'title': conv_data.get('title', 'Untitled Chat'),
+                'message_count': len(conv_data.get('messages', [])),
+                'last_updated': last_updated,
+                'model_icon': model_icon
+            })
+        
+        return recent
+        
+    except Exception as e:
+        logger.error(f"Error getting recent conversations: {e}")
+        return []
 
 def render_homepage():
     """Render the main homepage with authentication-aware content."""
@@ -92,19 +160,62 @@ def render_homepage():
     username = st.session_state.get('username', '')
     
     if authenticated:
-        # Authenticated user view
+        # Load user stats
+        user_stats = get_user_stats()
+        
+        # Authenticated user view with stats
         st.markdown(f"""
         <div class="welcome-text">
             <h2>Welcome back, {username}! 👋</h2>
-            <p>Ready to explore pharmacology with AI assistance?</p>
+            <p>Ready to continue your pharmacology learning journey?</p>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Show user stats
+        if user_stats['total_conversations'] > 0:
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("💬 Conversations", user_stats['total_conversations'])
+            
+            with col2:
+                st.metric("📝 Messages", user_stats['total_messages'])
+            
+            with col3:
+                st.metric("📚 Documents", user_stats.get('total_documents', 0))
+            
+            with col4:
+                st.metric("🕒 Last Active", user_stats.get('last_active', 'Today'))
         
         # Center the chatbot button
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
-            if st.button("🚀 Start Chatting", use_container_width=True, type="primary"):
+            if st.button("🚀 Continue Chatting", use_container_width=True, type="primary"):
                 st.switch_page("pages/3_💬_Chatbot.py")
+        
+        # Recent conversations
+        if user_stats['total_conversations'] > 0:
+            st.markdown("### 📋 Recent Conversations")
+            recent_conversations = get_recent_conversations()
+            
+            for conv in recent_conversations[:3]:  # Show last 3 conversations
+                with st.container():
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    
+                    with col1:
+                        st.markdown(f"**💬 {conv['title']}**")
+                        st.caption(f"{conv['message_count']} messages • {conv['last_updated']}")
+                    
+                    with col2:
+                        if st.button("Open", key=f"open_{conv['id']}", use_container_width=True):
+                            st.session_state.current_conversation_id = conv['id']
+                            st.switch_page("pages/3_💬_Chatbot.py")
+                    
+                    with col3:
+                        st.markdown(f"**{conv['model_icon']}**")
+            
+            if user_stats['total_conversations'] > 3:
+                st.info(f"📁 {user_stats['total_conversations'] - 3} more conversations available in the chatbot")
         
         # Show features for authenticated users
         st.markdown("### ✨ What you can do:")

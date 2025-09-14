@@ -1,6 +1,6 @@
 """
-Clean Conversation Management for PharmGPT
-Simple, reliable conversation and message handling
+Enhanced Conversation Management for PharmGPT
+Advanced conversation and message handling with better features
 """
 
 import asyncio
@@ -30,8 +30,8 @@ def run_async(coro):
         logger.error(f"Async operation failed: {e}")
         raise
 
-async def create_new_conversation():
-    """Create a new conversation."""
+async def create_new_conversation(title: str = None) -> Optional[str]:
+    """Create a new conversation with enhanced features."""
     logger.info("Creating new conversation")
     
     try:
@@ -46,14 +46,15 @@ async def create_new_conversation():
             return None
         
         # Generate conversation title
-        st.session_state.conversation_counter = st.session_state.get('conversation_counter', 0) + 1
-        title = f"New Chat {st.session_state.conversation_counter}"
+        if not title:
+            st.session_state.conversation_counter = st.session_state.get('conversation_counter', 0) + 1
+            title = f"New Chat {st.session_state.conversation_counter}"
         
         # Create conversation in database
         conversation_id = await conversation_service.create_conversation(
             user_data['id'], 
             title, 
-            "meta-llama/llama-4-maverick-17b-128e-instruct"
+            st.session_state.get('selected_model_mode', 'normal')
         )
         
         # Update local session state
@@ -64,9 +65,19 @@ async def create_new_conversation():
             "title": title,
             "messages": [],
             "created_at": datetime.now().isoformat(),
-            "model": "meta-llama/llama-4-maverick-17b-128e-instruct"
+            "updated_at": datetime.now().isoformat(),
+            "model": st.session_state.get('selected_model_mode', 'normal'),
+            "message_count": 0
         }
+        
+        # Set as current conversation
         st.session_state.current_conversation_id = conversation_id
+        st.session_state.chat_messages = []
+        
+        # Clear any existing documents for new conversation
+        if 'conversation_documents' not in st.session_state:
+            st.session_state.conversation_documents = {}
+        st.session_state.conversation_documents[conversation_id] = []
         
         logger.info(f"✅ New conversation created: {conversation_id}")
         return conversation_id
@@ -74,6 +85,33 @@ async def create_new_conversation():
     except Exception as e:
         logger.error(f"Failed to create conversation: {e}")
         return None
+
+async def load_user_conversations() -> Dict:
+    """Load all conversations for the current user."""
+    try:
+        if not st.session_state.get('authenticated') or not st.session_state.get('user_id'):
+            return {}
+        
+        from services.conversation_service import conversation_service
+        from services.user_service import user_service
+        
+        # Get user UUID
+        user_data = await user_service.get_user_by_id(st.session_state.user_id)
+        if not user_data:
+            return {}
+        
+        # Load conversations from database
+        conversations = await conversation_service.get_user_conversations(user_data['id'])
+        
+        # Update session state
+        st.session_state.conversations = conversations
+        
+        logger.info(f"Loaded {len(conversations)} conversations")
+        return conversations
+        
+    except Exception as e:
+        logger.error(f"Error loading conversations: {e}")
+        return {}
 
 def get_current_messages() -> List[Dict]:
     """Get messages from current conversation."""
@@ -88,7 +126,7 @@ def get_current_messages() -> List[Dict]:
     return []
 
 async def add_message_to_current_conversation(role: str, content: str) -> bool:
-    """Add message to current conversation."""
+    """Add message to current conversation with enhanced features."""
     logger.info(f"Adding {role} message to conversation")
     
     try:
@@ -108,11 +146,12 @@ async def add_message_to_current_conversation(role: str, content: str) -> bool:
             logger.error("User not found")
             return False
         
-        # Create message
+        # Create message with enhanced metadata
         message = {
             "role": role,
             "content": content,
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now().isoformat(),
+            "model": st.session_state.get('selected_model_mode', 'normal') if role == "assistant" else None
         }
         
         # Add to database
@@ -126,11 +165,13 @@ async def add_message_to_current_conversation(role: str, content: str) -> bool:
             # Update local session state
             if st.session_state.current_conversation_id in st.session_state.conversations:
                 st.session_state.conversations[st.session_state.current_conversation_id]["messages"].append(message)
+                st.session_state.conversations[st.session_state.current_conversation_id]["updated_at"] = datetime.now().isoformat()
+                st.session_state.conversations[st.session_state.current_conversation_id]["message_count"] += 1
                 
                 # Update conversation title based on first user message
                 if (role == "user" and 
                     len(st.session_state.conversations[st.session_state.current_conversation_id]["messages"]) == 1):
-                    title = content[:50] + "..." if len(content) > 50 else content
+                    title = generate_smart_title(content)
                     st.session_state.conversations[st.session_state.current_conversation_id]["title"] = title
                     
                     # Update title in database
@@ -150,8 +191,77 @@ async def add_message_to_current_conversation(role: str, content: str) -> bool:
         logger.error(f"Error adding message: {e}")
         return False
 
+def generate_smart_title(content: str) -> str:
+    """Generate a smart title based on message content."""
+    # Remove common question words and clean up
+    content = content.strip()
+    
+    # Common pharmacology terms to prioritize in titles
+    pharma_terms = [
+        'mechanism', 'action', 'drug', 'interaction', 'side effect', 'dosage',
+        'pharmacokinetics', 'pharmacodynamics', 'receptor', 'enzyme', 'pathway',
+        'metabolism', 'absorption', 'distribution', 'excretion', 'bioavailability',
+        'half-life', 'clearance', 'toxicity', 'adverse', 'contraindication'
+    ]
+    
+    # Look for important terms
+    words = content.lower().split()
+    important_words = []
+    
+    for word in words:
+        if any(term in word for term in pharma_terms):
+            important_words.append(word)
+    
+    # Create title
+    if important_words:
+        # Use important pharmacology terms
+        title_base = ' '.join(important_words[:3])
+    else:
+        # Fallback to first few words
+        title_base = ' '.join(words[:5])
+    
+    # Capitalize and limit length
+    title = title_base.title()
+    if len(title) > 50:
+        title = title[:47] + "..."
+    
+    return title if title else f"Chat {datetime.now().strftime('%m/%d %H:%M')}"
+
+async def update_conversation_title(conversation_id: str, new_title: str) -> bool:
+    """Update conversation title."""
+    try:
+        from services.conversation_service import conversation_service
+        from services.user_service import user_service
+        
+        # Get user UUID
+        user_data = await user_service.get_user_by_id(st.session_state.user_id)
+        if not user_data:
+            return False
+        
+        # Update in database
+        success = await conversation_service.update_conversation_title(
+            user_data['id'],
+            conversation_id,
+            new_title
+        )
+        
+        if success:
+            # Update local session state
+            if conversation_id in st.session_state.conversations:
+                st.session_state.conversations[conversation_id]["title"] = new_title
+                st.session_state.conversations[conversation_id]["updated_at"] = datetime.now().isoformat()
+            
+            logger.info(f"✅ Conversation title updated: {conversation_id}")
+            return True
+        
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error updating conversation title: {e}")
+        return False
+
 async def delete_conversation(conversation_id: str) -> bool:
-    """Delete a conversation."""
+    """Delete a conversation with enhanced cleanup."""
     try:
         # Import here to avoid circular imports
         from services.conversation_service import conversation_service
@@ -173,12 +283,25 @@ async def delete_conversation(conversation_id: str) -> bool:
             if conversation_id in st.session_state.conversations:
                 del st.session_state.conversations[conversation_id]
             
+            # Clean up conversation documents
+            if 'conversation_documents' in st.session_state and conversation_id in st.session_state.conversation_documents:
+                del st.session_state.conversation_documents[conversation_id]
+            
+            # Handle current conversation
             if st.session_state.current_conversation_id == conversation_id:
                 # Switch to another conversation or clear current
                 if st.session_state.conversations:
-                    st.session_state.current_conversation_id = list(st.session_state.conversations.keys())[0]
+                    # Switch to most recent conversation
+                    sorted_conversations = sorted(
+                        st.session_state.conversations.items(),
+                        key=lambda x: x[1].get('updated_at', x[1].get('created_at', '')),
+                        reverse=True
+                    )
+                    st.session_state.current_conversation_id = sorted_conversations[0][0]
+                    st.session_state.chat_messages = sorted_conversations[0][1].get('messages', [])
                 else:
                     st.session_state.current_conversation_id = None
+                    st.session_state.chat_messages = []
             
             logger.info(f"✅ Conversation deleted: {conversation_id}")
             return True
@@ -189,8 +312,8 @@ async def delete_conversation(conversation_id: str) -> bool:
         logger.error(f"Error deleting conversation: {e}")
         return False
 
-async def duplicate_conversation(conversation_id: str) -> Optional[str]:
-    """Duplicate a conversation."""
+async def duplicate_conversation(conversation_id: str, new_title: str = None) -> Optional[str]:
+    """Duplicate a conversation with enhanced features."""
     try:
         # Import here to avoid circular imports
         from services.conversation_service import conversation_service
@@ -209,11 +332,13 @@ async def duplicate_conversation(conversation_id: str) -> Optional[str]:
         original_conv = st.session_state.conversations[conversation_id]
         
         # Create new conversation with duplicated title
-        new_title = f"Copy of {original_conv['title']}"
+        if not new_title:
+            new_title = f"Copy of {original_conv['title']}"
+        
         new_conversation_id = await conversation_service.create_conversation(
             user_data['id'], 
             new_title, 
-            original_conv.get('model', 'meta-llama/llama-4-maverick-17b-128e-instruct')
+            original_conv.get('model', 'normal')
         )
         
         if not new_conversation_id:
@@ -232,8 +357,14 @@ async def duplicate_conversation(conversation_id: str) -> Optional[str]:
             "title": new_title,
             "messages": original_conv.get('messages', []).copy(),
             "created_at": datetime.now().isoformat(),
-            "model": original_conv.get('model', 'meta-llama/llama-4-maverick-17b-128e-instruct')
+            "updated_at": datetime.now().isoformat(),
+            "model": original_conv.get('model', 'normal'),
+            "message_count": len(original_conv.get('messages', []))
         }
+        
+        # Copy documents if any
+        if 'conversation_documents' in st.session_state and conversation_id in st.session_state.conversation_documents:
+            st.session_state.conversation_documents[new_conversation_id] = st.session_state.conversation_documents[conversation_id].copy()
         
         logger.info(f"✅ Conversation duplicated: {new_conversation_id}")
         return new_conversation_id
@@ -241,3 +372,72 @@ async def duplicate_conversation(conversation_id: str) -> Optional[str]:
     except Exception as e:
         logger.error(f"Error duplicating conversation: {e}")
         return None
+
+async def search_conversations(query: str) -> List[Dict]:
+    """Search conversations by title and content."""
+    try:
+        conversations = st.session_state.get('conversations', {})
+        results = []
+        
+        query_lower = query.lower()
+        
+        for conv_id, conv_data in conversations.items():
+            # Search in title
+            if query_lower in conv_data.get('title', '').lower():
+                results.append({
+                    'conversation_id': conv_id,
+                    'title': conv_data['title'],
+                    'match_type': 'title',
+                    'relevance': 1.0
+                })
+                continue
+            
+            # Search in messages
+            messages = conv_data.get('messages', [])
+            for message in messages:
+                if query_lower in message.get('content', '').lower():
+                    results.append({
+                        'conversation_id': conv_id,
+                        'title': conv_data['title'],
+                        'match_type': 'content',
+                        'relevance': 0.8,
+                        'message_preview': message['content'][:100] + "..."
+                    })
+                    break
+        
+        # Sort by relevance
+        results.sort(key=lambda x: x['relevance'], reverse=True)
+        return results
+        
+    except Exception as e:
+        logger.error(f"Error searching conversations: {e}")
+        return []
+
+def get_conversation_stats() -> Dict:
+    """Get statistics about user's conversations."""
+    try:
+        conversations = st.session_state.get('conversations', {})
+        
+        total_conversations = len(conversations)
+        total_messages = sum(len(conv.get('messages', [])) for conv in conversations.values())
+        
+        # Most active conversation
+        most_active = None
+        max_messages = 0
+        
+        for conv_id, conv_data in conversations.items():
+            message_count = len(conv_data.get('messages', []))
+            if message_count > max_messages:
+                max_messages = message_count
+                most_active = conv_data.get('title', 'Untitled')
+        
+        return {
+            'total_conversations': total_conversations,
+            'total_messages': total_messages,
+            'most_active_conversation': most_active,
+            'most_active_message_count': max_messages
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting conversation stats: {e}")
+        return {}
