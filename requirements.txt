@@ -4,9 +4,17 @@ streamlit>=1.28.0
 # AI and OpenAI-compatible APIs
 openai>=1.0.0
 
-# Lightweight RAG System Dependencies (only install when needed)
-chromadb>=0.4.0
+# LangChain for advanced RAG
+langchain>=0.1.0
+langchain-openai>=0.0.5
+langchain-community>=0.0.20
+
+# Vector embeddings
 sentence-transformers>=2.2.0
+
+# Supabase pgvector integration
+vecs>=0.4.0
+pgvector>=0.2.0
 
 # Essential Document Processing (lightweight versions)
 PyPDF2>=3.0.0

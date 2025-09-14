@@ -31,6 +31,14 @@ def initialize_session_state():
     if "session_id" not in st.session_state:
         st.session_state.session_id = None
     
+    # Validate existing session on page load
+    if st.session_state.authenticated and st.session_state.user_id:
+        try:
+            validate_existing_session()
+        except Exception as e:
+            logger.warning(f"Session validation failed: {e}")
+            # Don't clear session immediately, let user continue
+    
     # Initialize theme
     if "theme_mode" not in st.session_state:
         st.session_state.theme_mode = "light"
@@ -48,6 +56,42 @@ def initialize_session_state():
     
     if "conversation_counter" not in st.session_state:
         st.session_state.conversation_counter = 0
+
+def validate_existing_session():
+    """Validate that the current session is still valid."""
+    try:
+        if not st.session_state.get('user_id'):
+            return False
+        
+        # Import here to avoid circular imports
+        from services.user_service import user_service
+        import asyncio
+        
+        # Check if user still exists
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        user_data = loop.run_until_complete(user_service.get_user_by_id(st.session_state.user_id))
+        
+        if user_data:
+            logger.info(f"Session validated for user: {st.session_state.username}")
+            return True
+        else:
+            logger.warning(f"User not found during session validation: {st.session_state.user_id}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Session validation error: {e}")
+        return False
+
+def extend_session():
+    """Extend the current session timeout."""
+    if st.session_state.get('authenticated'):
+        st.session_state.session_last_activity = datetime.now()
+        logger.debug("Session activity updated")
     
     if "search_query" not in st.session_state:
         st.session_state.search_query = ""
