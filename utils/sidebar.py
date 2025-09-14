@@ -17,21 +17,8 @@ def render_sidebar():
         if 'generating_response' not in st.session_state:
             st.session_state.generating_response = False
         
-        # User info and logout
-        st.markdown(f"### 👋 Welcome, {st.session_state.username}!")
-        
-        # Home page button
-        if st.button("🏠 Home", use_container_width=True, type="secondary"):
-            st.session_state.current_page = "homepage"
-            # Try multipage navigation first, fallback to session state
-            try:
-                if hasattr(st, 'switch_page'):
-                    st.switch_page("pages/1_🏠_Homepage.py")
-                else:
-                    st.rerun()
-            except Exception as e:
-                logger.warning(f"Page switch failed: {e}")
-                st.rerun()
+        # App title/logo
+        st.markdown("# 💊 PharmGPT")
         
         # Sign out button
         if st.button("🚪 Sign Out", use_container_width=True, type="secondary"):
@@ -39,7 +26,6 @@ def render_sidebar():
             if not st.session_state.get('generating_response', False):
                 logout_current_user()
                 st.session_state.current_page = "homepage"
-                # Try multipage navigation first, fallback to session state
                 try:
                     if hasattr(st, 'switch_page'):
                         st.switch_page("pages/1_🏠_Homepage.py")

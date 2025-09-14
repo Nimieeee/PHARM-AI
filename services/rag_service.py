@@ -56,7 +56,7 @@ class RAGService:
         
         # Set default processing mode
         self.default_full_document_mode = default_full_document_mode
-        logger.info(f"RAG Service initialized with full document mode: {default_full_document_mode}")
+        logger.info("RAG Service initialized")
         
         # Import Supabase connection
         from supabase_manager import connection_manager
@@ -73,7 +73,7 @@ class RAGService:
     ) -> bool:
         """Process document for full knowledge base (default) or similarity search."""
         try:
-            logger.info(f"Processing document {document_id} for full document knowledge base")
+            logger.info(f"Processing document {document_id}")
             
             # Create LangChain document with enhanced metadata
             enhanced_metadata = metadata or {}
@@ -110,7 +110,7 @@ class RAGService:
             
             # Split document into chunks
             chunks = splitter.split_documents([doc])
-            logger.info(f"Split document into {len(chunks)} chunks using full document mode")
+            logger.info(f"Split document into {len(chunks)} chunks")
             
             # Process chunks in batches
             batch_size = 10
@@ -120,7 +120,7 @@ class RAGService:
                     batch, document_id, conversation_id, user_uuid, i
                 )
             
-            logger.info(f"✅ Successfully processed {len(chunks)} chunks for full document knowledge base")
+            logger.info(f"Successfully processed {len(chunks)} chunks")
             return True
             
         except Exception as e:
@@ -290,7 +290,7 @@ class RAGService:
     ) -> str:
         """Get complete document context for conversation (entire documents as knowledge base)."""
         try:
-            logger.info(f"Getting full document context for conversation {conversation_id}")
+            logger.info(f"Getting document context for conversation {conversation_id}")
             
             # Get ALL chunks for this conversation (not just similar ones)
             result = await self.db.execute_rpc(
@@ -360,7 +360,7 @@ class RAGService:
                     break
             
             full_context = "".join(context_parts)
-            logger.info(f"Built full document context: {len(full_context)} chars from {len(documents)} documents")
+            logger.info(f"Built document context: {len(full_context)} chars from {len(documents)} documents")
             
             return full_context
             

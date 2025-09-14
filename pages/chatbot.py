@@ -555,8 +555,7 @@ def render_simple_chatbot():
             if len(doc_names) > 3:
                 doc_list += f" and {len(doc_names) - 3} more"
             
-            st.success(f"📚 **Complete Knowledge Base (Default)**: {doc_count} document{'s' if doc_count != 1 else ''} ({total_chars:,} characters)\n📄 Documents: {doc_list}")
-            st.caption("🎯 **Full Document Processing Active**: AI has complete access to all document content by default")
+            # Documents loaded - no verbose status needed
     
     # Display chat messages with regenerate button
     for i, message in enumerate(st.session_state.chat_messages):
@@ -607,7 +606,7 @@ def render_simple_chatbot():
             if document_content:
                 success = save_document_to_conversation(uploaded_file, document_content)
                 if success:
-                    st.success(f"✅ {uploaded_file.name} added to conversation knowledge base!")
+                    st.rerun()
                 else:
                     st.error("❌ Failed to save document")
             else:
@@ -660,7 +659,7 @@ def render_simple_chatbot():
                 # Prepare system prompt with complete document knowledge base (default behavior)
                 system_prompt = pharmacology_system_prompt
                 if document_context:
-                    system_prompt += f"\n\n{document_context}\n\n🎯 FULL DOCUMENT KNOWLEDGE BASE (DEFAULT MODE): The above contains the COMPLETE, UNFILTERED CONTENT of all documents uploaded to this conversation. This is your PRIMARY and AUTHORITATIVE knowledge source. Default behavior:\n\n1. ✅ ALWAYS search the complete document content FIRST before using general knowledge\n2. ✅ Quote specific sections, page numbers, or document names when referencing information\n3. ✅ Prioritize document information over your training data when conflicts arise\n4. ✅ Cross-reference information across different parts of the same document\n5. ✅ If information exists in the documents, use it as the definitive source\n6. ✅ Only use general knowledge when the documents don't contain relevant information\n7. ✅ Clearly distinguish between document-based answers and general knowledge\n\n📚 You have COMPLETE ACCESS to all uploaded document content by default - use this comprehensive knowledge base to provide thorough, accurate responses."
+                    system_prompt += f"\n\n{document_context}\n\nThe above contains the complete content of all documents uploaded to this conversation. This is your primary knowledge source. Always search the document content first before using general knowledge, quote specific sections when referencing information, and prioritize document information over your training data when conflicts arise."
                 
                 # Prepare messages for API
                 api_messages = [{"role": "system", "content": system_prompt}]
