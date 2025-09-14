@@ -307,7 +307,7 @@ def save_document_to_conversation(uploaded_file, content):
         
         st.session_state.conversation_documents[conv_id].append(document_info)
         
-        # Process with advanced RAG (async in background)
+        # Process with advanced RAG for full document knowledge base
         try:
             from services.rag_service import RAGService
             from services.user_service import user_service
@@ -319,7 +319,7 @@ def save_document_to_conversation(uploaded_file, content):
                 rag_service = RAGService()
                 document_id = str(uuid.uuid4())
                 
-                # Process document for semantic search
+                # Process document for full knowledge base (larger chunks for complete context)
                 success = run_async(rag_service.process_document(
                     content, 
                     document_id, 
@@ -328,17 +328,18 @@ def save_document_to_conversation(uploaded_file, content):
                     metadata={
                         'filename': uploaded_file.name,
                         'file_size': len(uploaded_file.getvalue()),
-                        'uploaded_at': datetime.now().isoformat()
+                        'uploaded_at': datetime.now().isoformat(),
+                        'processing_mode': 'full_document_knowledge_base'
                     }
                 ))
                 
                 if success:
-                    logger.info(f"✅ Document processed with advanced RAG: {uploaded_file.name}")
+                    logger.info(f"✅ Document processed for full knowledge base: {uploaded_file.name}")
                 else:
-                    logger.warning(f"⚠️ RAG processing failed for: {uploaded_file.name}")
+                    logger.warning(f"⚠️ Full document processing failed for: {uploaded_file.name}")
             
         except Exception as rag_error:
-            logger.warning(f"Advanced RAG processing failed: {rag_error}")
+            logger.warning(f"Full document RAG processing failed: {rag_error}")
             # Continue with basic storage
         
         logger.info(f"Document saved to conversation {conv_id}: {uploaded_file.name}")
@@ -349,50 +350,43 @@ def save_document_to_conversation(uploaded_file, content):
         return False
 
 def get_conversation_context(user_query=""):
-    """Get enhanced document context for current conversation using multi-strategy RAG."""
+    """Get full document context for current conversation (entire documents as knowledge base)."""
     try:
         conv_id = st.session_state.get('current_conversation_id')
         if not conv_id:
             return ""
         
-        # Try advanced RAG search first
-        if user_query:
-            try:
-                from services.rag_service import RAGService
-                from services.user_service import user_service
+        # Try full document RAG first (entire documents as knowledge base)
+        try:
+            from services.rag_service import RAGService
+            from services.user_service import user_service
+            
+            # Get user UUID
+            user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
+            if user_data:
+                rag_service = RAGService()
                 
-                # Get user UUID
-                user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
-                if user_data:
-                    rag_service = RAGService()
-                    
-                    # Multi-query strategy for thorough search
-                    contexts = []
-                    
-                    # Original query
-                    context1 = run_async(rag_service.get_conversation_context(
-                        user_query, conv_id, user_data['id'], max_context_length=2000
+                # Get FULL document context (entire documents)
+                full_context = run_async(rag_service.get_full_document_context(
+                    conv_id, user_data['id'], max_context_length=15000
+                ))
+                
+                if full_context:
+                    logger.info(f"✅ Retrieved full document context: {len(full_context)} chars")
+                    return f"\n\n--- COMPLETE DOCUMENT KNOWLEDGE BASE ---\n{full_context}\n"
+                
+                # Fallback to similarity search if no full context
+                if user_query:
+                    similarity_context = run_async(rag_service.get_conversation_context(
+                        user_query, conv_id, user_data['id'], max_context_length=8000
                     ))
-                    if context1:
-                        contexts.append(context1)
                     
-                    # Extract key terms for additional searches
-                    key_terms = extract_key_terms(user_query)
-                    for term in key_terms[:2]:  # Limit to 2 additional searches
-                        context_term = run_async(rag_service.get_conversation_context(
-                            term, conv_id, user_data['id'], max_context_length=1500
-                        ))
-                        if context_term and context_term not in contexts:
-                            contexts.append(context_term)
+                    if similarity_context:
+                        logger.info(f"✅ Retrieved similarity-based context: {len(similarity_context)} chars")
+                        return f"\n\n--- RELEVANT DOCUMENT EXCERPTS ---\n{similarity_context}\n"
                     
-                    # Combine contexts
-                    if contexts:
-                        combined_context = "\n\n".join(contexts)
-                        logger.info(f"✅ Retrieved multi-strategy RAG context: {len(combined_context)} chars")
-                        return f"\n\n--- RELEVANT DOCUMENT EXCERPTS ---\n{combined_context}\n"
-                    
-            except Exception as rag_error:
-                logger.warning(f"RAG search failed, falling back to simple context: {rag_error}")
+        except Exception as rag_error:
+            logger.warning(f"Full document RAG failed, falling back to session context: {rag_error}")
         
         # Fallback to session-based documents (enhanced)
         if 'conversation_documents' in st.session_state:
@@ -545,13 +539,22 @@ def render_simple_chatbot():
                            help="Switch between Normal and Turbo modes")
         st.session_state.selected_model_mode = "turbo" if is_turbo else "normal"
     
-    # Show document status for current conversation
+    # Show enhanced document status for current conversation
     conv_id = st.session_state.get('current_conversation_id')
     if conv_id and 'conversation_documents' in st.session_state:
         documents = st.session_state.conversation_documents.get(conv_id, [])
         if documents:
             doc_count = len(documents)
-            st.info(f"📚 {doc_count} document{'s' if doc_count != 1 else ''} available in this conversation")
+            total_chars = sum(len(doc.get('content', '')) for doc in documents)
+            
+            # Show document summary
+            doc_names = [doc.get('filename', 'Unknown') for doc in documents]
+            doc_list = ", ".join(doc_names[:3])  # Show first 3 document names
+            if len(doc_names) > 3:
+                doc_list += f" and {len(doc_names) - 3} more"
+            
+            st.info(f"📚 **Full Knowledge Base Active**: {doc_count} document{'s' if doc_count != 1 else ''} ({total_chars:,} characters)\n📄 Documents: {doc_list}")
+            st.caption("💡 The AI has access to the complete content of all uploaded documents")
     
     # Display chat messages with regenerate button
     for i, message in enumerate(st.session_state.chat_messages):
@@ -652,10 +655,10 @@ def render_simple_chatbot():
                 # Get enhanced document context for this conversation
                 document_context = get_conversation_context(prompt)
                 
-                # Prepare system prompt with enhanced document context
+                # Prepare system prompt with full document context
                 system_prompt = pharmacology_system_prompt
                 if document_context:
-                    system_prompt += f"\n\n{document_context}\n\nIMPORTANT: Use the above document excerpts as primary sources when answering questions. Reference specific information from the documents when relevant. If the user's question relates to the uploaded documents, prioritize information from those documents over general knowledge."
+                    system_prompt += f"\n\n{document_context}\n\nIMPORTANT: The above contains the COMPLETE CONTENT of all documents uploaded to this conversation. Treat this as your primary knowledge base for this conversation. When answering questions:\n\n1. ALWAYS check if the answer exists in the uploaded documents first\n2. Quote specific sections from the documents when relevant\n3. If information is in the documents, prioritize it over your general knowledge\n4. Reference the document name when citing information\n5. If the user asks about something not in the documents, clearly state that and then provide general knowledge\n\nThe documents contain the complete, authoritative information for this conversation."
                 
                 # Prepare messages for API
                 api_messages = [{"role": "system", "content": system_prompt}]

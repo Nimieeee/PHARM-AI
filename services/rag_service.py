@@ -38,12 +38,20 @@ class RAGService:
                 model_name="all-MiniLM-L6-v2"
             )
         
-        # Initialize text splitter with better parameters for thorough analysis
+        # Initialize text splitter optimized for full document knowledge base
         self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=800,  # Larger chunks for more context
-            chunk_overlap=200,  # More overlap to maintain context
+            chunk_size=1500,  # Much larger chunks to preserve more context
+            chunk_overlap=300,  # Substantial overlap to maintain continuity
             length_function=len,
             separators=["\n\n", "\n", ". ", "! ", "? ", "; ", ", ", " ", ""]
+        )
+        
+        # Alternative splitter for very large documents
+        self.large_doc_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=3000,  # Very large chunks for comprehensive context
+            chunk_overlap=500,  # Large overlap for continuity
+            length_function=len,
+            separators=["\n\n\n", "\n\n", "\n", ". ", "! ", "? "]
         )
         
         # Import Supabase connection
@@ -241,6 +249,92 @@ class RAGService:
         except Exception as e:
             logger.error(f"Error searching similar chunks: {e}")
             return []
+    
+    async def get_full_document_context(
+        self,
+        conversation_id: str,
+        user_uuid: str,
+        max_context_length: int = 15000  # Much larger for full document context
+    ) -> str:
+        """Get complete document context for conversation (entire documents as knowledge base)."""
+        try:
+            logger.info(f"Getting full document context for conversation {conversation_id}")
+            
+            # Get ALL chunks for this conversation (not just similar ones)
+            result = await self.db.execute_rpc(
+                'get_conversation_chunks',
+                {
+                    'target_conversation_id': conversation_id,
+                    'target_user_uuid': user_uuid
+                }
+            )
+            
+            if not result.data:
+                logger.info("No document chunks found for conversation")
+                return ""
+            
+            # Group chunks by document
+            documents = {}
+            for chunk in result.data:
+                doc_uuid = chunk['document_uuid']
+                if doc_uuid not in documents:
+                    documents[doc_uuid] = {
+                        'chunks': [],
+                        'metadata': chunk.get('metadata', {})
+                    }
+                documents[doc_uuid]['chunks'].append(chunk)
+            
+            # Build complete document context
+            context_parts = []
+            current_length = 0
+            
+            for doc_uuid, doc_data in documents.items():
+                # Sort chunks by index to maintain document order
+                sorted_chunks = sorted(doc_data['chunks'], key=lambda x: x['chunk_index'])
+                
+                # Reconstruct full document content
+                doc_content = ""
+                doc_filename = "Unknown Document"
+                
+                # Try to get filename from metadata
+                try:
+                    if isinstance(doc_data['metadata'], str):
+                        import json
+                        metadata = json.loads(doc_data['metadata'])
+                    else:
+                        metadata = doc_data['metadata']
+                    
+                    doc_filename = metadata.get('filename', doc_filename)
+                except:
+                    pass
+                
+                # Combine all chunks to reconstruct full document
+                for chunk in sorted_chunks:
+                    doc_content += chunk['content'] + "\n"
+                
+                # Add document to context if it fits
+                doc_section = f"\n=== DOCUMENT: {doc_filename} ===\n{doc_content.strip()}\n"
+                
+                if current_length + len(doc_section) <= max_context_length:
+                    context_parts.append(doc_section)
+                    current_length += len(doc_section)
+                else:
+                    # If document is too long, include as much as possible
+                    remaining_space = max_context_length - current_length - 100  # Leave some buffer
+                    if remaining_space > 500:  # Only add if meaningful space left
+                        truncated_content = doc_content[:remaining_space] + "\n[... document continues ...]"
+                        doc_section = f"\n=== DOCUMENT: {doc_filename} ===\n{truncated_content}\n"
+                        context_parts.append(doc_section)
+                    break
+            
+            full_context = "".join(context_parts)
+            logger.info(f"Built full document context: {len(full_context)} chars from {len(documents)} documents")
+            
+            return full_context
+            
+        except Exception as e:
+            logger.error(f"Error getting full document context: {e}")
+            return ""
     
     async def get_conversation_context(
         self,
