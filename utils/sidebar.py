@@ -92,7 +92,7 @@ def render_sidebar():
                     with col2:
                         # Delete button
                         if st.button("🗑️", key=f"del_{conv_id}", help="Delete conversation"):
-                            from utils.conversation_manager import run_async
+                            from utils.conversation_manager import run_async, create_new_conversation
                             success = run_async(delete_conversation(conv_id))
                             if success:
                                 # Check if we need to create a new conversation
