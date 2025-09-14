@@ -24,11 +24,9 @@ docx2txt>=0.8
 python-pptx>=0.6.21
 pandas>=2.0.0
 
-# Image processing
+# Image processing and OCR
 opencv-python>=4.8.0
-pytesseract>=0.3.10
-
-# Image Processing (essential only)
+pytesseract>=0.3.10  # Note: Requires tesseract-ocr system package
 Pillow>=10.0.0
 
 # SQLite upgrade for ChromaDB compatibility on Streamlit Cloud

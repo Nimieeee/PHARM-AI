@@ -3,8 +3,12 @@ Sidebar for Authenticated Users
 """
 
 import streamlit as st
+import logging
 from auth import logout_current_user
 from utils.conversation_manager import delete_conversation, duplicate_conversation
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 def render_sidebar():
     """Render the sidebar with conversations and settings."""
@@ -19,9 +23,14 @@ def render_sidebar():
         # Home page button
         if st.button("🏠 Home", use_container_width=True, type="secondary"):
             st.session_state.current_page = "homepage"
+            # Try multipage navigation first, fallback to session state
             try:
-                st.switch_page("pages/1_🏠_Homepage.py")
-            except:
+                if hasattr(st, 'switch_page'):
+                    st.switch_page("pages/1_🏠_Homepage.py")
+                else:
+                    st.rerun()
+            except Exception as e:
+                logger.warning(f"Page switch failed: {e}")
                 st.rerun()
         
         # Sign out button
@@ -30,9 +39,14 @@ def render_sidebar():
             if not st.session_state.get('generating_response', False):
                 logout_current_user()
                 st.session_state.current_page = "homepage"
+                # Try multipage navigation first, fallback to session state
                 try:
-                    st.switch_page("pages/1_🏠_Homepage.py")
-                except:
+                    if hasattr(st, 'switch_page'):
+                        st.switch_page("pages/1_🏠_Homepage.py")
+                    else:
+                        st.rerun()
+                except Exception as e:
+                    logger.warning(f"Page switch failed: {e}")
                     st.rerun()
             else:
                 st.warning("⚠️ Please wait for the current response to complete before signing out.")

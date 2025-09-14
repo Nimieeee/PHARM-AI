@@ -106,7 +106,7 @@ def load_conversation_messages():
         st.session_state.chat_messages = []
 
 def process_uploaded_document(uploaded_file):
-    """Process uploaded document and return text content."""
+    """Process uploaded document and return text content with enhanced support for images and PPTX."""
     try:
         # Read file content
         file_content = uploaded_file.read()
@@ -115,19 +115,28 @@ def process_uploaded_document(uploaded_file):
         # Process based on file type
         if uploaded_file.type == "text/plain" or uploaded_file.name.endswith('.txt'):
             text_content = file_content.decode('utf-8')
+            
         elif uploaded_file.name.endswith('.md'):
             text_content = file_content.decode('utf-8')
+            
         elif uploaded_file.type == "application/pdf" or uploaded_file.name.endswith('.pdf'):
             try:
                 import PyPDF2
                 import io
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(file_content))
                 text_content = ""
-                for page in pdf_reader.pages:
-                    text_content += page.extract_text() + "\n"
+                for page_num, page in enumerate(pdf_reader.pages, 1):
+                    page_text = page.extract_text()
+                    if page_text.strip():
+                        text_content += f"\n--- Page {page_num} ---\n{page_text}\n"
+                
+                if not text_content.strip():
+                    text_content = f"[PDF Document: {uploaded_file.name} - {len(file_content)} bytes - No extractable text found]"
+                    
             except Exception as pdf_error:
                 logger.warning(f"PDF processing failed: {pdf_error}")
-                text_content = f"[PDF Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed]"
+                text_content = f"[PDF Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed: {pdf_error}]"
+                
         elif uploaded_file.name.endswith('.docx'):
             try:
                 import docx2txt
@@ -141,20 +150,137 @@ def process_uploaded_document(uploaded_file):
                 try:
                     text_content = docx2txt.process(tmp_path)
                     if not text_content.strip():
-                        raise Exception("No text extracted")
+                        # Try alternative method with python-docx
+                        try:
+                            from docx import Document
+                            doc = Document(tmp_path)
+                            paragraphs = []
+                            for paragraph in doc.paragraphs:
+                                if paragraph.text.strip():
+                                    paragraphs.append(paragraph.text)
+                            text_content = "\n".join(paragraphs)
+                        except:
+                            raise Exception("No text extracted with any method")
                 finally:
                     os.unlink(tmp_path)
+                    
             except Exception as docx_error:
                 logger.warning(f"DOCX processing failed: {docx_error}")
-                text_content = f"[DOCX Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed]"
+                text_content = f"[DOCX Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed: {docx_error}]"
+                
+        elif uploaded_file.name.endswith('.pptx'):
+            # Enhanced PPTX processing
+            try:
+                from pptx import Presentation
+                import tempfile
+                import os
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.pptx') as tmp_file:
+                    tmp_file.write(file_content)
+                    tmp_path = tmp_file.name
+                
+                try:
+                    prs = Presentation(tmp_path)
+                    slides_text = []
+                    
+                    for slide_num, slide in enumerate(prs.slides, 1):
+                        slide_content = f"\n--- Slide {slide_num} ---\n"
+                        
+                        # Extract text from shapes
+                        text_found = False
+                        for shape in slide.shapes:
+                            if hasattr(shape, "text") and shape.text.strip():
+                                slide_content += f"{shape.text.strip()}\n"
+                                text_found = True
+                            
+                            # Extract text from tables
+                            if hasattr(shape, "table"):
+                                table = shape.table
+                                for row in table.rows:
+                                    row_text = []
+                                    for cell in row.cells:
+                                        if cell.text.strip():
+                                            row_text.append(cell.text.strip())
+                                    if row_text:
+                                        slide_content += " | ".join(row_text) + "\n"
+                                        text_found = True
+                        
+                        # Extract notes
+                        if slide.notes_slide and slide.notes_slide.notes_text_frame:
+                            notes_text = slide.notes_slide.notes_text_frame.text.strip()
+                            if notes_text:
+                                slide_content += f"\nNotes: {notes_text}\n"
+                                text_found = True
+                        
+                        if text_found:
+                            slides_text.append(slide_content)
+                    
+                    text_content = "\n".join(slides_text)
+                    
+                    if not text_content.strip():
+                        text_content = f"[PPTX Document: {uploaded_file.name} - {len(prs.slides)} slides - No extractable text found]"
+                        
+                finally:
+                    os.unlink(tmp_path)
+                    
+            except Exception as pptx_error:
+                logger.warning(f"PPTX processing failed: {pptx_error}")
+                text_content = f"[PPTX Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed: {pptx_error}]"
+                
+        elif (uploaded_file.type and uploaded_file.type.startswith('image/')) or uploaded_file.name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp')):
+            # Enhanced image processing with OCR
+            try:
+                from PIL import Image
+                import tempfile
+                import os
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                    tmp_file.write(file_content)
+                    tmp_path = tmp_file.name
+                
+                try:
+                    # Open and process image
+                    image = Image.open(tmp_path)
+                    
+                    # Get image info
+                    image_info = f"Image: {uploaded_file.name}\nSize: {image.size[0]}x{image.size[1]} pixels\nFormat: {image.format}\n\n"
+                    
+                    # Try OCR text extraction
+                    try:
+                        import pytesseract
+                        
+                        # Convert to RGB if necessary
+                        if image.mode != 'RGB':
+                            image = image.convert('RGB')
+                        
+                        # Extract text using OCR
+                        extracted_text = pytesseract.image_to_string(image, config='--psm 6')
+                        
+                        if extracted_text.strip():
+                            text_content = f"{image_info}OCR Extracted Text:\n{extracted_text.strip()}"
+                        else:
+                            text_content = f"{image_info}[No text detected in image]"
+                            
+                    except ImportError:
+                        text_content = f"{image_info}[OCR not available - install pytesseract for text extraction]"
+                    except Exception as ocr_error:
+                        text_content = f"{image_info}[OCR failed: {ocr_error}]"
+                        
+                finally:
+                    os.unlink(tmp_path)
+                    
+            except Exception as image_error:
+                logger.warning(f"Image processing failed: {image_error}")
+                text_content = f"[Image: {uploaded_file.name} - {len(file_content)} bytes - Processing failed: {image_error}]"
+                
         else:
-            text_content = f"[Document: {uploaded_file.name} - {len(file_content)} bytes - Unsupported format]"
+            text_content = f"[Document: {uploaded_file.name} - {len(file_content)} bytes - Unsupported format. Supported: TXT, MD, PDF, DOCX, PPTX, Images]"
         
         return text_content
         
     except Exception as e:
         logger.error(f"Error processing document: {e}")
-        return None
+        return f"[Error processing {uploaded_file.name}: {e}]"
 
 def save_document_to_conversation(uploaded_file, content):
     """Save document to conversation knowledge base with advanced RAG processing."""
@@ -461,11 +587,11 @@ def render_simple_chatbot():
         prompt = st.chat_input("Ask me anything about pharmacology...")
     
     with col2:
-        # Document upload
+        # Document upload with enhanced format support
         uploaded_file = st.file_uploader(
             "📎 Upload",
-            type=['txt', 'pdf', 'docx', 'md'],
-            help="Upload a document for this conversation",
+            type=['txt', 'pdf', 'docx', 'md', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'],
+            help="Upload documents, presentations, or images for this conversation",
             key=f"doc_upload_{st.session_state.get('current_conversation_id', 'new')}"
         )
     
