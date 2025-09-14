@@ -41,3 +41,8 @@ psutil>=5.9.0
 
 # Database - Supabase (required)
 supabase[async]>=2.0.0
+
+# Document export functionality
+reportlab>=4.0.0
+python-docx>=0.8.11
+markdown>=3.5.0
