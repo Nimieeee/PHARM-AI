@@ -444,6 +444,12 @@ def render_main_chat_area():
     with message_container:
         # Display chat messages with enhanced features
         render_chat_messages()
+        
+        # Show processing indicator if generating response
+        if st.session_state.get('processing_input', False):
+            with st.chat_message("assistant"):
+                st.markdown("🤔 Thinking...")
+                st.caption("Generating response...")
     
     # Fixed bottom input area
     render_bottom_input_area()
@@ -515,19 +521,27 @@ def render_welcome_message():
 
 def render_chat_messages():
     """Render chat messages with enhanced features."""
+    # Ensure we have messages to display
+    if not st.session_state.get('chat_messages'):
+        return
+    
     for i, message in enumerate(st.session_state.chat_messages):
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             
             # Add timestamp for messages
             if "timestamp" in message:
-                timestamp = datetime.fromisoformat(message["timestamp"].replace('Z', '+00:00'))
-                st.caption(f"🕒 {timestamp.strftime('%H:%M:%S')}")
+                try:
+                    timestamp = datetime.fromisoformat(message["timestamp"].replace('Z', '+00:00'))
+                    st.caption(f"🕒 {timestamp.strftime('%H:%M:%S')}")
+                except:
+                    st.caption(f"🕒 Message {i+1}")
             
             # Add regenerate button for the last assistant message
             if (message["role"] == "assistant" and 
                 i == len(st.session_state.chat_messages) - 1 and 
-                i > 0):
+                i > 0 and 
+                not st.session_state.get('processing_input', False)):  # Don't show during processing
                 
                 col1, col2, col3 = st.columns([1, 1, 3])
                 with col1:
@@ -541,14 +555,18 @@ def render_chat_messages():
 
 def regenerate_response(message_index):
     """Regenerate the assistant response."""
+    if st.session_state.get('processing_input', False):
+        st.warning("⚠️ Please wait for the current response to complete.")
+        return
+    
     if message_index > 0 and st.session_state.chat_messages[message_index-1]["role"] == "user":
         user_prompt = st.session_state.chat_messages[message_index-1]["content"]
+        
         # Remove the current assistant response
         st.session_state.chat_messages.pop()
-        # Set regeneration flag
-        st.session_state.regenerate_response = True
-        st.session_state.regenerate_prompt = user_prompt
-        st.rerun()
+        
+        # Process the regeneration
+        process_chat_input(user_prompt)
 
 def render_bottom_input_area():
     """Render the bottom input area with document upload."""
@@ -587,23 +605,22 @@ def render_bottom_input_area():
     # Document upload area
     render_document_upload()
     
-    # Chat input
-    prompt = st.chat_input("Ask me anything about pharmacology...")
-    
-    # Handle example prompts
-    if st.session_state.get('example_prompt'):
-        prompt = st.session_state.example_prompt
-        st.session_state.example_prompt = None
-    
-    # Handle regenerate response
-    if st.session_state.get('regenerate_response', False):
-        prompt = st.session_state.get('regenerate_prompt', '')
-        st.session_state.regenerate_response = False
-        st.session_state.regenerate_prompt = None
-    
-    # Process chat input
-    if prompt:
-        process_chat_input(prompt)
+    # Chat input with processing state check
+    if st.session_state.get('processing_input', False):
+        st.info("🤔 Generating response... Please wait.")
+        # Disable input during processing
+        st.chat_input("Generating response...", disabled=True)
+    else:
+        prompt = st.chat_input("Ask me anything about pharmacology...")
+        
+        # Handle example prompts
+        if st.session_state.get('example_prompt'):
+            prompt = st.session_state.example_prompt
+            st.session_state.example_prompt = None
+        
+        # Process chat input
+        if prompt and not st.session_state.get('processing_input', False):
+            process_chat_input(prompt)
 
 def render_document_upload():
     """Render enhanced document upload area."""
@@ -670,26 +687,25 @@ def process_chat_input(prompt):
     """Process chat input with enhanced features."""
     logger.info(f"Processing user input: {prompt[:50]}...")
     
-    # Add user message
-    user_message = {
-        "role": "user", 
-        "content": prompt,
-        "timestamp": datetime.now().isoformat()
-    }
-    st.session_state.chat_messages.append(user_message)
+    # Prevent duplicate processing
+    if st.session_state.get('processing_input', False):
+        return
     
-    # Display user message
-    with st.chat_message("user"):
-        st.markdown(prompt)
-        st.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')}")
+    st.session_state.processing_input = True
     
-    # Generate assistant response
-    with st.chat_message("assistant"):
-        response_placeholder = st.empty()
+    try:
+        # Add user message to session state first
+        user_message = {
+            "role": "user", 
+            "content": prompt,
+            "timestamp": datetime.now().isoformat()
+        }
+        st.session_state.chat_messages.append(user_message)
         
+        # Generate assistant response
         try:
             # Generate response with enhanced context
-            full_response = generate_enhanced_response(prompt, response_placeholder)
+            full_response = generate_enhanced_response(prompt)
             
             # Add assistant message to chat history
             assistant_message = {
@@ -699,25 +715,34 @@ def process_chat_input(prompt):
             }
             st.session_state.chat_messages.append(assistant_message)
             
-            # Save conversation
+            # Save conversation to database
             save_conversation_to_database()
+            
+            logger.info(f"Response generated and saved: {len(full_response)} characters")
             
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             error_message = f"Sorry, I encountered an error: {str(e)}"
-            response_placeholder.markdown(error_message)
             
+            # Add error message to chat history
             st.session_state.chat_messages.append({
                 "role": "assistant", 
                 "content": error_message,
                 "timestamp": datetime.now().isoformat()
             })
+    
+    finally:
+        # Always reset processing flag
+        st.session_state.processing_input = False
+        
+        # Force a rerun to display the new messages
+        st.rerun()
 
-def generate_enhanced_response(prompt, response_placeholder):
+def generate_enhanced_response(prompt):
     """Generate enhanced AI response with document context."""
     try:
         # Import AI functions
-        from openai_client import chat_completion_stream, get_available_model_modes
+        from openai_client import chat_completion, get_available_model_modes
         from prompts import pharmacology_system_prompt
         
         # Get available models
@@ -740,24 +765,21 @@ def generate_enhanced_response(prompt, response_placeholder):
         if document_context:
             enhanced_system_prompt += f"\n\n{document_context}\n\nUse the above document context to enhance your responses when relevant."
         
-        # Prepare messages for API
+        # Prepare messages for API (exclude the current user message to avoid duplication)
         api_messages = [{"role": "system", "content": enhanced_system_prompt}]
         
-        # Add recent conversation history (last 10 messages)
-        recent_messages = st.session_state.chat_messages[-10:]
+        # Add recent conversation history (last 8 messages, excluding the just-added user message)
+        recent_messages = st.session_state.chat_messages[:-1][-8:]  # Exclude the last message (current user input)
         for msg in recent_messages:
             api_messages.append({"role": msg["role"], "content": msg["content"]})
         
-        # Stream the response
-        full_response = ""
-        for chunk in chat_completion_stream(model, api_messages):
-            full_response += chunk
-            response_placeholder.markdown(full_response + "▌")
+        # Add the current user message
+        api_messages.append({"role": "user", "content": prompt})
         
-        # Final response without cursor
-        response_placeholder.markdown(full_response)
-        response_placeholder.caption(f"🕒 {datetime.now().strftime('%H:%M:%S')} • {selected_mode.title()} Mode")
+        # Generate the response (non-streaming for stability)
+        full_response = chat_completion(model, api_messages)
         
+        logger.info(f"Generated response: {len(full_response)} characters")
         return full_response
         
     except Exception as e:
@@ -823,9 +845,11 @@ def save_conversation_to_database():
     """Save current conversation to database."""
     try:
         if not st.session_state.get('authenticated') or not st.session_state.get('user_id'):
+            logger.warning("Cannot save conversation: user not authenticated")
             return False
         
         if not st.session_state.chat_messages:
+            logger.info("No messages to save")
             return True
         
         # Import services
@@ -835,6 +859,7 @@ def save_conversation_to_database():
         # Get user UUID
         user_data = run_async_operation(user_service.get_user_by_id(st.session_state.user_id))
         if not user_data:
+            logger.error("User data not found")
             return False
         
         # Create or update conversation
@@ -847,6 +872,7 @@ def save_conversation_to_database():
                 st.session_state.get('selected_model_mode', 'normal')
             ))
             st.session_state.current_conversation_id = conversation_id
+            logger.info(f"Created new conversation: {conversation_id}")
         
         # Update conversation with current messages
         success = run_async_operation(conversation_service.update_conversation(
@@ -856,10 +882,23 @@ def save_conversation_to_database():
         ))
         
         if success:
-            logger.info(f"Conversation saved: {len(st.session_state.chat_messages)} messages")
+            # Update local conversations cache
+            if 'conversations' not in st.session_state:
+                st.session_state.conversations = {}
+            
+            st.session_state.conversations[st.session_state.current_conversation_id] = {
+                'title': generate_conversation_title(),
+                'messages': st.session_state.chat_messages.copy(),
+                'updated_at': datetime.now().isoformat(),
+                'model': st.session_state.get('selected_model_mode', 'normal'),
+                'message_count': len(st.session_state.chat_messages)
+            }
+            
+            logger.info(f"Conversation saved successfully: {len(st.session_state.chat_messages)} messages")
             return True
-        
-        return False
+        else:
+            logger.error("Failed to save conversation to database")
+            return False
         
     except Exception as e:
         logger.error(f"Error saving conversation: {e}")
