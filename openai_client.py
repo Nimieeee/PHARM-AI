@@ -55,35 +55,18 @@ def get_available_model_modes() -> Dict:
     return available_modes
 
 def get_model_token_limits() -> Dict:
-    """Get token limits for different models and providers."""
+    """Get unified token limits for all models."""
     return {
-        "groq": {
-            "max_tokens": 8000,
+        "unified": {
+            "max_tokens": 7500,
             "context_window": 128000,
-            "description": "Groq models support high token output"
-        },
-        "openrouter": {
-            "max_tokens": 4000,
-            "context_window": 32000,
-            "description": "OpenRouter models with good output capacity"
-        },
-        "default": {
-            "max_tokens": 4000,
-            "context_window": 16000,
-            "description": "Default limits for other providers"
+            "description": "Unified high-capacity output for all models"
         }
     }
 
 def get_optimal_max_tokens(model: str, base_url: str) -> int:
-    """Get optimal max_tokens for a specific model and provider."""
-    limits = get_model_token_limits()
-    
-    if "groq" in base_url.lower():
-        return limits["groq"]["max_tokens"]
-    elif "openrouter" in base_url.lower():
-        return limits["openrouter"]["max_tokens"]
-    else:
-        return limits["default"]["max_tokens"]
+    """Get unified max_tokens for all models (7500 tokens)."""
+    return 7500  # Unified limit for both Normal and Turbo modes
 
 def _get_client_for_model(model: str) -> openai.OpenAI:
     """Get OpenAI client for specific model."""
@@ -102,19 +85,14 @@ def _get_client_for_model(model: str) -> openai.OpenAI:
     raise ValueError(f"Unknown model: {model}")
 
 def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
-    """Generate streaming chat completion with full output support."""
+    """Generate ultra-fluid streaming chat completion with 7500 token capacity."""
     try:
         client = _get_client_for_model(model)
         
-        # Determine appropriate max_tokens based on model and provider
-        if "groq" in client.base_url.lower():
-            max_tokens = 8000  # Groq models support longer outputs
-        elif "openrouter" in client.base_url.lower():
-            max_tokens = 4000  # OpenRouter models
-        else:
-            max_tokens = 4000  # Default for other providers
+        # Unified 7500 token limit for all models
+        max_tokens = 7500
         
-        logger.info(f"Starting stream with max_tokens: {max_tokens} for model: {model}")
+        logger.info(f"Starting ultra-fluid stream with {max_tokens} tokens for model: {model}")
         
         stream = client.chat.completions.create(
             model=model,
@@ -122,50 +100,44 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
             stream=True,
             temperature=0.7,
             max_tokens=max_tokens,
-            # Additional parameters for better output
-            top_p=0.9,
-            frequency_penalty=0.1,
-            presence_penalty=0.1
+            # Optimized parameters for fluid streaming
+            top_p=0.95,
+            frequency_penalty=0.0,
+            presence_penalty=0.0
         )
         
-        total_tokens = 0
+        # Ultra-fluid streaming - yield every chunk immediately
         for chunk in stream:
             if chunk.choices[0].delta.content is not None:
-                content = chunk.choices[0].delta.content
-                total_tokens += len(content.split())  # Rough token count
-                yield content
+                yield chunk.choices[0].delta.content
             
-            # Check if stream finished
+            # Silent finish reason handling (no user-visible messages)
             if chunk.choices[0].finish_reason is not None:
                 finish_reason = chunk.choices[0].finish_reason
-                logger.info(f"Stream finished. Reason: {finish_reason}, Approx tokens: {total_tokens}")
-                
-                if finish_reason == "length":
-                    logger.warning("Response was truncated due to max_tokens limit")
-                    yield "\n\n[Response may be incomplete due to length limits]"
+                logger.info(f"Stream completed: {finish_reason}")
+                # No additional messages to maintain fluid experience
                 
     except Exception as e:
         logger.error(f"Streaming error: {str(e)}")
         yield f"Error: {str(e)}"
 
 def chat_completion(model: str, messages: List[Dict]) -> str:
-    """Generate non-streaming chat completion with full output support."""
+    """Generate non-streaming chat completion with unified 7500 token capacity."""
     try:
         client = _get_client_for_model(model)
         
-        # Determine appropriate max_tokens based on model
-        if "groq" in client.base_url.lower():
-            max_tokens = 8000  # Groq models support longer outputs
-        elif "openrouter" in client.base_url.lower():
-            max_tokens = 4000  # OpenRouter models
-        else:
-            max_tokens = 4000  # Default for other providers
+        # Unified 7500 token limit for all models
+        max_tokens = 7500
         
         response = client.chat.completions.create(
             model=model,
             messages=messages,
             temperature=0.7,
-            max_tokens=max_tokens  # Increased for full output
+            max_tokens=max_tokens,
+            # Optimized parameters
+            top_p=0.95,
+            frequency_penalty=0.0,
+            presence_penalty=0.0
         )
         
         return response.choices[0].message.content
