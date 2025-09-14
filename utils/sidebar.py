@@ -76,6 +76,9 @@ def render_sidebar():
                             # Only switch conversations if we're not generating a response
                             if not st.session_state.get('generating_response', False):
                                 st.session_state.current_conversation_id = conv_id
+                                # Clear chat messages to force reload
+                                if 'last_loaded_conversation' in st.session_state:
+                                    st.session_state.last_loaded_conversation = None
                                 st.rerun()
                             else:
                                 st.warning("⚠️ Please wait for the current response to complete before switching conversations.")
@@ -86,6 +89,16 @@ def render_sidebar():
                             from utils.conversation_manager import run_async
                             success = run_async(delete_conversation(conv_id))
                             if success:
+                                # Check if we need to create a new conversation
+                                if not st.session_state.conversations:
+                                    # No conversations left, create a new one automatically
+                                    new_conv_id = run_async(create_new_conversation())
+                                    if new_conv_id:
+                                        st.session_state.current_conversation_id = new_conv_id
+                                        # Clear chat messages to force reload
+                                        if 'last_loaded_conversation' in st.session_state:
+                                            st.session_state.last_loaded_conversation = None
+                                
                                 # Only rerun if we're not currently generating a response
                                 if not st.session_state.get('generating_response', False):
                                     st.success("✅ Conversation deleted!")
@@ -96,4 +109,15 @@ def render_sidebar():
                                 st.error("Failed to delete conversation")
         else:
             st.info("No conversations yet. Click 'New Chat' to start!")
+            # Auto-create first conversation if none exist
+            if not st.session_state.get('auto_created_first_chat', False):
+                from utils.conversation_manager import create_new_conversation, run_async
+                conversation_id = run_async(create_new_conversation())
+                if conversation_id:
+                    st.session_state.current_conversation_id = conversation_id
+                    st.session_state.auto_created_first_chat = True
+                    # Clear chat messages to force reload
+                    if 'last_loaded_conversation' in st.session_state:
+                        st.session_state.last_loaded_conversation = None
+                    st.rerun()
 

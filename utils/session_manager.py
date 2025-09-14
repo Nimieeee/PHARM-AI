@@ -31,10 +31,19 @@ def initialize_session_state():
     if "session_id" not in st.session_state:
         st.session_state.session_id = None
     
+    # Try to restore session from browser storage if available
+    if not st.session_state.authenticated and st.session_state.session_id:
+        try:
+            restore_session_from_storage()
+        except Exception as e:
+            logger.warning(f"Session restoration failed: {e}")
+    
     # Validate existing session on page load
     if st.session_state.authenticated and st.session_state.user_id:
         try:
-            validate_existing_session()
+            if not validate_existing_session():
+                # Clear invalid session
+                clear_session_state()
         except Exception as e:
             logger.warning(f"Session validation failed: {e}")
             # Don't clear session immediately, let user continue
@@ -102,6 +111,44 @@ def extend_session():
             load_user_conversations()
         except Exception as e:
             logger.error(f"Error loading user conversations: {e}")
+
+def restore_session_from_storage():
+    """Try to restore session from stored session ID."""
+    try:
+        if st.session_state.session_id:
+            from auth import validate_session
+            username = validate_session(st.session_state.session_id)
+            if username:
+                st.session_state.authenticated = True
+                st.session_state.username = username
+                # Get user_id from username
+                from services.user_service import user_service
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                user_data = loop.run_until_complete(user_service.get_user_by_username(username))
+                if user_data:
+                    st.session_state.user_id = user_data['legacy_id']
+                    logger.info(f"Session restored for user: {username}")
+                    return True
+    except Exception as e:
+        logger.error(f"Session restoration error: {e}")
+    return False
+
+def clear_session_state():
+    """Clear all session state variables."""
+    st.session_state.authenticated = False
+    st.session_state.username = None
+    st.session_state.user_id = None
+    st.session_state.session_id = None
+    st.session_state.conversations = {}
+    st.session_state.current_conversation_id = None
+    st.session_state.chat_messages = []
+    logger.info("Session state cleared")
 
 def load_user_conversations():
     """Load user conversations from database."""

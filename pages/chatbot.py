@@ -88,6 +88,23 @@ def generate_conversation_title():
     # Fallback title
     return f"Chat {datetime.now().strftime('%m/%d %H:%M')}"
 
+def load_conversation_messages():
+    """Load messages for the current conversation."""
+    try:
+        current_conv_id = st.session_state.get('current_conversation_id')
+        if current_conv_id and st.session_state.get('conversations'):
+            conversation = st.session_state.conversations.get(current_conv_id)
+            if conversation:
+                st.session_state.chat_messages = conversation.get('messages', [])
+                logger.info(f"Loaded {len(st.session_state.chat_messages)} messages for conversation {current_conv_id}")
+            else:
+                st.session_state.chat_messages = []
+        else:
+            st.session_state.chat_messages = []
+    except Exception as e:
+        logger.error(f"Error loading conversation messages: {e}")
+        st.session_state.chat_messages = []
+
 def render_simple_chatbot():
     """Render a simple, clean chatbot interface."""
     
@@ -98,10 +115,6 @@ def render_simple_chatbot():
     
     st.title("💊 PharmGPT")
     
-    # Initialize messages in session state
-    if 'chat_messages' not in st.session_state:
-        st.session_state.chat_messages = []
-    
     # Initialize conversation ID
     if 'current_conversation_id' not in st.session_state:
         st.session_state.current_conversation_id = None
@@ -109,6 +122,20 @@ def render_simple_chatbot():
     # Initialize model preference
     if 'selected_model_mode' not in st.session_state:
         st.session_state.selected_model_mode = "normal"
+    
+    # Track conversation changes and load appropriate messages
+    if 'last_loaded_conversation' not in st.session_state:
+        st.session_state.last_loaded_conversation = None
+    
+    # Check if conversation changed
+    current_conv_id = st.session_state.get('current_conversation_id')
+    if st.session_state.last_loaded_conversation != current_conv_id:
+        load_conversation_messages()
+        st.session_state.last_loaded_conversation = current_conv_id
+    
+    # Initialize messages if not already done
+    if 'chat_messages' not in st.session_state:
+        st.session_state.chat_messages = []
     
     # Simple model selection
     col1, col2, col3 = st.columns([2, 1, 2])
