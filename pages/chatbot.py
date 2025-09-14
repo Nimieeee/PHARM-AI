@@ -533,13 +533,19 @@ def render_simple_chatbot():
     if 'chat_messages' not in st.session_state:
         st.session_state.chat_messages = []
     
-    # Simple model selection and document status
+    # Enhanced model selection with output capacity info
     col1, col2, col3 = st.columns([2, 1, 2])
     with col2:
         is_turbo = st.toggle("⚡ Turbo Mode", 
                            value=(st.session_state.selected_model_mode == "turbo"),
-                           help="Switch between Normal and Turbo modes")
+                           help="Switch between Normal (8K tokens) and Turbo (4K tokens) modes")
         st.session_state.selected_model_mode = "turbo" if is_turbo else "normal"
+        
+        # Show current model output capacity
+        if st.session_state.selected_model_mode == "turbo":
+            st.caption("🚀 Turbo: 4K token output capacity")
+        else:
+            st.caption("🧠 Normal: 8K token output capacity")
     
     # Show enhanced document status for current conversation
     conv_id = st.session_state.get('current_conversation_id')
@@ -669,39 +675,77 @@ def render_simple_chatbot():
                 for msg in st.session_state.chat_messages[-10:]:
                     api_messages.append({"role": msg["role"], "content": msg["content"]})
                 
-                # Try streaming first
+                # Enhanced streaming for full output support
                 try:
-                    response_placeholder.markdown("💭 Thinking...")
+                    response_placeholder.markdown("💭 Generating comprehensive response...")
+                    
+                    chunk_count = 0
+                    last_update_length = 0
                     
                     for chunk in chat_completion_stream(model, api_messages):
                         if chunk:
                             full_response += chunk
-                            response_placeholder.markdown(full_response + "▌")
+                            chunk_count += 1
+                            
+                            # Update display every few chunks or significant length increase
+                            if chunk_count % 3 == 0 or len(full_response) - last_update_length > 100:
+                                response_placeholder.markdown(full_response + "▌")
+                                last_update_length = len(full_response)
                     
                     # Final display without cursor
                     if full_response.strip():
                         response_placeholder.markdown(full_response)
-                        logger.info(f"✅ Streaming completed: {len(full_response)} chars")
+                        logger.info(f"✅ Full streaming completed: {len(full_response)} chars, {chunk_count} chunks")
+                        
+                        # Check if response seems complete
+                        if len(full_response) > 3000:
+                            logger.info("✅ Generated comprehensive response (>3000 chars)")
+                        elif full_response.endswith((".", "!", "?", "```")):
+                            logger.info("✅ Response appears complete (proper ending)")
+                        else:
+                            logger.warning("⚠️ Response may be incomplete (no proper ending)")
                     else:
                         raise Exception("Streaming failed or empty response")
                         
                 except Exception as stream_error:
                     logger.warning(f"Streaming failed: {stream_error}, trying fallback...")
                     
-                    # Fallback to non-streaming
-                    response_placeholder.markdown("💭 Processing...")
+                    # Enhanced fallback to non-streaming
+                    response_placeholder.markdown("💭 Processing with fallback method...")
                     full_response = chat_completion(model, api_messages)
                     
                     if full_response and not full_response.startswith("Error:"):
                         response_placeholder.markdown(full_response)
                         logger.info(f"✅ Fallback completed: {len(full_response)} chars")
+                        
+                        # Check fallback response completeness
+                        if len(full_response) > 3000:
+                            logger.info("✅ Fallback generated comprehensive response")
+                        elif not full_response.endswith((".", "!", "?", "```")):
+                            logger.warning("⚠️ Fallback response may be incomplete")
                     else:
                         raise Exception(f"API call failed: {full_response}")
                 
-                # Add response to chat history
+                # Enhanced response validation and storage
                 if full_response and not full_response.startswith("Error:") and not full_response.startswith("❌"):
+                    # Check if response seems truncated and offer continuation
+                    response_length = len(full_response)
+                    seems_truncated = (
+                        response_length > 2000 and 
+                        not full_response.rstrip().endswith((".", "!", "?", "```", "**", "*")) and
+                        not full_response.endswith("\n")
+                    )
+                    
+                    if seems_truncated:
+                        logger.warning(f"Response may be truncated at {response_length} chars")
+                        full_response += "\n\n*[Response may be incomplete. Click 'Regenerate' for a complete answer or ask me to continue.]*"
+                    
                     st.session_state.chat_messages.append({"role": "assistant", "content": full_response})
-                    logger.info("✅ Response added to chat history")
+                    logger.info(f"✅ Response added to chat history ({response_length} chars)")
+                    
+                    # Show response statistics
+                    if response_length > 1000:
+                        logger.info(f"📊 Generated substantial response: {response_length} characters")
                     
                     # Auto-save conversation
                     try:
@@ -711,7 +755,7 @@ def render_simple_chatbot():
                     except Exception as save_error:
                         logger.error(f"Auto-save error: {save_error}")
                 else:
-                    logger.error(f"Response not added: {full_response[:100]}...")
+                    logger.error(f"Response not added: {full_response[:100] if full_response else 'Empty response'}...")
                     
             except Exception as e:
                 error_msg = f"❌ Error generating response: {str(e)}"
