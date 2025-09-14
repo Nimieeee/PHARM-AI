@@ -16,7 +16,10 @@ def render_homepage():
     with col2:
         if st.button("🚀 Get Started - Sign In", key="main_cta_signin_button", use_container_width=True, type="primary"):
             st.session_state.current_page = "signin"
-            st.rerun()
+            try:
+                st.switch_page("pages/2_🔐_Sign_In.py")
+            except:
+                st.rerun()
     
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -242,7 +245,10 @@ def render_homepage():
         
         if st.button("🚀 Try It Now - Sign In", key="demo_try_now_button", type="primary"):
             st.session_state.current_page = "signin"
-            st.rerun()
+            try:
+                st.switch_page("pages/2_🔐_Sign_In.py")
+            except:
+                st.rerun()
     
     st.markdown("<br>", unsafe_allow_html=True)
     

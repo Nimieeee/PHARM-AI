@@ -19,7 +19,10 @@ def render_sidebar():
         # Home page button
         if st.button("🏠 Home", use_container_width=True, type="secondary"):
             st.session_state.current_page = "homepage"
-            st.rerun()
+            try:
+                st.switch_page("pages/1_🏠_Homepage.py")
+            except:
+                st.rerun()
         
         # Sign out button
         if st.button("🚪 Sign Out", use_container_width=True, type="secondary"):
@@ -27,7 +30,10 @@ def render_sidebar():
             if not st.session_state.get('generating_response', False):
                 logout_current_user()
                 st.session_state.current_page = "homepage"
-                st.rerun()
+                try:
+                    st.switch_page("pages/1_🏠_Homepage.py")
+                except:
+                    st.rerun()
             else:
                 st.warning("⚠️ Please wait for the current response to complete before signing out.")
         

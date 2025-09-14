@@ -45,7 +45,10 @@ def render_signin_form():
                     st.session_state.user_id = get_user_legacy_id(username)
                     st.session_state.current_page = "chatbot"
                     st.success("✅ Successfully signed in!")
-                    st.rerun()
+                    try:
+                        st.switch_page("pages/3_💬_Chatbot.py")
+                    except:
+                        st.rerun()
                 else:
                     st.error(f"❌ {message}")
     
@@ -89,7 +92,10 @@ def render_signup_form():
                     st.session_state.user_id = get_user_legacy_id(username)
                     st.session_state.current_page = "chatbot"
                     st.success("✅ Account created successfully!")
-                    st.rerun()
+                    try:
+                        st.switch_page("pages/3_💬_Chatbot.py")
+                    except:
+                        st.rerun()
                 else:
                     st.error(f"❌ {message}")
     

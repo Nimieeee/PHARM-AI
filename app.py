@@ -36,6 +36,10 @@ def main():
     import logging
     logger = logging.getLogger(__name__)
     logger.info("🚀 App started - main() called.")
+    
+    # Handle URL routing for Streamlit Cloud
+    handle_url_routing()
+    
     # Check for setup page via query params
     query_params = st.query_params
     if query_params.get("page") == "setup":
@@ -69,13 +73,42 @@ def main():
         if authenticated:
             render_chatbot_page()
         else:
-            # Avoid unnecessary rerun by setting state directly
-            st.session_state.current_page = "homepage"
-            render_homepage()
+            # Redirect to signin for unauthenticated users
+            st.session_state.current_page = "signin"
+            render_signin_page()
     else:
         # Default to homepage without rerun
         st.session_state.current_page = "homepage"
         render_homepage()
+
+def handle_url_routing():
+    """Handle direct URL access for Streamlit Cloud."""
+    try:
+        # Check if we're accessing a direct page URL
+        query_params = st.query_params
+        
+        # Handle direct page access via URL parameters
+        if "page" in query_params:
+            page = query_params["page"]
+            if page in ["homepage", "signin", "chatbot", "chatbot_complex"]:
+                # Map chatbot_complex to regular chatbot
+                if page == "chatbot_complex":
+                    page = "chatbot"
+                st.session_state.current_page = page
+                logger = logging.getLogger(__name__)
+                logger.info(f"URL routing: Set page to {page}")
+        
+        # Handle Streamlit multipage navigation
+        # If user is accessing via sidebar navigation, respect that
+        if hasattr(st, 'session_state') and 'current_page' not in st.session_state:
+            # Default to homepage for new sessions
+            st.session_state.current_page = "homepage"
+            
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"URL routing error (non-critical): {e}")
+        # Continue with default routing
 
 if __name__ == "__main__":
     main()
