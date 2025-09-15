@@ -697,10 +697,31 @@ def process_uploaded_document_multipage(uploaded_file):
 def save_document_to_conversation_multipage(uploaded_file, content):
     """Save document to conversation knowledge base with advanced RAG processing."""
     try:
+        logger.info(f"Starting document save for: {uploaded_file.name}")
+        
+        # Check if we have a conversation ID
         if not st.session_state.get('current_conversation_id'):
-            return False
+            logger.error("No current conversation ID found")
+            # Create a new conversation if none exists
+            try:
+                from utils.conversation_manager import run_async, create_new_conversation
+                conv_id = run_async(create_new_conversation())
+                if not conv_id:
+                    logger.error("Failed to create new conversation for document")
+                    return False
+                st.session_state.current_conversation_id = conv_id
+                logger.info(f"Created new conversation for document: {conv_id}")
+            except Exception as conv_error:
+                logger.error(f"Error creating conversation: {conv_error}")
+                return False
         
         conv_id = st.session_state.current_conversation_id
+        logger.info(f"Using conversation ID: {conv_id}")
+        
+        # Check authentication
+        if not st.session_state.get('authenticated') or not st.session_state.get('user_id'):
+            logger.error("User not authenticated")
+            return False
         
         # Save to session state for immediate access
         if 'conversation_documents' not in st.session_state:
@@ -710,29 +731,37 @@ def save_document_to_conversation_multipage(uploaded_file, content):
             st.session_state.conversation_documents[conv_id] = []
         
         # Add document to conversation knowledge base
-        document_info = {
-            'filename': uploaded_file.name,
-            'content': content,
-            'uploaded_at': datetime.now().isoformat(),
-            'file_size': len(uploaded_file.getvalue())
-        }
+        try:
+            document_info = {
+                'filename': uploaded_file.name,
+                'content': content,
+                'uploaded_at': datetime.now().isoformat(),
+                'file_size': len(uploaded_file.getvalue())
+            }
+            
+            st.session_state.conversation_documents[conv_id].append(document_info)
+            logger.info(f"Document added to session state: {uploaded_file.name}")
+        except Exception as session_error:
+            logger.error(f"Error adding document to session state: {session_error}")
+            return False
         
-        st.session_state.conversation_documents[conv_id].append(document_info)
-        
-        # Process with advanced RAG for full document knowledge base
+        # Try RAG processing (optional - don't fail if this doesn't work)
         try:
             from services.rag_service import RAGService
             from services.user_service import user_service
+            from utils.conversation_manager import run_async
             import uuid
             
+            logger.info("Starting RAG processing...")
+            
             # Get user UUID
-            user_data = run_async_operation(user_service.get_user_by_id(st.session_state.user_id))
+            user_data = run_async(user_service.get_user_by_id(st.session_state.user_id))
             if user_data:
                 rag_service = RAGService()
                 document_id = str(uuid.uuid4())
                 
                 # Always process document for full knowledge base (default behavior)
-                success = run_async_operation(rag_service.process_document(
+                success = run_async(rag_service.process_document(
                     content, 
                     document_id, 
                     conv_id, 
@@ -750,16 +779,20 @@ def save_document_to_conversation_multipage(uploaded_file, content):
                     logger.info(f"✅ Document processed for full knowledge base: {uploaded_file.name}")
                 else:
                     logger.warning(f"⚠️ Full document processing failed for: {uploaded_file.name}")
+            else:
+                logger.warning("User data not found for RAG processing")
             
         except Exception as rag_error:
-            logger.warning(f"Full document RAG processing failed: {rag_error}")
-            # Continue with basic storage
+            logger.warning(f"RAG processing failed (non-critical): {rag_error}")
+            # Continue - RAG failure shouldn't prevent document saving
         
-        logger.info(f"Document saved to conversation {conv_id}: {uploaded_file.name}")
+        logger.info(f"Document successfully saved to conversation {conv_id}: {uploaded_file.name}")
         return True
         
     except Exception as e:
-        logger.error(f"Error saving document to conversation: {e}")
+        logger.error(f"Critical error saving document to conversation: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return False
 
 def render_main_chat_area():
@@ -1006,10 +1039,13 @@ def show_current_documents():
 
 def process_document_upload(uploaded_file):
     """Process uploaded document with enhanced features."""
+    logger.info(f"Starting document upload process for: {uploaded_file.name}")
+    
     # Check if this file has already been processed to prevent loops
     file_key = f"{uploaded_file.name}_{uploaded_file.size}_{st.session_state.get('current_conversation_id', 'new')}"
     
     if st.session_state.get(f'processed_doc_{file_key}', False):
+        logger.info(f"Document already processed: {uploaded_file.name}")
         return  # Already processed, don't process again
     
     # Mark as being processed
@@ -1017,10 +1053,14 @@ def process_document_upload(uploaded_file):
     
     with st.spinner(f"Processing {uploaded_file.name}..."):
         try:
+            logger.info(f"Processing document content for: {uploaded_file.name}")
+            
             # Process the document directly (no import needed)
             content = process_uploaded_document_multipage(uploaded_file)
             
             if content:
+                logger.info(f"Document content extracted: {len(content)} characters")
+                
                 # Save to conversation
                 success = save_document_to_conversation_multipage(uploaded_file, content)
                 
@@ -1032,17 +1072,23 @@ def process_document_upload(uploaded_file):
                     st.success(f"✅ Document processed: {uploaded_file.name}")
                     st.info(f"📄 Extracted {len(content)} characters of content")
                     
+                    logger.info(f"Document successfully processed and saved: {uploaded_file.name}")
+                    
                     # Don't call st.rerun() here - let the natural flow handle it
                 else:
-                    st.error("❌ Failed to save document")
+                    logger.error(f"Failed to save document: {uploaded_file.name}")
+                    st.error("❌ Failed to save document - check logs for details")
                     st.session_state[f'processing_doc_{file_key}'] = False
             else:
-                st.error("❌ Failed to process document")
+                logger.error(f"Failed to extract content from document: {uploaded_file.name}")
+                st.error("❌ Failed to process document - no content extracted")
                 st.session_state[f'processing_doc_{file_key}'] = False
                 
         except Exception as e:
-            logger.error(f"Document upload error: {e}")
-            st.error(f"❌ Error processing document: {e}")
+            logger.error(f"Document upload error for {uploaded_file.name}: {e}")
+            import traceback
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            st.error(f"❌ Error processing document: {str(e)}")
             st.session_state[f'processing_doc_{file_key}'] = False
 
 def process_chat_input(prompt):
