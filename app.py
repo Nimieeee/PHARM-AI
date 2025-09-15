@@ -329,6 +329,13 @@ def render_homepage():
     
     # Footer
     st.markdown("---")
+    
+    # Contact support button in footer
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("📞 Need Help? Contact Support", use_container_width=True):
+            st.switch_page("pages/4_📞_Contact_Support.py")
+    
     st.markdown("""
     <div style="text-align: center; color: #666; padding: 1rem;">
         <p><strong>Educational Use Only</strong> - Always consult healthcare professionals for clinical decisions</p>

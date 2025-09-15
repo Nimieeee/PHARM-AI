@@ -28,6 +28,10 @@ def render_public_navigation():
         if st.button("🔐 Sign In", use_container_width=True, type="primary"):
             st.switch_page("pages/2_🔐_Sign_In.py")
         
+        # Contact Support button
+        if st.button("📞 Contact Support", use_container_width=True):
+            st.switch_page("pages/4_📞_Contact_Support.py")
+        
         st.markdown("---")
         st.markdown("### About PharmGPT")
         st.markdown("""
@@ -55,6 +59,10 @@ def render_authenticated_navigation():
         # Chatbot button
         if st.button("💬 Chatbot", use_container_width=True, type="primary"):
             st.switch_page("pages/3_💬_Chatbot.py")
+        
+        # Contact Support button
+        if st.button("📞 Contact Support", use_container_width=True):
+            st.switch_page("pages/4_📞_Contact_Support.py")
         
         # Logout button
         if st.button("🚪 Logout", use_container_width=True):

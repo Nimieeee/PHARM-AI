@@ -20,6 +20,10 @@ def render_sidebar():
         # App title/logo
         st.markdown("# 💊 PharmGPT")
         
+        # Contact Support button
+        if st.button("📞 Contact Support", use_container_width=True):
+            st.switch_page("pages/4_📞_Contact_Support.py")
+        
         # Sign out button
         if st.button("🚪 Sign Out", use_container_width=True, type="secondary"):
             # Only sign out if we're not generating a response

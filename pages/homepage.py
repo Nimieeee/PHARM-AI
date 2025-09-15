@@ -254,4 +254,11 @@ def render_homepage():
     
     # Footer with disclaimer
     st.markdown("---")
+    
+    # Contact support button
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("📞 Need Help? Contact Support", key="homepage_contact_support", use_container_width=True):
+            st.switch_page("pages/4_📞_Contact_Support.py")
+    
     st.error("⚠️ **Important Disclaimer**: PharmGPT is designed for educational purposes only. The information provided should not replace professional medical advice, diagnosis, or treatment. Always consult qualified healthcare professionals for clinical decisions and patient care.")
