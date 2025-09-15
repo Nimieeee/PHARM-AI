@@ -671,12 +671,13 @@ def process_uploaded_document_multipage(uploaded_file):
                         if extracted_text.strip():
                             text_content = f"{image_info}OCR Extracted Text:\n{extracted_text.strip()}"
                         else:
-                            text_content = f"{image_info}[No text detected in image]"
+                            text_content = f"{image_info}This image appears to contain visual content (charts, graphs, or diagrams) but no readable text was detected."
                             
                     except ImportError:
-                        text_content = f"{image_info}[OCR not available - install pytesseract for text extraction]"
+                        # OCR not available - provide helpful message without confusing the AI
+                        text_content = f"{image_info}IMAGE UPLOADED: This appears to be a scientific/research image based on the filename. Since text extraction is not available, please describe what you see in the image (charts, graphs, data, etc.) and I can help explain the pharmacological concepts shown."
                     except Exception as ocr_error:
-                        text_content = f"{image_info}[OCR failed: {ocr_error}]"
+                        text_content = f"{image_info}IMAGE UPLOADED: This image may contain charts, graphs, or visual scientific content. Please describe what you see in the image and I can provide pharmacological insights about the data or concepts shown."
                         
                 finally:
                     os.unlink(tmp_path)
@@ -1170,8 +1171,8 @@ def generate_enhanced_response(prompt):
         
         # Prepare enhanced system prompt
         enhanced_system_prompt = pharmacology_system_prompt
-        if document_context:
-            enhanced_system_prompt += f"\n\n{document_context}\n\nUse the above document context to enhance your responses when relevant."
+        if document_context and is_useful_document_context(document_context):
+            enhanced_system_prompt += f"\n\n--- DOCUMENT CONTEXT ---\n{document_context}\n\nIMPORTANT: Use the above document context to enhance your pharmacology responses when relevant. If the documents contain error messages or are not related to pharmacology, focus on providing expert pharmacology knowledge based on the user's question instead."
         
         # Prepare messages for API (exclude the current user message to avoid duplication)
         api_messages = [{"role": "system", "content": enhanced_system_prompt}]
@@ -1193,6 +1194,57 @@ def generate_enhanced_response(prompt):
     except Exception as e:
         logger.error(f"Error in generate_enhanced_response: {e}")
         return f"Sorry, I encountered an error: {str(e)}"
+
+def is_useful_document_context(context):
+    """Check if document context is useful and not just error messages."""
+    if not context or len(context.strip()) < 50:
+        return False
+    
+    # Check for common error indicators
+    error_indicators = [
+        "OCR not available",
+        "OCR failed",
+        "Text extraction failed",
+        "No extractable text found",
+        "Processing failed",
+        "install pytesseract",
+        "Unsupported format",
+        "text extraction is not available",
+        "Please describe what you see"
+    ]
+    
+    # If context is mostly error messages, it's not useful
+    error_count = sum(1 for indicator in error_indicators if indicator.lower() in context.lower())
+    
+    # If more than 1 error indicator or context is very short, consider it not useful
+    if error_count > 1 or len(context.strip()) < 100:
+        return False
+    
+    return True
+
+def clean_document_content(content):
+    """Clean document content to remove unhelpful error messages."""
+    if not content:
+        return content
+    
+    # Remove common error message patterns
+    error_patterns = [
+        r"\[.*?OCR not available.*?\]",
+        r"\[.*?OCR failed.*?\]",
+        r"\[.*?Text extraction failed.*?\]",
+        r"\[.*?install pytesseract.*?\]",
+        r"\[.*?Processing failed.*?\]"
+    ]
+    
+    import re
+    cleaned_content = content
+    for pattern in error_patterns:
+        cleaned_content = re.sub(pattern, "", cleaned_content, flags=re.IGNORECASE | re.DOTALL)
+    
+    # Clean up extra whitespace
+    cleaned_content = re.sub(r'\n\s*\n', '\n\n', cleaned_content.strip())
+    
+    return cleaned_content
 
 def get_conversation_context(user_query=""):
     """Get document context for current conversation."""
@@ -1227,10 +1279,26 @@ def get_conversation_context(user_query=""):
             documents = st.session_state.conversation_documents.get(conv_id, [])
             if documents:
                 context = "\n\n--- CONVERSATION DOCUMENTS ---\n"
+                useful_docs = 0
+                
                 for doc in documents:
-                    content = doc['content'][:2000]  # Limit content length
-                    context += f"\n[Document: {doc['filename']}]\n{content}\n"
-                return context
+                    content = doc['content']
+                    
+                    # Filter out documents that are mostly error messages
+                    if is_useful_document_context(content):
+                        # Limit content length and clean it
+                        clean_content = clean_document_content(content[:2000])
+                        context += f"\n[Document: {doc['filename']}]\n{clean_content}\n"
+                        useful_docs += 1
+                    else:
+                        # For non-useful documents (like failed OCR), provide basic info
+                        context += f"\n[Document: {doc['filename']} - Visual content uploaded but text not extractable]\n"
+                
+                if useful_docs > 0:
+                    return context
+                else:
+                    # No useful document content, return empty to avoid confusing the AI
+                    return ""
         
         return ""
         
