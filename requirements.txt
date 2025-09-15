@@ -26,8 +26,10 @@ pandas>=2.0.0
 
 # Image processing and OCR
 opencv-python>=4.8.0
-pytesseract>=0.3.10  # Note: Requires tesseract-ocr system package
+pytesseract>=0.3.10  # OCR text extraction from images
 Pillow>=10.0.0
+easyocr>=1.7.0  # Alternative OCR engine (no system dependencies)
+pdf2image>=1.16.0  # Convert PDF pages to images for OCR
 
 # SQLite upgrade for ChromaDB compatibility on Streamlit Cloud
 pysqlite3-binary>=0.5.0; sys_platform == "linux"

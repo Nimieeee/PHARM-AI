@@ -640,51 +640,32 @@ def process_uploaded_document_multipage(uploaded_file):
                 text_content = f"[PPTX Document: {uploaded_file.name} - {len(file_content)} bytes - Text extraction failed: {pptx_error}]"
                 
         elif (uploaded_file.type and uploaded_file.type.startswith('image/')) or uploaded_file.name.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp')):
-            # Enhanced image processing with OCR
+            # Enhanced image processing with multiple OCR engines
             try:
-                from PIL import Image
-                import tempfile
-                import os
+                from utils.ocr_manager import process_image_file
+                text_content = process_image_file(uploaded_file, file_content)
                 
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
-                    tmp_file.write(file_content)
-                    tmp_path = tmp_file.name
-                
-                try:
-                    # Open and process image
-                    image = Image.open(tmp_path)
-                    
-                    # Get image info
-                    image_info = f"Image: {uploaded_file.name}\nSize: {image.size[0]}x{image.size[1]} pixels\nFormat: {image.format}\n\n"
-                    
-                    # Try OCR text extraction
-                    try:
-                        import pytesseract
-                        
-                        # Convert to RGB if necessary
-                        if image.mode != 'RGB':
-                            image = image.convert('RGB')
-                        
-                        # Extract text using OCR
-                        extracted_text = pytesseract.image_to_string(image, config='--psm 6')
-                        
-                        if extracted_text.strip():
-                            text_content = f"{image_info}OCR Extracted Text:\n{extracted_text.strip()}"
-                        else:
-                            text_content = f"{image_info}This image appears to contain visual content (charts, graphs, or diagrams) but no readable text was detected."
-                            
-                    except ImportError:
-                        # OCR not available - provide helpful message without confusing the AI
-                        text_content = f"{image_info}IMAGE UPLOADED: This appears to be a scientific/research image based on the filename. Since text extraction is not available, please describe what you see in the image (charts, graphs, data, etc.) and I can help explain the pharmacological concepts shown."
-                    except Exception as ocr_error:
-                        text_content = f"{image_info}IMAGE UPLOADED: This image may contain charts, graphs, or visual scientific content. Please describe what you see in the image and I can provide pharmacological insights about the data or concepts shown."
-                        
-                finally:
-                    os.unlink(tmp_path)
-                    
             except Exception as image_error:
                 logger.warning(f"Image processing failed: {image_error}")
-                text_content = f"[Image: {uploaded_file.name} - {len(file_content)} bytes - Processing failed: {image_error}]"
+                # Fallback to basic image info
+                try:
+                    from PIL import Image
+                    import tempfile
+                    import os
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.png') as tmp_file:
+                        tmp_file.write(file_content)
+                        tmp_path = tmp_file.name
+                    
+                    try:
+                        image = Image.open(tmp_path)
+                        image_info = f"Image: {uploaded_file.name}\nSize: {image.size[0]}x{image.size[1]} pixels\nFormat: {image.format}\n\n"
+                        text_content = f"{image_info}IMAGE UPLOADED: OCR processing failed. Please describe what you see in the image and I can help explain the pharmacological concepts shown."
+                    finally:
+                        os.unlink(tmp_path)
+                        
+                except Exception as fallback_error:
+                    text_content = f"[Image: {uploaded_file.name} - {len(file_content)} bytes - Processing failed: {image_error}]"
                 
         else:
             text_content = f"[Document: {uploaded_file.name} - {len(file_content)} bytes - Unsupported format. Supported: TXT, MD, PDF, DOCX, PPTX, Images]"

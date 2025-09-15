@@ -94,6 +94,25 @@ def render_conversation_sidebar():
         message_count = len(st.session_state.chat_messages)
         st.markdown(f"**Messages:** {message_count}")
     
+    # OCR Status
+    with st.expander("🔍 OCR Status"):
+        try:
+            from utils.ocr_manager import get_ocr_status
+            ocr_status = get_ocr_status()
+            
+            if ocr_status['ocr_working']:
+                st.success("✅ OCR Available")
+                if ocr_status['easyocr_available']:
+                    st.info("📱 EasyOCR: Ready")
+                if ocr_status['tesseract_available']:
+                    st.info("🔧 Tesseract: Ready")
+            else:
+                st.warning("⚠️ OCR Not Available")
+                st.info("Install: pip install easyocr")
+                
+        except Exception as e:
+            st.error("❌ OCR Status Unknown")
+    
     # Tips
     with st.expander("💡 Tips"):
         st.markdown("""
@@ -101,4 +120,5 @@ def render_conversation_sidebar():
         - Use regenerate button to get different answers
         - Switch between Normal and Turbo modes
         - Your conversations are automatically saved
+        - Upload images with text for OCR extraction
         """)
