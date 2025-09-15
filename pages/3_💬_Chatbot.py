@@ -978,6 +978,7 @@ def render_bottom_input_area():
 def render_document_upload():
     """Render enhanced document upload area."""
     with st.expander("📎 Upload Documents (PDF, DOCX, Images)", expanded=False):
+        st.info("📷 **Image OCR**: Only text content will be extracted from images for processing. Charts, graphs, and visual elements will not be analyzed.")
         uploaded_file = st.file_uploader(
             "Choose files to enhance your conversation",
             type=['txt', 'pdf', 'docx', 'md', 'pptx', 'png', 'jpg', 'jpeg'],

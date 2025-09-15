@@ -25,10 +25,8 @@ python-pptx>=0.6.21
 pandas>=2.0.0
 
 # Image processing and OCR
-opencv-python>=4.8.0
-pytesseract>=0.3.10  # OCR text extraction from images
+pytesseract>=0.3.10  # OCR text extraction from images (Tesseract pre-installed on Streamlit Cloud)
 Pillow>=10.0.0
-easyocr>=1.7.0  # Alternative OCR engine (no system dependencies)
 pdf2image>=1.16.0  # Convert PDF pages to images for OCR
 
 # SQLite upgrade for ChromaDB compatibility on Streamlit Cloud

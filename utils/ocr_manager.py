@@ -1,10 +1,10 @@
 """
 OCR Manager for PharmGPT
-Handles text extraction from images using multiple OCR engines
+Handles text extraction from images using Tesseract OCR
+Optimized for Streamlit Cloud deployment
 """
 
 import logging
-from typing import Optional, Tuple
 import tempfile
 import os
 from PIL import Image
@@ -13,80 +13,43 @@ from PIL import Image
 logger = logging.getLogger(__name__)
 
 class OCRManager:
-    """Manages OCR operations with multiple fallback engines."""
+    """Manages OCR operations using Tesseract (pre-installed on Streamlit Cloud)."""
     
     def __init__(self):
-        self.available_engines = []
-        self._check_available_engines()
+        self.tesseract_available = self._check_tesseract()
     
-    def _check_available_engines(self):
-        """Check which OCR engines are available."""
-        # Check EasyOCR (no system dependencies)
-        try:
-            import easyocr
-            self.available_engines.append('easyocr')
-            logger.info("✅ EasyOCR available")
-        except ImportError:
-            logger.info("⚠️ EasyOCR not available")
-        
-        # Check Tesseract
+    def _check_tesseract(self) -> bool:
+        """Check if Tesseract OCR is available."""
         try:
             import pytesseract
-            # Try to run tesseract to see if it's installed
+            # Try to get version to verify it's working
             pytesseract.get_tesseract_version()
-            self.available_engines.append('tesseract')
             logger.info("✅ Tesseract OCR available")
+            return True
         except (ImportError, Exception) as e:
-            logger.info(f"⚠️ Tesseract OCR not available: {e}")
-        
-        logger.info(f"Available OCR engines: {self.available_engines}")
+            logger.warning(f"⚠️ Tesseract OCR not available: {e}")
+            return False
     
     def extract_text_from_image(self, image_path: str, image_info: str = "") -> str:
-        """Extract text from image using the best available OCR engine."""
-        if not self.available_engines:
-            return f"{image_info}OCR engines not available. Please install tesseract-ocr system package or easyocr Python package for text extraction from images."
+        """Extract text from image using Tesseract OCR."""
+        if not self.tesseract_available:
+            return f"{image_info}OCR not available. Tesseract OCR is required for text extraction from images."
         
-        # Try each available engine
-        for engine in self.available_engines:
-            try:
-                if engine == 'easyocr':
-                    text = self._extract_with_easyocr(image_path)
-                elif engine == 'tesseract':
-                    text = self._extract_with_tesseract(image_path)
-                else:
-                    continue
+        try:
+            text = self._extract_with_tesseract(image_path)
+            
+            if text and text.strip():
+                logger.info(f"✅ Text extracted: {len(text)} characters")
+                return f"{image_info}📄 Extracted Text:\n{text.strip()}"
+            else:
+                return f"{image_info}📷 This image appears to contain visual content (charts, graphs, or diagrams) but no readable text was detected."
                 
-                if text and text.strip():
-                    logger.info(f"✅ Text extracted using {engine}: {len(text)} characters")
-                    return f"{image_info}OCR Extracted Text (using {engine}):\n{text.strip()}"
-                
-            except Exception as e:
-                logger.warning(f"OCR engine {engine} failed: {e}")
-                continue
-        
-        # No text found with any engine
-        return f"{image_info}This image appears to contain visual content (charts, graphs, or diagrams) but no readable text was detected by OCR engines."
-    
-    def _extract_with_easyocr(self, image_path: str) -> str:
-        """Extract text using EasyOCR."""
-        import easyocr
-        
-        # Initialize EasyOCR reader (supports multiple languages)
-        reader = easyocr.Reader(['en'])  # English only for now, can add more languages
-        
-        # Extract text
-        results = reader.readtext(image_path)
-        
-        # Combine all detected text
-        extracted_text = []
-        for (bbox, text, confidence) in results:
-            if confidence > 0.5:  # Only include text with reasonable confidence
-                extracted_text.append(text)
-        
-        return ' '.join(extracted_text)
+        except Exception as e:
+            logger.error(f"OCR extraction failed: {e}")
+            return f"{image_info}❌ Text extraction failed: {str(e)}"
     
     def _extract_with_tesseract(self, image_path: str) -> str:
-        """Extract text using Tesseract OCR."""
+        """Extract text using Tesseract OCR with optimized settings."""
         import pytesseract
         from PIL import Image
         
@@ -97,19 +60,28 @@ class OCRManager:
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
-        # Extract text using different PSM modes for better results
-        psm_modes = [6, 8, 13]  # Different page segmentation modes
+        # Try different OCR configurations for better results
+        configs = [
+            '--psm 6',  # Uniform block of text
+            '--psm 8',  # Single word
+            '--psm 13', # Raw line. Treat the image as a single text line
+            '--psm 3',  # Fully automatic page segmentation (default)
+        ]
         
-        for psm in psm_modes:
+        best_text = ""
+        max_length = 0
+        
+        for config in configs:
             try:
-                config = f'--psm {psm}'
                 text = pytesseract.image_to_string(image, config=config)
-                if text and text.strip():
-                    return text
-            except:
+                if text and len(text.strip()) > max_length:
+                    best_text = text
+                    max_length = len(text.strip())
+            except Exception as e:
+                logger.debug(f"Config {config} failed: {e}")
                 continue
         
-        return ""
+        return best_text
     
     def process_image_file(self, uploaded_file, file_content: bytes) -> str:
         """Process an uploaded image file and extract text."""
@@ -138,12 +110,12 @@ class OCRManager:
             return f"[Image: {uploaded_file.name} - {len(file_content)} bytes - Processing failed: {e}]"
     
     def get_ocr_status(self) -> dict:
-        """Get status of available OCR engines."""
+        """Get status of Tesseract OCR engine."""
         return {
-            'available_engines': self.available_engines,
-            'easyocr_available': 'easyocr' in self.available_engines,
-            'tesseract_available': 'tesseract' in self.available_engines,
-            'ocr_working': len(self.available_engines) > 0
+            'tesseract_available': self.tesseract_available,
+            'ocr_working': self.tesseract_available,
+            'engine': 'tesseract',
+            'note': 'Only text content will be extracted from images for processing'
         }
 
 # Global OCR manager instance

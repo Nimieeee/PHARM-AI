@@ -592,6 +592,7 @@ def render_simple_chatbot():
     
     with col2:
         # Document upload with enhanced format support
+        st.caption("📷 Images: Text extraction only")
         uploaded_file = st.file_uploader(
             "📎 Upload",
             type=['txt', 'pdf', 'docx', 'md', 'pptx', 'png', 'jpg', 'jpeg', 'gif', 'bmp', 'tiff', 'webp'],
