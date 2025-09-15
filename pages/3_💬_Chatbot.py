@@ -14,7 +14,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.session_manager import initialize_session_state
 from utils.theme import apply_theme
 from auth import initialize_auth_session, logout_current_user
-from config import APP_TITLE, APP_ICON
+from config import APP_TITLE, APP_ICON, MAX_FILE_SIZE_MB
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -169,28 +169,7 @@ def render_conversation_list():
                 if st.button("🗑️", key=f"delete_{conv_id}", help="Delete conversation"):
                     delete_specific_conversation(conv_id)
             
-            with col3:
-                # Quick export button for each conversation
-                if st.button("📤", key=f"export_{conv_id}", help="Export options"):
-                    st.session_state[f"show_export_{conv_id}"] = not st.session_state.get(f"show_export_{conv_id}", False)
-            
-            # Show export options if toggled
-            if st.session_state.get(f"show_export_{conv_id}", False):
-                with st.container():
-                    st.markdown("**Quick Export:**")
-                    export_col1, export_col2 = st.columns(2)
-                    
-                    with export_col1:
-                        if st.button("📄 PDF", key=f"pdf_{conv_id}", use_container_width=True):
-                            export_specific_conversation(conv_id, 'pdf')
-                        if st.button("📋 TXT", key=f"txt_{conv_id}", use_container_width=True):
-                            export_specific_conversation(conv_id, 'txt')
-                    
-                    with export_col2:
-                        if st.button("📝 Word", key=f"docx_{conv_id}", use_container_width=True):
-                            export_specific_conversation(conv_id, 'docx')
-                        if st.button("📖 MD", key=f"md_{conv_id}", use_container_width=True):
-                            export_specific_conversation(conv_id, 'md')
+            # Removed export functionality
     
     # Show more conversations option
     if len(conversations) > 10:
@@ -215,9 +194,7 @@ def render_conversation_list():
                     if st.button("🗑️", key=f"delete_more_{conv_id}", help="Delete conversation"):
                         delete_specific_conversation(conv_id)
                 
-                with col3:
-                    if st.button("📤", key=f"export_more_{conv_id}", help="Export"):
-                        export_specific_conversation(conv_id, 'txt')  # Quick text export
+                # Removed export functionality
 
 def load_conversation(conversation_id):
     """Load a specific conversation."""
@@ -251,25 +228,6 @@ def render_conversation_info():
     
     # Conversation actions
     with st.expander("🔧 Actions"):
-        # Export options
-        st.markdown("**📤 Export Conversation**")
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if st.button("📄 Export PDF", use_container_width=True):
-                export_current_conversation('pdf')
-            
-            if st.button("📝 Export Word", use_container_width=True):
-                export_current_conversation('docx')
-        
-        with col2:
-            if st.button("📋 Export Text", use_container_width=True):
-                export_current_conversation('txt')
-            
-            if st.button("📖 Export Markdown", use_container_width=True):
-                export_current_conversation('md')
-        
-        st.markdown("---")
         
         # Other actions
         if st.button("📋 Duplicate Chat", use_container_width=True):
@@ -352,121 +310,7 @@ def duplicate_current_conversation():
         logger.error(f"Error duplicating conversation: {e}")
         st.error(f"❌ Error: {e}")
 
-def export_current_conversation(format_type: str):
-    """Export the current conversation to specified format."""
-    conv_id = st.session_state.get('current_conversation_id')
-    if not conv_id:
-        st.error("❌ No conversation to export")
-        return
-    
-    conversations = st.session_state.get('conversations', {})
-    if conv_id not in conversations:
-        st.error("❌ Conversation not found")
-        return
-    
-    try:
-        with st.spinner(f"Exporting conversation to {format_type.upper()}..."):
-            from utils.export_manager import export_conversation_to_format, get_export_filename
-            
-            # Get conversation data
-            conversation_data = conversations[conv_id].copy()
-            
-            # Add current messages if they're more recent
-            if st.session_state.get('chat_messages'):
-                conversation_data['messages'] = st.session_state.chat_messages
-            
-            # Export conversation
-            exported_data = export_conversation_to_format(conversation_data, format_type)
-            
-            if exported_data:
-                # Generate filename
-                filename = get_export_filename(conversation_data, format_type)
-                
-                # Provide download
-                mime_types = {
-                    'pdf': 'application/pdf',
-                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'txt': 'text/plain',
-                    'md': 'text/markdown'
-                }
-                
-                st.download_button(
-                    label=f"📥 Download {format_type.upper()} File",
-                    data=exported_data,
-                    file_name=filename,
-                    mime=mime_types.get(format_type, 'application/octet-stream'),
-                    use_container_width=True
-                )
-                
-                st.success(f"✅ Conversation exported to {format_type.upper()}!")
-                
-                # Show export info
-                file_size = len(exported_data)
-                st.info(f"📊 Export details:\n- Format: {format_type.upper()}\n- File size: {file_size:,} bytes\n- Messages: {len(conversation_data.get('messages', []))}")
-                
-            else:
-                st.error(f"❌ Failed to export conversation to {format_type.upper()}")
-                
-    except Exception as e:
-        logger.error(f"Export error: {e}")
-        st.error(f"❌ Export failed: {str(e)}")
-        
-        # Show helpful error message based on the error
-        if "reportlab" in str(e).lower():
-            st.info("💡 PDF export requires additional dependencies. Try Text or Markdown export instead.")
-        elif "docx" in str(e).lower():
-            st.info("💡 Word export requires additional dependencies. Try Text or Markdown export instead.")
-
-def export_specific_conversation(conv_id: str, format_type: str):
-    """Export a specific conversation from the sidebar."""
-    conversations = st.session_state.get('conversations', {})
-    if conv_id not in conversations:
-        st.error("❌ Conversation not found")
-        return
-    
-    try:
-        with st.spinner(f"Exporting to {format_type.upper()}..."):
-            from utils.export_manager import export_conversation_to_format, get_export_filename
-            
-            # Get conversation data
-            conversation_data = conversations[conv_id].copy()
-            
-            # Export conversation
-            exported_data = export_conversation_to_format(conversation_data, format_type)
-            
-            if exported_data:
-                # Generate filename
-                filename = get_export_filename(conversation_data, format_type)
-                
-                # Provide download
-                mime_types = {
-                    'pdf': 'application/pdf',
-                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'txt': 'text/plain',
-                    'md': 'text/markdown'
-                }
-                
-                st.download_button(
-                    label=f"📥 Download {format_type.upper()}",
-                    data=exported_data,
-                    file_name=filename,
-                    mime=mime_types.get(format_type, 'application/octet-stream'),
-                    key=f"download_{conv_id}_{format_type}",
-                    use_container_width=True
-                )
-                
-                st.success(f"✅ Ready to download!")
-                
-            else:
-                st.error(f"❌ Export failed")
-                
-    except Exception as e:
-        logger.error(f"Sidebar export error: {e}")
-        st.error(f"❌ Error: {str(e)}")
-        
-        # Provide fallback options
-        if format_type in ['pdf', 'docx']:
-            st.info("💡 Try Text or Markdown export for better compatibility.")
+# Export functions removed
 
 def render_rename_dialog():
     """Render dialog to rename current conversation."""
@@ -987,6 +831,12 @@ def render_document_upload():
         )
         
         if uploaded_file is not None:
+            # Check file size limit
+            file_size_mb = uploaded_file.size / (1024 * 1024)
+            if file_size_mb > MAX_FILE_SIZE_MB:
+                st.error(f"❌ File too large! Maximum size allowed is {MAX_FILE_SIZE_MB}MB. Your file is {file_size_mb:.1f}MB.")
+                return
+            
             process_document_upload(uploaded_file)
         
         # Show current documents

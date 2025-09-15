@@ -5,6 +5,7 @@ Simplified Chatbot Page - Clean, Minimal Implementation
 import streamlit as st
 import logging
 from datetime import datetime
+from config import MAX_FILE_SIZE_MB
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -602,16 +603,21 @@ def render_simple_chatbot():
     
     # Handle document upload
     if uploaded_file is not None:
-        with st.spinner(f"Processing {uploaded_file.name}..."):
-            document_content = process_uploaded_document(uploaded_file)
-            if document_content:
-                success = save_document_to_conversation(uploaded_file, document_content)
-                if success:
-                    st.rerun()
+        # Check file size limit
+        file_size_mb = uploaded_file.size / (1024 * 1024)
+        if file_size_mb > MAX_FILE_SIZE_MB:
+            st.error(f"❌ File too large! Maximum size allowed is {MAX_FILE_SIZE_MB}MB. Your file is {file_size_mb:.1f}MB.")
+        else:
+            with st.spinner(f"Processing {uploaded_file.name}..."):
+                document_content = process_uploaded_document(uploaded_file)
+                if document_content:
+                    success = save_document_to_conversation(uploaded_file, document_content)
+                    if success:
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to save document")
                 else:
-                    st.error("❌ Failed to save document")
-            else:
-                st.error("❌ Failed to process document")
+                    st.error("❌ Failed to process document")
     
     # Handle regenerate response
     if st.session_state.get('regenerate_response', False):

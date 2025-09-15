@@ -57,7 +57,7 @@ APP_TITLE = "PharmGPT - AI Pharmacology Assistant"
 APP_ICON = "💊"
 
 # File upload settings
-MAX_FILE_SIZE_MB = 10
+MAX_FILE_SIZE_MB = 20
 ALLOWED_FILE_TYPES = ['pdf', 'txt', 'csv', 'docx', 'doc', 'png', 'jpg', 'jpeg']
 
 # Database settings - Supabase only

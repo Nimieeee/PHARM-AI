@@ -97,112 +97,8 @@ def get_recent_conversations():
         logger.error(f"Error getting recent conversations: {e}")
         return []
 
-def export_all_conversations(format_type: str):
-    """Export all user conversations to a single file."""
-    try:
-        conversations = st.session_state.get('conversations', {})
-        
-        if not conversations:
-            st.error("❌ No conversations to export")
-            return
-        
-        with st.spinner(f"Exporting all conversations to {format_type.upper()}..."):
-            from utils.export_manager import ConversationExporter
-            
-            # Create combined conversation data
-            combined_data = {
-                'title': f"All PharmGPT Conversations - {st.session_state.username}",
-                'messages': [],
-                'model': 'combined',
-                'export_type': 'bulk',
-                'conversation_count': len(conversations),
-                'total_messages': sum(len(conv.get('messages', [])) for conv in conversations.values())
-            }
-            
-            # Sort conversations by creation date
-            sorted_conversations = sorted(
-                conversations.items(),
-                key=lambda x: x[1].get('created_at', ''),
-                reverse=False  # Oldest first for chronological order
-            )
-            
-            # Combine all messages with conversation separators
-            for conv_id, conv_data in sorted_conversations:
-                # Add conversation separator
-                separator_message = {
-                    'role': 'system',
-                    'content': f"=== CONVERSATION: {conv_data.get('title', 'Untitled')} ===",
-                    'timestamp': conv_data.get('created_at', ''),
-                    'conversation_id': conv_id
-                }
-                combined_data['messages'].append(separator_message)
-                
-                # Add all messages from this conversation
-                for message in conv_data.get('messages', []):
-                    message_copy = message.copy()
-                    message_copy['conversation_id'] = conv_id
-                    message_copy['conversation_title'] = conv_data.get('title', 'Untitled')
-                    combined_data['messages'].append(message_copy)
-                
-                # Add end separator
-                end_separator = {
-                    'role': 'system',
-                    'content': f"=== END OF CONVERSATION ===",
-                    'timestamp': conv_data.get('updated_at', conv_data.get('created_at', '')),
-                    'conversation_id': conv_id
-                }
-                combined_data['messages'].append(end_separator)
-            
-            # Export using the conversation exporter
-            exporter = ConversationExporter()
-            exported_data = exporter.export_conversation(combined_data, format_type)
-            
-            if exported_data:
-                # Generate filename
-                from datetime import datetime
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                filename = f"PharmGPT_All_Conversations_{st.session_state.username}_{timestamp}.{format_type}"
-                
-                # Provide download
-                mime_types = {
-                    'pdf': 'application/pdf',
-                    'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'txt': 'text/plain',
-                    'md': 'text/markdown'
-                }
-                
-                st.download_button(
-                    label=f"📥 Download All Conversations ({format_type.upper()})",
-                    data=exported_data,
-                    file_name=filename,
-                    mime=mime_types.get(format_type, 'application/octet-stream'),
-                    use_container_width=True
-                )
-                
-                st.success(f"✅ All conversations exported to {format_type.upper()}!")
-                
-                # Show export statistics
-                file_size = len(exported_data)
-                st.info(f"""
-                📊 **Export Summary:**
-                - **Format:** {format_type.upper()}
-                - **Conversations:** {combined_data['conversation_count']}
-                - **Total Messages:** {combined_data['total_messages']}
-                - **File Size:** {file_size:,} bytes
-                """)
-                
-            else:
-                st.error(f"❌ Failed to export conversations to {format_type.upper()}")
-                
-    except Exception as e:
-        logger.error(f"Bulk export error: {e}")
-        st.error(f"❌ Export failed: {str(e)}")
-        
+
         # Show helpful error message
-        if "reportlab" in str(e).lower():
-            st.info("💡 PDF export requires additional dependencies. Try Text export instead.")
-        elif "docx" in str(e).lower():
-            st.info("💡 Word export requires additional dependencies. Try Text export instead.")
 
 def render_homepage():
     """Render the main homepage with authentication-aware content."""
@@ -300,24 +196,8 @@ def render_homepage():
             if st.button("🚀 Continue Chatting", use_container_width=True, type="primary"):
                 st.switch_page("pages/3_💬_Chatbot.py")
         
-        # Export options for users with conversations
-        if user_stats['total_conversations'] > 0:
-            st.markdown("---")
-            st.markdown("### 📤 Export Options")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("📄 Export All as PDF", use_container_width=True):
-                    export_all_conversations('pdf')
-            
-            with col2:
-                if st.button("📝 Export All as Word", use_container_width=True):
-                    export_all_conversations('docx')
-            
-            with col3:
-                if st.button("📋 Export All as Text", use_container_width=True):
-                    export_all_conversations('txt')
+        # Removed export options
+
         
         # Recent conversations
         if user_stats['total_conversations'] > 0:
@@ -343,47 +223,8 @@ def render_homepage():
             if user_stats['total_conversations'] > 3:
                 st.info(f"📁 {user_stats['total_conversations'] - 3} more conversations available in the chatbot")
         
-        # Export statistics
-        if user_stats['total_conversations'] > 0:
-            with st.expander("📊 Export Statistics & Options"):
-                st.markdown("**Available Export Formats:**")
-                
-                col1, col2, col3, col4 = st.columns(4)
-                
-                with col1:
-                    st.markdown("""
-                    **📄 PDF**
-                    - Professional format
-                    - Great for printing
-                    - Preserves formatting
-                    """)
-                
-                with col2:
-                    st.markdown("""
-                    **📝 Word (DOCX)**
-                    - Editable format
-                    - Easy to share
-                    - Professional layout
-                    """)
-                
-                with col3:
-                    st.markdown("""
-                    **📋 Plain Text**
-                    - Universal compatibility
-                    - Lightweight
-                    - Easy to read
-                    """)
-                
-                with col4:
-                    st.markdown("""
-                    **📖 Markdown**
-                    - Developer-friendly
-                    - Version control ready
-                    - Clean formatting
-                    """)
-                
-                st.markdown("---")
-                st.info("💡 **Tip:** Individual conversations can also be exported from the chatbot sidebar!")
+        # Removed export statistics section
+
         
         # Show features for authenticated users
         st.markdown("### ✨ What you can do:")
