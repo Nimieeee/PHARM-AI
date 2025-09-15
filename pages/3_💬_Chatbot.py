@@ -149,9 +149,10 @@ def render_conversation_list():
         is_current = st.session_state.get('current_conversation_id') == conv_id
         button_type = "primary" if is_current else "secondary"
         
-        # Create expandable conversation item
+        # Create conversation item with action buttons
         with st.container():
-            col1, col2 = st.columns([4, 1])
+            # Main conversation button
+            col1, col2, col3 = st.columns([6, 1, 1])
             
             with col1:
                 if st.button(
@@ -164,8 +165,13 @@ def render_conversation_list():
                     load_conversation(conv_id)
             
             with col2:
+                # Delete button for each conversation
+                if st.button("🗑️", key=f"delete_{conv_id}", help="Delete conversation"):
+                    delete_specific_conversation(conv_id)
+            
+            with col3:
                 # Quick export button for each conversation
-                if st.button("📤", key=f"export_{conv_id}", help="Quick export options"):
+                if st.button("📤", key=f"export_{conv_id}", help="Export options"):
                     st.session_state[f"show_export_{conv_id}"] = not st.session_state.get(f"show_export_{conv_id}", False)
             
             # Show export options if toggled
@@ -192,14 +198,26 @@ def render_conversation_list():
             for conv_id, conv_data in sorted_conversations[10:]:
                 title = conv_data.get('title', 'Untitled Chat')
                 message_count = len(conv_data.get('messages', []))
-                display_title = title[:25] + "..." if len(title) > 25 else title
+                display_title = title[:20] + "..." if len(title) > 20 else title
                 
-                if st.button(
-                    f"{display_title} ({message_count})",
-                    key=f"conv_more_{conv_id}",
-                    use_container_width=True
-                ):
-                    load_conversation(conv_id)
+                # More conversations with delete buttons
+                col1, col2, col3 = st.columns([6, 1, 1])
+                
+                with col1:
+                    if st.button(
+                        f"{display_title} ({message_count})",
+                        key=f"conv_more_{conv_id}",
+                        use_container_width=True
+                    ):
+                        load_conversation(conv_id)
+                
+                with col2:
+                    if st.button("🗑️", key=f"delete_more_{conv_id}", help="Delete conversation"):
+                        delete_specific_conversation(conv_id)
+                
+                with col3:
+                    if st.button("📤", key=f"export_more_{conv_id}", help="Export"):
+                        export_specific_conversation(conv_id, 'txt')  # Quick text export
 
 def load_conversation(conversation_id):
     """Load a specific conversation."""
@@ -254,19 +272,30 @@ def render_conversation_info():
         st.markdown("---")
         
         # Other actions
-        if st.button("🗑️ Delete Chat", use_container_width=True):
-            delete_current_conversation()
-        
         if st.button("📋 Duplicate Chat", use_container_width=True):
             duplicate_current_conversation()
+        
+        if st.button("✏️ Rename Chat", use_container_width=True):
+            st.session_state.show_rename_dialog = True
+        
+        # Show rename dialog if requested
+        if st.session_state.get('show_rename_dialog', False):
+            render_rename_dialog()
 
-def delete_current_conversation():
-    """Delete the current conversation."""
-    conv_id = st.session_state.get('current_conversation_id')
-    if not conv_id:
-        return
-    
+def delete_specific_conversation(conv_id: str):
+    """Delete a specific conversation from the sidebar."""
     try:
+        # Confirm deletion with user
+        if f"confirm_delete_{conv_id}" not in st.session_state:
+            st.session_state[f"confirm_delete_{conv_id}"] = False
+        
+        if not st.session_state[f"confirm_delete_{conv_id}"]:
+            # First click - ask for confirmation
+            st.session_state[f"confirm_delete_{conv_id}"] = True
+            st.warning("⚠️ Click delete again to confirm")
+            return
+        
+        # Second click - actually delete
         from utils.conversation_manager import run_async, delete_conversation
         success = run_async(delete_conversation(conv_id))
         
@@ -275,17 +304,32 @@ def delete_current_conversation():
             if conv_id in st.session_state.conversations:
                 del st.session_state.conversations[conv_id]
             
-            # Clear current conversation
-            st.session_state.current_conversation_id = None
-            st.session_state.chat_messages = []
+            # Clean up confirmation state
+            del st.session_state[f"confirm_delete_{conv_id}"]
+            
+            # If this was the current conversation, switch to another or clear
+            if st.session_state.get('current_conversation_id') == conv_id:
+                remaining_conversations = list(st.session_state.conversations.keys())
+                if remaining_conversations:
+                    # Switch to the most recent conversation
+                    st.session_state.current_conversation_id = remaining_conversations[0]
+                    st.session_state.chat_messages = st.session_state.conversations[remaining_conversations[0]].get('messages', [])
+                else:
+                    # No conversations left
+                    st.session_state.current_conversation_id = None
+                    st.session_state.chat_messages = []
             
             st.success("✅ Conversation deleted!")
             st.rerun()
         else:
             st.error("❌ Failed to delete conversation")
+            st.session_state[f"confirm_delete_{conv_id}"] = False
+            
     except Exception as e:
         logger.error(f"Error deleting conversation: {e}")
         st.error(f"❌ Error: {e}")
+        if f"confirm_delete_{conv_id}" in st.session_state:
+            st.session_state[f"confirm_delete_{conv_id}"] = False
 
 def duplicate_current_conversation():
     """Duplicate the current conversation."""
@@ -423,6 +467,53 @@ def export_specific_conversation(conv_id: str, format_type: str):
         # Provide fallback options
         if format_type in ['pdf', 'docx']:
             st.info("💡 Try Text or Markdown export for better compatibility.")
+
+def render_rename_dialog():
+    """Render dialog to rename current conversation."""
+    conv_id = st.session_state.get('current_conversation_id')
+    if not conv_id:
+        st.session_state.show_rename_dialog = False
+        return
+    
+    conversations = st.session_state.get('conversations', {})
+    current_title = conversations.get(conv_id, {}).get('title', 'Untitled Chat')
+    
+    st.markdown("**✏️ Rename Conversation**")
+    
+    new_title = st.text_input(
+        "New title:",
+        value=current_title,
+        key="rename_input",
+        placeholder="Enter new conversation title"
+    )
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("✅ Save", use_container_width=True):
+            if new_title and new_title.strip():
+                try:
+                    from utils.conversation_manager import run_async, update_conversation_title
+                    success = run_async(update_conversation_title(conv_id, new_title.strip()))
+                    
+                    if success:
+                        # Update local state
+                        st.session_state.conversations[conv_id]['title'] = new_title.strip()
+                        st.success("✅ Conversation renamed!")
+                        st.session_state.show_rename_dialog = False
+                        st.rerun()
+                    else:
+                        st.error("❌ Failed to rename conversation")
+                except Exception as e:
+                    logger.error(f"Error renaming conversation: {e}")
+                    st.error(f"❌ Error: {e}")
+            else:
+                st.error("❌ Please enter a valid title")
+    
+    with col2:
+        if st.button("❌ Cancel", use_container_width=True):
+            st.session_state.show_rename_dialog = False
+            st.rerun()
 
 def render_main_chat_area():
     """Render the main chat area with enhanced features."""
@@ -653,11 +744,30 @@ def show_current_documents():
                 st.markdown(f"• {doc['filename']} ({doc.get('file_size', 0)} bytes)")
             with col2:
                 if st.button("🗑️", key=f"del_doc_{i}", help="Remove document"):
+                    # Remove document and mark for cleanup
                     documents.pop(i)
+                    
+                    # Clean up processing flags for this document
+                    file_key = f"{doc['filename']}_{doc.get('file_size', 0)}_{conv_id}"
+                    if f'processed_doc_{file_key}' in st.session_state:
+                        del st.session_state[f'processed_doc_{file_key}']
+                    if f'processing_doc_{file_key}' in st.session_state:
+                        del st.session_state[f'processing_doc_{file_key}']
+                    
+                    st.success(f"✅ Removed {doc['filename']}")
                     st.rerun()
 
 def process_document_upload(uploaded_file):
     """Process uploaded document with enhanced features."""
+    # Check if this file has already been processed to prevent loops
+    file_key = f"{uploaded_file.name}_{uploaded_file.size}_{st.session_state.get('current_conversation_id', 'new')}"
+    
+    if st.session_state.get(f'processed_doc_{file_key}', False):
+        return  # Already processed, don't process again
+    
+    # Mark as being processed
+    st.session_state[f'processing_doc_{file_key}'] = True
+    
     with st.spinner(f"Processing {uploaded_file.name}..."):
         try:
             # Import document processing functions
@@ -671,17 +781,25 @@ def process_document_upload(uploaded_file):
                 success = save_document_to_conversation(uploaded_file, content)
                 
                 if success:
+                    # Mark as successfully processed
+                    st.session_state[f'processed_doc_{file_key}'] = True
+                    st.session_state[f'processing_doc_{file_key}'] = False
+                    
                     st.success(f"✅ Document processed: {uploaded_file.name}")
                     st.info(f"📄 Extracted {len(content)} characters of content")
-                    st.rerun()
+                    
+                    # Don't call st.rerun() here - let the natural flow handle it
                 else:
                     st.error("❌ Failed to save document")
+                    st.session_state[f'processing_doc_{file_key}'] = False
             else:
                 st.error("❌ Failed to process document")
+                st.session_state[f'processing_doc_{file_key}'] = False
                 
         except Exception as e:
             logger.error(f"Document upload error: {e}")
             st.error(f"❌ Error processing document: {e}")
+            st.session_state[f'processing_doc_{file_key}'] = False
 
 def process_chat_input(prompt):
     """Process chat input with enhanced features."""
