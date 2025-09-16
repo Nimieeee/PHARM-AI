@@ -954,8 +954,12 @@ def process_chat_input(prompt):
     """Process chat input with enhanced features."""
     logger.info(f"Processing user input: {prompt[:50]}...")
     
+    # DEBUG: Show that function is being called
+    st.info(f"🔄 Processing your message: {prompt[:50]}...")
+    
     # Prevent duplicate processing
     if st.session_state.get('processing_input', False):
+        st.warning("Already processing, please wait...")
         return
     
     st.session_state.processing_input = True
@@ -977,8 +981,15 @@ def process_chat_input(prompt):
         
         # Generate assistant response
         try:
+            logger.info("About to generate response...")
+            st.info("🤖 Generating AI response...")
+            
             # Generate response with enhanced context
             full_response = generate_enhanced_response(prompt)
+            logger.info(f"Generated response: {full_response[:100]}...")
+            
+            if not full_response or full_response.strip() == "":
+                full_response = f"I received your message: '{prompt}'. This is a test response to confirm the system is working."
             
             # Add assistant message to chat history
             assistant_message = {
@@ -987,6 +998,7 @@ def process_chat_input(prompt):
                 "timestamp": datetime.now().isoformat()
             }
             st.session_state.chat_messages.append(assistant_message)
+            logger.info(f"Added assistant message to chat. Total messages: {len(st.session_state.chat_messages)}")
             
             # Save conversation to database (simplified for now)
             # save_conversation_to_database()  # Disabled to avoid errors
@@ -1008,7 +1020,13 @@ def process_chat_input(prompt):
         # Always reset processing flag
         st.session_state.processing_input = False
         
-        # Note: Removed st.rerun() to prevent multiple executions
+        # Trigger rerun to display new messages (but only if not already processing)
+        if not st.session_state.get('rerun_triggered', False):
+            st.session_state.rerun_triggered = True
+            st.rerun()
+        else:
+            # Reset the flag for next time
+            st.session_state.rerun_triggered = False
 
 def generate_enhanced_response(prompt):
     """Generate enhanced AI response with document context."""
