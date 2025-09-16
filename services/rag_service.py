@@ -26,17 +26,22 @@ class RAGService:
     
     def __init__(self, default_full_document_mode: bool = True):
         # Initialize embeddings model (384 dimensions) - using new import
+        # Use the new langchain-huggingface package
         try:
             from langchain_huggingface import HuggingFaceEmbeddings
             self.embeddings = HuggingFaceEmbeddings(
                 model_name="all-MiniLM-L6-v2"
             )
+            logger.info("Using new langchain-huggingface embeddings")
         except ImportError:
-            # Fallback to old import for compatibility
-            from langchain_community.embeddings import HuggingFaceEmbeddings as SentenceTransformerEmbeddings
-            self.embeddings = SentenceTransformerEmbeddings(
+            # Fallback to old import for compatibility (with warning suppression)
+            import warnings
+            warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            self.embeddings = HuggingFaceEmbeddings(
                 model_name="all-MiniLM-L6-v2"
             )
+            logger.warning("Using deprecated langchain embeddings - consider upgrading to langchain-huggingface")
         
         # Initialize text splitter optimized for full document knowledge base
         self.text_splitter = RecursiveCharacterTextSplitter(

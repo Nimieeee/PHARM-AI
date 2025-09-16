@@ -961,6 +961,12 @@ def process_chat_input(prompt):
     st.session_state.processing_input = True
     
     try:
+        # Ensure we have a conversation ID
+        if not st.session_state.get('current_conversation_id'):
+            import uuid
+            st.session_state.current_conversation_id = str(uuid.uuid4())
+            logger.info(f"Created new conversation ID: {st.session_state.current_conversation_id}")
+        
         # Add user message to session state first
         user_message = {
             "role": "user", 
