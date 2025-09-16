@@ -1053,6 +1053,32 @@ def generate_enhanced_response(prompt):
         logger.error(f"Error in generate_enhanced_response: {e}")
         return f"Sorry, I encountered an error: {str(e)}"
 
+def get_conversation_context(prompt):
+    """Get document context for the current conversation."""
+    try:
+        # Check if we have documents in the current conversation
+        conv_id = st.session_state.get('current_conversation_id')
+        if not conv_id or 'conversation_documents' not in st.session_state:
+            return ""
+        
+        documents = st.session_state.conversation_documents.get(conv_id, [])
+        if not documents:
+            return ""
+        
+        # Build context from uploaded documents
+        context_parts = []
+        for doc in documents:
+            filename = doc.get('filename', 'Unknown')
+            content = doc.get('content', '')
+            if content and len(content.strip()) > 50:
+                context_parts.append(f"=== {filename} ===\n{content[:2000]}...")
+        
+        return "\n\n".join(context_parts) if context_parts else ""
+        
+    except Exception as e:
+        logger.error(f"Error getting conversation context: {e}")
+        return ""
+
 def is_useful_document_context(context):
     """Check if document context is useful and not just error messages."""
     if not context or len(context.strip()) < 50:
