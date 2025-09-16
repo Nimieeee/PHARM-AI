@@ -11,23 +11,29 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 def initialize_session_state():
-    """Initialize session state variables with enhanced security."""
+    """Initialize session state variables with optimized security checks."""
+    # Check if already initialized to avoid redundant work
+    if st.session_state.get('_session_initialized'):
+        return
+    
     logger.info("Initializing session state with security checks")
     
     # Import the enhanced validation
     try:
         from fix_user_isolation import enhanced_session_validation, initialize_secure_session
         
-        # Run enhanced validation
+        # Run enhanced validation (but cache the result)
         if enhanced_session_validation():
             # Initialize secure session if validation passed
             initialize_secure_session()
+            st.session_state._session_initialized = True
         else:
             logger.warning("Enhanced session validation failed")
             return
             
     except ImportError:
         logger.warning("Enhanced validation not available, using basic initialization")
+        st.session_state._session_initialized = True
         # Fallback to basic initialization
         basic_session_initialization()
     

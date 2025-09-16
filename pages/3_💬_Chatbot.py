@@ -28,18 +28,13 @@ st.set_page_config(
 )
 
 def main():
-    """Chatbot page entry point."""
+    """Chatbot page entry point with optimized performance."""
     # Initialize session state and authentication
     initialize_session_state()
     apply_theme()
     initialize_auth_session()
     
-    # CRITICAL: Validate user isolation to prevent seeing other users' messages
-    from fix_user_isolation import enhanced_session_validation
-    if not enhanced_session_validation():
-        return  # Will redirect to login if validation fails
-    
-    # Check authentication
+    # Check authentication first (faster than validation)
     if not st.session_state.get('authenticated'):
         st.error("🔐 Please sign in to access the chatbot.")
         col1, col2, col3 = st.columns([1, 2, 1])
@@ -50,14 +45,23 @@ def main():
                 st.switch_page("app.py")
         return
     
+    # CRITICAL: Validate user isolation (but only once per session)
+    validation_cache_key = f"session_validated_{st.session_state.get('session_id')}"
+    if not st.session_state.get(validation_cache_key):
+        from fix_user_isolation import enhanced_session_validation
+        if not enhanced_session_validation():
+            return  # Will redirect to login if validation fails
+        st.session_state[validation_cache_key] = True
+    
     # Render the chatbot interface
     render_chatbot_interface()
 
 def render_chatbot_interface():
-    """Render the enhanced chatbot interface with full functionality."""
+    """Render the enhanced chatbot interface with optimized performance."""
     
-    # Load user conversations
-    load_user_conversations()
+    # Load user conversations only when needed (lazy loading)
+    if not st.session_state.get('conversations'):
+        load_user_conversations()
     
     # Enhanced sidebar for conversation management
     render_enhanced_sidebar()
@@ -66,23 +70,33 @@ def render_chatbot_interface():
     render_main_chat_area()
 
 def load_user_conversations():
-    """Load user conversations from database with proper user isolation."""
+    """Load user conversations from database with proper user isolation and caching."""
     if not st.session_state.get('authenticated') or not st.session_state.get('user_id'):
+        return
+    
+    # Check if conversations are already loaded and cached
+    cache_key = f"conversations_loaded_{st.session_state.user_id}"
+    if st.session_state.get(cache_key) and st.session_state.get('conversations'):
+        logger.info("Using cached conversations")
         return
     
     try:
         # Use the secure conversation loading function
         from fix_user_isolation import load_user_conversations_safely, ensure_user_isolation
         
-        # Validate user isolation first
-        if not ensure_user_isolation():
-            logger.error("User isolation validation failed!")
-            st.session_state.conversations = {}
-            return
+        # Validate user isolation first (but cache the result)
+        isolation_cache_key = f"isolation_validated_{st.session_state.user_id}"
+        if not st.session_state.get(isolation_cache_key):
+            if not ensure_user_isolation():
+                logger.error("User isolation validation failed!")
+                st.session_state.conversations = {}
+                return
+            st.session_state[isolation_cache_key] = True
         
         # Load conversations safely
         conversations = load_user_conversations_safely()
         st.session_state.conversations = conversations
+        st.session_state[cache_key] = True
         logger.info(f"Safely loaded {len(conversations)} conversations for user: {st.session_state.username}")
     except Exception as e:
         logger.error(f"Failed to load conversations: {e}")

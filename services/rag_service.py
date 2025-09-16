@@ -25,23 +25,9 @@ class RAGService:
     """Advanced RAG service with LangChain and pgvector - Full Document Processing by Default."""
     
     def __init__(self, default_full_document_mode: bool = True):
-        # Initialize embeddings model (384 dimensions) - using new import
-        # Use the new langchain-huggingface package
-        try:
-            from langchain_huggingface import HuggingFaceEmbeddings
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name="all-MiniLM-L6-v2"
-            )
-            logger.info("Using new langchain-huggingface embeddings")
-        except ImportError:
-            # Fallback to old import for compatibility (with warning suppression)
-            import warnings
-            warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
-            from langchain_community.embeddings import HuggingFaceEmbeddings
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name="all-MiniLM-L6-v2"
-            )
-            logger.warning("Using deprecated langchain embeddings - consider upgrading to langchain-huggingface")
+        # Lazy initialization - only initialize embeddings when needed
+        self.embeddings = None
+        self._embeddings_initialized = False
         
         # Initialize text splitter optimized for full document knowledge base
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -61,11 +47,34 @@ class RAGService:
         
         # Set default processing mode
         self.default_full_document_mode = default_full_document_mode
-        logger.info("RAG Service initialized")
+        logger.info("RAG Service initialized (lazy mode)")
         
         # Import Supabase connection
         from supabase_manager import connection_manager
         self.db = connection_manager
+    
+    def _initialize_embeddings(self):
+        """Initialize embeddings model only when needed (lazy loading)."""
+        if self._embeddings_initialized:
+            return
+        
+        try:
+            from langchain_huggingface import HuggingFaceEmbeddings
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2"
+            )
+            logger.info("Using new langchain-huggingface embeddings")
+        except ImportError:
+            # Fallback to old import for compatibility (with warning suppression)
+            import warnings
+            warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
+            from langchain_community.embeddings import HuggingFaceEmbeddings
+            self.embeddings = HuggingFaceEmbeddings(
+                model_name="all-MiniLM-L6-v2"
+            )
+            logger.warning("Using deprecated langchain embeddings - consider upgrading to langchain-huggingface")
+        
+        self._embeddings_initialized = True
     
     async def process_document(
         self, 
@@ -240,6 +249,9 @@ class RAGService:
     async def _generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         """Generate embeddings for a list of texts."""
         try:
+            # Initialize embeddings if not already done
+            self._initialize_embeddings()
+            
             # Run embedding generation in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
             embeddings = await loop.run_in_executor(
@@ -264,6 +276,9 @@ class RAGService:
         """Search for similar document chunks using semantic similarity."""
         try:
             logger.info(f"Searching for similar chunks: '{query[:50]}...'")
+            
+            # Initialize embeddings if not already done
+            self._initialize_embeddings()
             
             # Generate embedding for query
             loop = asyncio.get_event_loop()
