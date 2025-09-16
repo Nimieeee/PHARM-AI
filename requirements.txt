@@ -3,6 +3,7 @@ streamlit>=1.28.0
 
 # AI and OpenAI-compatible APIs
 openai>=1.0.0
+groq>=0.4.0
 
 # LangChain for advanced RAG
 langchain>=0.1.0
