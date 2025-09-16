@@ -177,42 +177,51 @@ class RAGService:
     
     async def _insert_chunk_with_retry(self, chunk_data: dict, max_retries: int = 3) -> bool:
         """Insert chunk with retry logic for RLS issues."""
+        
+        # Ensure user_uuid is properly formatted
+        if 'user_uuid' in chunk_data and chunk_data['user_uuid']:
+            try:
+                import uuid
+                # Validate and ensure proper UUID format
+                if isinstance(chunk_data['user_uuid'], str):
+                    uuid_obj = uuid.UUID(chunk_data['user_uuid'])
+                    chunk_data['user_uuid'] = str(uuid_obj)
+            except ValueError as e:
+                logger.error(f"Invalid UUID format: {chunk_data['user_uuid']} - {e}")
+                return False
+        
         for attempt in range(max_retries):
             try:
+                # Set user context before insertion
+                if 'user_uuid' in chunk_data:
+                    await self.db.execute_rpc('set_user_context', {'user_uuid_param': chunk_data['user_uuid']})
+                
                 result = await self.db.execute_query(
                     'document_chunks',
                     'insert',
                     data=chunk_data
                 )
                 
-                if result.data:
+                if result and hasattr(result, 'data') and result.data:
+                    logger.debug(f"Successfully inserted chunk on attempt {attempt + 1}")
                     return True
                 else:
                     logger.warning(f"Insert attempt {attempt + 1} failed - no data returned")
                     
             except Exception as e:
                 error_msg = str(e)
+                logger.error(f"Insert attempt {attempt + 1} failed: {error_msg}")
                 
-                # Check for RLS policy violation
-                if "row-level security policy" in error_msg.lower():
-                    logger.error(f"RLS policy violation on attempt {attempt + 1}: {error_msg}")
-                    
-                    # Try to fix user_uuid format
-                    if attempt < max_retries - 1:
-                        # Ensure user_uuid is properly formatted
-                        if isinstance(chunk_data['user_uuid'], str):
-                            try:
-                                import uuid
-                                # Validate and reformat UUID
-                                uuid_obj = uuid.UUID(chunk_data['user_uuid'])
-                                chunk_data['user_uuid'] = str(uuid_obj)
-                                logger.info(f"Reformatted user_uuid for retry {attempt + 2}")
-                                continue
-                            except ValueError:
-                                logger.error(f"Invalid UUID format: {chunk_data['user_uuid']}")
-                                break
-                else:
-                    logger.error(f"Insert attempt {attempt + 1} failed: {error_msg}")
+                # Check for specific error types
+                if "relation \"document_chunks\" does not exist" in error_msg.lower():
+                    logger.error("document_chunks table does not exist! Please run the database migration.")
+                    return False
+                elif "row-level security policy" in error_msg.lower():
+                    logger.error(f"RLS policy violation on attempt {attempt + 1}")
+                    # Continue to retry
+                elif "permission denied" in error_msg.lower():
+                    logger.error("Permission denied - check database permissions")
+                    return False
                 
                 if attempt == max_retries - 1:
                     logger.error(f"All {max_retries} insert attempts failed for chunk")

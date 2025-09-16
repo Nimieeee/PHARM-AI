@@ -11,9 +11,44 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 def initialize_session_state():
-    """Initialize session state variables."""
-    logger.info("Initializing session state")
+    """Initialize session state variables with enhanced security."""
+    logger.info("Initializing session state with security checks")
     
+    # Import the enhanced validation
+    try:
+        from fix_user_isolation import enhanced_session_validation, initialize_secure_session
+        
+        # Run enhanced validation
+        if enhanced_session_validation():
+            # Initialize secure session if validation passed
+            initialize_secure_session()
+        else:
+            logger.warning("Enhanced session validation failed")
+            return
+            
+    except ImportError:
+        logger.warning("Enhanced validation not available, using basic initialization")
+        # Fallback to basic initialization
+        basic_session_initialization()
+    
+    # Initialize other session variables
+    if "theme_mode" not in st.session_state:
+        st.session_state.theme_mode = "light"
+    
+    if "current_page" not in st.session_state:
+        if st.session_state.authenticated:
+            st.session_state.current_page = "chatbot"
+        else:
+            st.session_state.current_page = "homepage"
+    
+    if "current_conversation_id" not in st.session_state:
+        st.session_state.current_conversation_id = None
+    
+    if "conversation_counter" not in st.session_state:
+        st.session_state.conversation_counter = 0
+
+def basic_session_initialization():
+    """Basic session initialization without enhanced security."""
     # Initialize conversations to an empty dict if not present
     if "conversations" not in st.session_state:
         st.session_state.conversations = {}

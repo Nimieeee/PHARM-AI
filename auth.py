@@ -252,15 +252,23 @@ def load_user_conversations(user_id: str) -> Dict:
         from services.user_service import user_service
         from services.conversation_service import get_user_conversations_sync
         
+        logger.info(f"Loading conversations for user_id: {user_id}")
+        
         # Get user UUID from legacy user_id
         user_data = run_async(user_service.get_user_by_id(user_id))
         if not user_data:
+            logger.warning(f"User not found for user_id: {user_id}")
             return {}
         
+        logger.info(f"Found user: {user_data['username']} (UUID: {user_data['id']})")
+        
+        # Load conversations with proper user isolation
         conversations = get_user_conversations_sync(user_data['id'])
+        
+        logger.info(f"Loaded {len(conversations)} conversations for user {user_data['username']}")
         return conversations
     except Exception as e:
-        logger.error(f"Error loading conversations: {e}")
+        logger.error(f"Error loading conversations for user {user_id}: {e}")
         return {}
 
 def save_user_conversations(user_id: str, conversations: Dict):
