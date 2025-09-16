@@ -67,7 +67,7 @@ def render_authenticated_navigation():
         # Admin Dashboard button (only for admin user)
         if st.session_state.get('username') == 'admin':
             if st.button("🛠️ Admin Dashboard", use_container_width=True):
-                st.switch_page("pages/99_admin_dashboard.py")
+                st.switch_page("admin_dashboard.py")
         
         # Logout button
         if st.button("🚪 Logout", use_container_width=True):
