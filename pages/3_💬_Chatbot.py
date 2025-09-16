@@ -90,6 +90,15 @@ def render_enhanced_sidebar():
                 logout_current_user()
                 st.switch_page("app.py")
         
+        # Contact Support button
+        if st.button("📞 Contact Support", use_container_width=True):
+            st.switch_page("pages/4_📞_Contact_Support.py")
+        
+        # Admin access (only for admin user)
+        if st.session_state.get('username') == 'admin':
+            if st.button("🛠️ Admin Dashboard", use_container_width=True):
+                st.switch_page("pages/nimi_admin.py")
+        
         st.markdown("---")
         
         # New conversation button

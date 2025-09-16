@@ -42,7 +42,7 @@ def authenticate_admin():
             
             if submitted:
                 # Simple hardcoded admin check (in production, use proper authentication)
-                if username == "nimi" and password == "admin123":
+                if username == "admin" and password == "Equanimity465@":
                     st.session_state.admin_authenticated = True
                     st.success("✅ Authentication successful!")
                     st.rerun()
@@ -73,7 +73,7 @@ def main():
     st.caption("Secure Admin Access - Support Ticket Management")
     
     # Admin info banner
-    st.success("✅ **Admin Access Granted** - Welcome, Nimi!")
+    st.success("✅ **Admin Access Granted** - Welcome, Admin!")
     
     # Navigation and logout
     col1, col2 = st.columns(2)

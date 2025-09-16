@@ -19,27 +19,38 @@ def render_sidebar():
         
         # App title/logo
         st.markdown("# 💊 PharmGPT")
+        st.markdown(f"**Welcome, {st.session_state.get('username', 'User')}!**")
+        
+        # Navigation buttons
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🏠 Home", use_container_width=True):
+                st.switch_page("app.py")
+        with col2:
+            if st.button("🚪 Sign Out", use_container_width=True, type="secondary"):
+                # Only sign out if we're not generating a response
+                if not st.session_state.get('generating_response', False):
+                    logout_current_user()
+                    st.session_state.current_page = "homepage"
+                    try:
+                        if hasattr(st, 'switch_page'):
+                            st.switch_page("app.py")
+                        else:
+                            st.rerun()
+                    except Exception as e:
+                        logger.warning(f"Page switch failed: {e}")
+                        st.rerun()
+                else:
+                    st.warning("⚠️ Please wait for the current response to complete before signing out.")
         
         # Contact Support button
         if st.button("📞 Contact Support", use_container_width=True):
             st.switch_page("pages/4_📞_Contact_Support.py")
         
-        # Sign out button
-        if st.button("🚪 Sign Out", use_container_width=True, type="secondary"):
-            # Only sign out if we're not generating a response
-            if not st.session_state.get('generating_response', False):
-                logout_current_user()
-                st.session_state.current_page = "homepage"
-                try:
-                    if hasattr(st, 'switch_page'):
-                        st.switch_page("pages/1_🏠_Homepage.py")
-                    else:
-                        st.rerun()
-                except Exception as e:
-                    logger.warning(f"Page switch failed: {e}")
-                    st.rerun()
-            else:
-                st.warning("⚠️ Please wait for the current response to complete before signing out.")
+        # Admin access (only for admin user)
+        if st.session_state.get('username') == 'admin':
+            if st.button("🛠️ Admin Dashboard", use_container_width=True):
+                st.switch_page("pages/nimi_admin.py")
         
         st.markdown("---")
         
