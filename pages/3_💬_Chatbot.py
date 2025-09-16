@@ -954,12 +954,8 @@ def process_chat_input(prompt):
     """Process chat input with enhanced features."""
     logger.info(f"Processing user input: {prompt[:50]}...")
     
-    # DEBUG: Show that function is being called
-    st.info(f"🔄 Processing your message: {prompt[:50]}...")
-    
     # Prevent duplicate processing
     if st.session_state.get('processing_input', False):
-        st.warning("Already processing, please wait...")
         return
     
     st.session_state.processing_input = True
@@ -981,15 +977,11 @@ def process_chat_input(prompt):
         
         # Generate assistant response
         try:
-            logger.info("About to generate response...")
-            st.info("🤖 Generating AI response...")
-            
             # Generate response with enhanced context
             full_response = generate_enhanced_response(prompt)
-            logger.info(f"Generated response: {full_response[:100]}...")
             
             if not full_response or full_response.strip() == "":
-                full_response = f"I received your message: '{prompt}'. This is a test response to confirm the system is working."
+                full_response = "I apologize, but I couldn't generate a response. Please try again."
             
             # Add assistant message to chat history
             assistant_message = {
@@ -1050,15 +1042,22 @@ def generate_enhanced_response(prompt):
         # Get document context
         document_context = get_conversation_context(prompt)
         
-        # SIMPLIFIED APPROACH - Remove document context temporarily to isolate the issue
-        # Use basic system prompt only
-        enhanced_system_prompt = pharmacology_system_prompt
-        
-        # Prepare messages for API - SIMPLIFIED (no conversation history for now)
-        api_messages = [
-            {"role": "system", "content": enhanced_system_prompt},
-            {"role": "user", "content": prompt}
-        ]
+        # Use RAG-enhanced prompt if we have document context
+        if document_context and is_useful_document_context(document_context):
+            from prompts import get_rag_enhanced_prompt
+            enhanced_system_prompt = get_rag_enhanced_prompt(prompt, document_context)
+            
+            # For RAG-enhanced prompt, we use it as the system message
+            api_messages = [
+                {"role": "system", "content": enhanced_system_prompt}
+            ]
+        else:
+            # Use basic pharmacology prompt
+            enhanced_system_prompt = pharmacology_system_prompt
+            api_messages = [
+                {"role": "system", "content": enhanced_system_prompt},
+                {"role": "user", "content": prompt}
+            ]
         
         logger.info(f"Sending to model: {model}")
         logger.info(f"System prompt length: {len(enhanced_system_prompt)}")
