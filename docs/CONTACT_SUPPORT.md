@@ -88,7 +88,7 @@ user_data/
 ### For Developers/Admins
 
 1. **Viewing Tickets**:
-   - Access `pages/admin_support.py` (development only)
+   - Access `pages/nimi_admin.py` (secure admin only)
    - View dashboard with ticket statistics
    - Filter and manage tickets
    - Export ticket data

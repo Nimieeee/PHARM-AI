@@ -368,7 +368,7 @@ def render_rename_dialog():
             st.session_state.show_rename_dialog = False
             st.rerun()
 
-# Document processing functions (copied from pages/chatbot.py to fix import issues)
+# Document processing functions
 
 def process_uploaded_document_multipage(uploaded_file):
     """Process uploaded document and return text content with enhanced support for images and PPTX."""
