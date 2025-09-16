@@ -94,10 +94,12 @@ def render_enhanced_sidebar():
         if st.button("📞 Contact Support", use_container_width=True):
             st.switch_page("pages/4_📞_Contact_Support.py")
         
-        # Admin Dashboard button (only for admin user)
+        # Admin Panel access (only for admin user)
         if st.session_state.get('username') == 'admin':
-            if st.button("🛠️ Admin Dashboard", use_container_width=True):
-                st.switch_page("admin_dashboard.py")
+            if st.button("🛠️ Admin Panel", use_container_width=True):
+                # Set admin mode flag and redirect to contact support page
+                st.session_state.admin_mode = True
+                st.switch_page("pages/4_📞_Contact_Support.py")
         
         st.markdown("---")
         
