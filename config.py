@@ -36,10 +36,10 @@ def get_model_configs():
     
     return {
         "normal": {
-            "model": "meta-llama/llama-4-maverick-17b-128e-instruct",
+            "model": "gemma2-9b-it",
             "api_key": groq_key,
             "base_url": "https://api.groq.com/openai/v1",
-            "description": "Llama 4 Maverick (Balanced)"
+            "description": "Gemma2 9B Instruct (Balanced)"
         },
         "turbo": {
             "model": "openrouter/sonoma-sky-alpha",
