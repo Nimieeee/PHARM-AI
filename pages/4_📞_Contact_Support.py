@@ -708,6 +708,5 @@ def render_admin_statistics():
             st.success(f"✅ Tickets exported to: {export_file}")
         else:
             st.error("❌ Failed to export tickets")
-if _
-_name__ == "__main__":
+if __name__ == "__main__":
     main()
