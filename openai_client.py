@@ -36,10 +36,10 @@ def get_model_configs():
             "description": "Gemma2 9B Instruct (Balanced)"
         },
         "turbo": {
-            "model": "openrouter/sonoma-sky-alpha",
-            "api_key": openrouter_key,
-            "base_url": "https://openrouter.ai/api/v1",
-            "description": "Sonoma Sky Alpha (Fast)"
+            "model": "openai/gpt-oss-120b",
+            "api_key": groq_key,
+            "base_url": "https://api.groq.com/openai/v1",
+            "description": "GPT OSS 120B (Ultra Fast & Powerful)"
         }
     }
 
