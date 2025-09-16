@@ -102,7 +102,14 @@ def render_contact_support():
     </style>
     """, unsafe_allow_html=True)
     
-    # Header
+    # Header with logo
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        try:
+            st.image("pharmGPT.png", width=200)
+        except:
+            pass  # If logo not found, continue without it
+    
     st.markdown("""
     <div class="support-header">
         <h1>📞 Contact Support</h1>
@@ -406,7 +413,6 @@ def render_system_info():
     
     # Environment info
     st.markdown("#### Environment")
-    import streamlit as st
     import sys
     import platform
     

@@ -1,5 +1,6 @@
 """
-Admin Support Dashboard (Secure Access Only)
+Secure Admin Support Dashboard
+Access via: https://your-app.streamlit.app/nimi_admin
 """
 
 import streamlit as st
@@ -11,29 +12,51 @@ from utils.theme import apply_theme
 
 # Page configuration
 st.set_page_config(
-    page_title="Support Admin Dashboard",
+    page_title="PharmGPT Admin Dashboard",
     page_icon="🛠️",
     layout="wide"
 )
 
-def check_admin_access():
-    """Check if user has admin access."""
-    # Get URL parameters
-    query_params = st.query_params
+def authenticate_admin():
+    """Simple admin authentication."""
+    if 'admin_authenticated' not in st.session_state:
+        st.session_state.admin_authenticated = False
     
-    # Check for admin access key
-    if query_params.get("admin") != "nimi_admin":
-        st.error("🚫 **Access Denied**")
-        st.markdown("This page requires admin credentials.")
-        st.markdown("If you're looking for support, please visit our [Contact Support](/4_📞_Contact_Support) page.")
+    if not st.session_state.admin_authenticated:
+        st.title("🔐 Admin Authentication")
+        
+        # Logo
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            try:
+                st.image("pharmGPT.png", width=200)
+            except:
+                pass
+        
+        st.markdown("### Enter Admin Credentials")
+        
+        with st.form("admin_login"):
+            username = st.text_input("Username")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Login")
+            
+            if submitted:
+                # Simple hardcoded admin check (in production, use proper authentication)
+                if username == "nimi" and password == "admin123":
+                    st.session_state.admin_authenticated = True
+                    st.success("✅ Authentication successful!")
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid credentials")
+        
+        st.markdown("---")
+        st.info("If you're looking for user support, please visit our [Contact Support](/4_📞_Contact_Support) page.")
         st.stop()
-    
-    return True
 
 def main():
     """Main admin support dashboard."""
-    # Check admin access first
-    check_admin_access()
+    # Authenticate admin first
+    authenticate_admin()
     
     initialize_session_state()
     apply_theme()
@@ -46,15 +69,21 @@ def main():
         except:
             pass
     
-    st.title("🛠️ Support Admin Dashboard")
-    st.caption("Secure Admin Access - View and manage support tickets")
+    st.title("🛠️ PharmGPT Admin Dashboard")
+    st.caption("Secure Admin Access - Support Ticket Management")
     
     # Admin info banner
-    st.success("✅ **Admin Access Granted** - You have full access to support management tools.")
+    st.success("✅ **Admin Access Granted** - Welcome, Nimi!")
     
-    # Navigation
-    if st.button("🏠 Back to App"):
-        st.switch_page("app.py")
+    # Navigation and logout
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🏠 Back to App"):
+            st.switch_page("app.py")
+    with col2:
+        if st.button("🚪 Logout"):
+            st.session_state.admin_authenticated = False
+            st.rerun()
     
     st.markdown("---")
     
