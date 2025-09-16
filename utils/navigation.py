@@ -110,16 +110,13 @@ def render_conversation_sidebar():
             
             if ocr_status['ocr_working']:
                 st.success("✅ OCR Available")
-                if ocr_status['easyocr_available']:
-                    st.info("📱 EasyOCR: Ready")
-                if ocr_status['tesseract_available']:
-                    st.info("🔧 Tesseract: Ready")
+                st.info("🔧 Tesseract: Ready")
             else:
-                st.warning("⚠️ OCR Not Available")
-                st.info("Install: pip install easyocr")
+                st.info("ℹ️ OCR Not Available")
+                st.caption("Text extraction from images is not available")
                 
-        except Exception as e:
-            st.error("❌ OCR Status Unknown")
+        except Exception:
+            st.info("ℹ️ OCR Status Unknown")
     
     # Tips
     with st.expander("💡 Tips"):

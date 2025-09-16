@@ -26,8 +26,11 @@ class OCRManager:
             pytesseract.get_tesseract_version()
             logger.info("✅ Tesseract OCR available")
             return True
-        except (ImportError, Exception) as e:
-            logger.warning(f"⚠️ Tesseract OCR not available: {e}")
+        except ImportError:
+            logger.debug("Tesseract OCR not installed")
+            return False
+        except Exception:
+            logger.debug("Tesseract OCR not available")
             return False
     
     def extract_text_from_image(self, image_path: str, image_info: str = "") -> str:
