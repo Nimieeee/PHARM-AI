@@ -106,9 +106,9 @@ def render_contact_support():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            st.image("pharmGPT.png", width=200)
+            st.image("pharmGPT.png", width=150)
         except:
-            pass  # If logo not found, continue without it
+            st.markdown("# 💊 PharmGPT")  # Fallback if logo not found
     
     st.markdown("""
     <div class="support-header">
@@ -117,6 +117,8 @@ def render_contact_support():
         <p>Get assistance with PharmGPT or report any issues</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
     
     # Navigation back to main app
     col1, col2, col3 = st.columns([1, 2, 1])
@@ -237,20 +239,39 @@ def render_support_ticket_form():
             # Add name if not authenticated
             if not st.session_state.get('authenticated', False):
                 ticket_data['contact_name'] = contact_name
+            else:
+                ticket_data['contact_name'] = st.session_state.get('username', 'User')
             
             # Save ticket
             ticket_id = save_support_ticket(ticket_data)
             
             if ticket_id:
+                # Send confirmation email
+                from utils.email_manager import send_ticket_confirmation
+                email_sent = send_ticket_confirmation(ticket_data)
+                
                 st.success(f"✅ **Support ticket submitted successfully!**")
                 st.info(f"**Ticket ID**: {ticket_id}")
+                
+                if email_sent:
+                    st.success(f"📧 **Confirmation email sent to**: {contact_email}")
+                else:
+                    st.warning("⚠️ Ticket saved but confirmation email failed to send")
+                
                 st.markdown("""
                 **What happens next?**
-                - You'll receive an email confirmation shortly
+                - You should receive an email confirmation shortly
                 - Our support team will review your ticket
                 - We typically respond within 24-48 hours
                 - You can reference your ticket ID in future communications
                 """)
+                
+                # Show confirmation preview
+                with st.expander("📧 Email Confirmation Preview"):
+                    from utils.email_manager import get_confirmation_template
+                    confirmation_text = get_confirmation_template(ticket_data)
+                    st.text(confirmation_text)
+                    
             else:
                 st.error("❌ Failed to submit ticket. Please try again or contact us directly.")
 
@@ -293,7 +314,7 @@ def render_faq_section():
         },
         {
             "question": "Why am I getting slow responses?",
-            "answer": "Response speed depends on your internet connection and the complexity of your question. Try using Turbo mode for faster responses, or check your internet connection."
+            "answer": "Response speed depends on your internet connection and the complexity of your question."
         },
         {
             "question": "Can I export my conversation history?",
