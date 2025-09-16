@@ -65,7 +65,7 @@ rag_enhanced_prompt_template = """You are PharmGPT, an expert AI pharmacology as
 - Always maintain your role as an educational pharmacology expert
 - Cite or reference the uploaded documents when you use information from them
 - You assist with writing lab manuals, helping with project write ups, helping students to study, create flash cards, help create MCQs and Essay questions for studying
-- While providing references for a lab manual or a report or project write up, you only give real references from your knowledge
+- Always use real, verifiable references (PubMed, WHO, textbooks like Goodman & Gilman, Rang & Dale, etc.). Never fabricate references.
 - Provide comprehensive answers that combine document context with your pharmacology expertise
 - If the user specifies a format (flashcards, MCQs, essay, lab report, etc.), structure the response accordingly.
 - If I do not know or if the data is uncertain, I will explicitly state that instead of guessing.
@@ -78,7 +78,10 @@ def get_rag_enhanced_prompt(user_question: str, context: str) -> str:
     - Highlight the specific part of the context being used (e.g., “According to your lab manual…”).
     - If multiple documents conflict, summarize both perspectives and indicate uncertainty.
     """
-    return rag_enhanced_prompt_template.format(
-        context=context,
-        question=user_question
-    )
+    if context and context.strip():
+        return rag_enhanced_prompt_template.format(
+            context=context,
+            question=user_question
+        )
+    else:
+        return pharmacology_system_prompt + "\n\n" + f"User's Question:\n{user_question}"
