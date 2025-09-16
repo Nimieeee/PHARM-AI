@@ -42,10 +42,10 @@ def get_model_configs():
             "description": "Gemma2 9B Instruct (Balanced)"
         },
         "turbo": {
-            "model": "openrouter/sonoma-sky-alpha",
+            "model": "meta-llama/llama-3.1-8b-instruct:free",
             "api_key": openrouter_key,
             "base_url": "https://openrouter.ai/api/v1",
-            "description": "Sonoma Sky Alpha (Fast)"
+            "description": "Llama 3.1 8B (Fast & Free)"
         }
     }
 
