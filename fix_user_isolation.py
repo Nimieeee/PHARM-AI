@@ -15,10 +15,16 @@ def ensure_user_isolation():
     if hasattr(st.session_state, '_session_cache'):
         delattr(st.session_state, '_session_cache')
     
-    # 2. Validate current session
+    # 2. Force clear conversations cache to prevent cross-user contamination
+    if 'conversations' in st.session_state:
+        st.session_state.conversations = {}
+    
+    # 3. Validate current session
     if st.session_state.get('authenticated') and st.session_state.get('session_id'):
         try:
-            from auth import validate_session, get_user_uuid
+            from auth import validate_session
+            from services.user_service import user_service
+            import asyncio
             
             # Re-validate session
             username = validate_session(st.session_state.session_id)
@@ -33,18 +39,25 @@ def ensure_user_isolation():
                 clear_user_state()
                 return False
             
-            # Ensure user_id is correct
-            correct_user_uuid = get_user_uuid(username)
-            if not correct_user_uuid:
-                logger.error(f"Could not get UUID for user: {username}")
+            # Get correct user data from database
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            user_data = loop.run_until_complete(user_service.get_user_by_username(username))
+            if not user_data:
+                logger.error(f"Could not get user data for: {username}")
                 clear_user_state()
                 return False
             
             # Update session state with correct data
             st.session_state.username = username
-            st.session_state.user_uuid = correct_user_uuid
+            st.session_state.user_id = user_data['legacy_id']
+            st.session_state.user_uuid = user_data['id']
             
-            logger.info(f"User isolation validated for: {username} (UUID: {correct_user_uuid})")
+            logger.info(f"User isolation validated for: {username} (ID: {user_data['legacy_id']}, UUID: {user_data['id']})")
             return True
             
         except Exception as e:
@@ -77,23 +90,38 @@ def load_user_conversations_safely():
         return {}
     
     try:
-        from auth import load_user_conversations
+        from services.conversation_service import conversation_service
+        from services.user_service import user_service
+        import asyncio
         
         # Ensure we have proper user identification
         if not st.session_state.get('user_id'):
             logger.error("No user_id in session state")
             return {}
         
-        # Load conversations for the specific user
-        conversations = load_user_conversations(st.session_state.user_id)
+        # Get user UUID from legacy user_id
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
         
-        # Validate that conversations belong to current user
+        user_data = loop.run_until_complete(user_service.get_user_by_id(st.session_state.user_id))
+        if not user_data:
+            logger.error(f"User not found: {st.session_state.user_id}")
+            return {}
+        
+        # Load conversations using the secure service with user UUID
+        conversations = loop.run_until_complete(conversation_service.get_user_conversations(user_data['id']))
+        
+        # Additional validation - ensure all conversations belong to this user
         validated_conversations = {}
         for conv_id, conv_data in conversations.items():
-            # Additional validation could be added here
-            validated_conversations[conv_id] = conv_data
+            # Only include conversations that have proper structure
+            if isinstance(conv_data, dict) and 'messages' in conv_data:
+                validated_conversations[conv_id] = conv_data
         
-        logger.info(f"Safely loaded {len(validated_conversations)} conversations")
+        logger.info(f"Safely loaded {len(validated_conversations)} conversations for user: {st.session_state.username}")
         return validated_conversations
         
     except Exception as e:
@@ -103,9 +131,8 @@ def load_user_conversations_safely():
 def initialize_secure_session():
     """Initialize session with security checks."""
     
-    # Clear any potentially stale data
-    if 'conversations' in st.session_state:
-        st.session_state.conversations = {}
+    # Clear ALL potentially stale data to prevent cross-user contamination
+    clear_all_user_data()
     
     # Validate user isolation
     if ensure_user_isolation():
@@ -114,6 +141,28 @@ def initialize_secure_session():
         logger.info("Secure session initialized successfully")
     else:
         logger.info("Session validation failed, user not authenticated")
+
+def clear_all_user_data():
+    """Clear all user-specific data to prevent cross-contamination."""
+    # Clear conversations and related data
+    st.session_state.conversations = {}
+    st.session_state.current_conversation_id = None
+    st.session_state.chat_messages = []
+    
+    # Clear document data
+    if 'conversation_documents' in st.session_state:
+        st.session_state.conversation_documents = {}
+    
+    # Clear any cached data
+    keys_to_remove = []
+    for key in st.session_state.keys():
+        if any(cache_key in key for cache_key in ['conversations_loaded_', 'isolation_validated_', 'processed_doc_', 'processing_doc_']):
+            keys_to_remove.append(key)
+    
+    for key in keys_to_remove:
+        del st.session_state[key]
+    
+    logger.info("All user data cleared for secure session initialization")
 
 # Add this to your session initialization
 def enhanced_session_validation():

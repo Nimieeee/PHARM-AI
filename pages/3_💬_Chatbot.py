@@ -45,13 +45,10 @@ def main():
                 st.switch_page("app.py")
         return
     
-    # CRITICAL: Validate user isolation (but only once per session)
-    validation_cache_key = f"session_validated_{st.session_state.get('session_id')}"
-    if not st.session_state.get(validation_cache_key):
-        from fix_user_isolation import enhanced_session_validation
-        if not enhanced_session_validation():
-            return  # Will redirect to login if validation fails
-        st.session_state[validation_cache_key] = True
+    # CRITICAL: Validate user isolation (ALWAYS - no caching for security)
+    from fix_user_isolation import enhanced_session_validation
+    if not enhanced_session_validation():
+        return  # Will redirect to login if validation fails
     
     # Render the chatbot interface
     render_chatbot_interface()
@@ -74,30 +71,26 @@ def load_user_conversations():
     if not st.session_state.get('authenticated') or not st.session_state.get('user_id'):
         return
     
-    # Check if conversations are already loaded and cached
-    cache_key = f"conversations_loaded_{st.session_state.user_id}"
-    if st.session_state.get(cache_key) and st.session_state.get('conversations'):
-        logger.info("Using cached conversations")
-        return
-    
     try:
-        # Use the secure conversation loading function
+        # ALWAYS validate user isolation first - no caching for security
         from fix_user_isolation import load_user_conversations_safely, ensure_user_isolation
         
-        # Validate user isolation first (but cache the result)
-        isolation_cache_key = f"isolation_validated_{st.session_state.user_id}"
-        if not st.session_state.get(isolation_cache_key):
-            if not ensure_user_isolation():
-                logger.error("User isolation validation failed!")
-                st.session_state.conversations = {}
-                return
-            st.session_state[isolation_cache_key] = True
+        # Force user isolation validation every time
+        if not ensure_user_isolation():
+            logger.error("User isolation validation failed!")
+            st.session_state.conversations = {}
+            return
         
-        # Load conversations safely
+        # Load conversations safely - always fresh to prevent cross-user contamination
         conversations = load_user_conversations_safely()
         st.session_state.conversations = conversations
-        st.session_state[cache_key] = True
+        
         logger.info(f"Safely loaded {len(conversations)} conversations for user: {st.session_state.username}")
+        
+        # Log conversation IDs for debugging (first 8 chars only)
+        conv_ids = [conv_id[:8] + "..." for conv_id in conversations.keys()]
+        logger.info(f"Conversation IDs: {conv_ids}")
+        
     except Exception as e:
         logger.error(f"Failed to load conversations: {e}")
         st.session_state.conversations = {}
@@ -689,6 +682,11 @@ def render_main_chat_area():
     
     # Fixed bottom input area
     render_bottom_input_area()
+    
+    # Force refresh if we just added a message
+    if st.session_state.get('force_refresh', False):
+        st.session_state.force_refresh = False
+        st.rerun()
 
 def render_chat_header():
     """Render the chat header with conversation title."""
@@ -979,7 +977,7 @@ def process_document_upload(uploaded_file):
             st.session_state[f'processing_doc_{file_key}'] = False
 
 def process_chat_input(prompt):
-    """Process chat input with enhanced features."""
+    """Process chat input with enhanced features and proper response visibility."""
     logger.info(f"Processing user input: {prompt[:50]}...")
     
     # Prevent duplicate processing
@@ -991,9 +989,21 @@ def process_chat_input(prompt):
     try:
         # Ensure we have a conversation ID
         if not st.session_state.get('current_conversation_id'):
-            import uuid
-            st.session_state.current_conversation_id = str(uuid.uuid4())
-            logger.info(f"Created new conversation ID: {st.session_state.current_conversation_id}")
+            from utils.conversation_manager import run_async, create_new_conversation
+            try:
+                conversation_id = run_async(create_new_conversation())
+                if conversation_id:
+                    st.session_state.current_conversation_id = conversation_id
+                    logger.info(f"Created new conversation: {conversation_id}")
+                else:
+                    # Fallback to UUID if service fails
+                    import uuid
+                    st.session_state.current_conversation_id = str(uuid.uuid4())
+                    logger.info(f"Created fallback conversation ID: {st.session_state.current_conversation_id}")
+            except Exception as conv_error:
+                logger.error(f"Error creating conversation: {conv_error}")
+                import uuid
+                st.session_state.current_conversation_id = str(uuid.uuid4())
         
         # Add user message to session state first
         user_message = {
@@ -1002,6 +1012,9 @@ def process_chat_input(prompt):
             "timestamp": datetime.now().isoformat()
         }
         st.session_state.chat_messages.append(user_message)
+        
+        # Mark for refresh to show user message immediately
+        st.session_state.force_refresh = True
         
         # Generate assistant response
         try:
@@ -1020,8 +1033,16 @@ def process_chat_input(prompt):
             st.session_state.chat_messages.append(assistant_message)
             logger.info(f"Added assistant message to chat. Total messages: {len(st.session_state.chat_messages)}")
             
-            # Save conversation to database (simplified for now)
-            # save_conversation_to_database()  # Disabled to avoid errors
+            # Save to database asynchronously
+            try:
+                from utils.conversation_manager import run_async, add_message_to_current_conversation
+                # Save user message
+                run_async(add_message_to_current_conversation("user", prompt))
+                # Save assistant message
+                run_async(add_message_to_current_conversation("assistant", full_response))
+                logger.info("Messages saved to database")
+            except Exception as save_error:
+                logger.warning(f"Failed to save to database: {save_error}")
             
             logger.info(f"Response generated and saved: {len(full_response)} characters")
             
@@ -1040,13 +1061,8 @@ def process_chat_input(prompt):
         # Always reset processing flag
         st.session_state.processing_input = False
         
-        # Trigger rerun to display new messages (but only if not already processing)
-        if not st.session_state.get('rerun_triggered', False):
-            st.session_state.rerun_triggered = True
-            st.rerun()
-        else:
-            # Reset the flag for next time
-            st.session_state.rerun_triggered = False
+        # Force rerun to display the response
+        st.rerun()
 
 def generate_enhanced_response(prompt):
     """Generate enhanced AI response with document context."""
