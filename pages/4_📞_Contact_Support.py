@@ -269,7 +269,7 @@ def render_faq_section():
         },
         {
             "question": "What's the difference between Normal and Turbo modes?",
-            "answer": "Normal mode provides detailed, comprehensive responses. Turbo mode gives faster, more concise answers. You can switch between modes in the chatbot settings."
+            "answer": "Normal mode gives faster, more concise answers. Turbo mode provides detailed, comprehensive responses. You can switch between modes in the chatbot settings."
         },
         {
             "question": "Are my conversations saved?",
