@@ -97,7 +97,7 @@ def render_enhanced_sidebar():
         # Admin Dashboard button (only for admin user)
         if st.session_state.get('username') == 'admin':
             if st.button("🛠️ Admin Dashboard", use_container_width=True):
-                st.switch_page("pages/nimi_admin.py")
+                st.switch_page("admin/dashboard.py")
         
         st.markdown("---")
         
