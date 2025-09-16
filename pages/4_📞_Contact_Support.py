@@ -504,10 +504,7 @@ Environment:
         st.code(system_info, language="text")
         st.success("✅ System information displayed above. Copy and paste this into your support ticket if requested.")
 
-if __name__ == "__main__":
-    main()
-def 
-render_admin_dashboard():
+def render_admin_dashboard():
     """Render the admin dashboard."""
     from utils.support_manager import get_support_stats, update_support_ticket
     
@@ -711,3 +708,6 @@ def render_admin_statistics():
             st.success(f"✅ Tickets exported to: {export_file}")
         else:
             st.error("❌ Failed to export tickets")
+if _
+_name__ == "__main__":
+    main()
