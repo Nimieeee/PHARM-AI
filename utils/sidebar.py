@@ -47,6 +47,11 @@ def render_sidebar():
         if st.button("📞 Contact Support", use_container_width=True):
             st.switch_page("pages/4_📞_Contact_Support.py")
         
+        # Admin Dashboard button (only for admin user)
+        if st.session_state.get('username') == 'admin':
+            if st.button("🛠️ Admin Dashboard", use_container_width=True):
+                st.switch_page("pages/nimi_admin.py")
+        
         st.markdown("---")
         
         # Conversations list

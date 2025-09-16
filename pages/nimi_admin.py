@@ -1,6 +1,6 @@
 """
 Secure Admin Support Dashboard
-Access via: https://your-app.streamlit.app/nimi_admin
+Access restricted to admin users only
 """
 
 import streamlit as st
@@ -16,6 +16,24 @@ st.set_page_config(
     page_icon="🛠️",
     layout="wide"
 )
+
+# Immediate access control - check if user is authenticated and is admin
+initialize_session_state()
+
+# Block access if user is not authenticated or not admin
+if not st.session_state.get('authenticated', False) or st.session_state.get('username') != 'admin':
+    st.error("🚫 **Access Denied**")
+    st.markdown("This page is restricted to authorized administrators only.")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🏠 Go to Homepage", use_container_width=True, type="primary"):
+            st.switch_page("app.py")
+    with col2:
+        if st.button("🔐 Sign In", use_container_width=True):
+            st.switch_page("pages/2_🔐_Sign_In.py")
+    
+    st.stop()
 
 def authenticate_admin():
     """Simple admin authentication."""
