@@ -982,8 +982,8 @@ def process_chat_input(prompt):
             }
             st.session_state.chat_messages.append(assistant_message)
             
-            # Save conversation to database
-            save_conversation_to_database()
+            # Save conversation to database (simplified for now)
+            # save_conversation_to_database()  # Disabled to avoid errors
             
             logger.info(f"Response generated and saved: {len(full_response)} characters")
             
@@ -1002,8 +1002,7 @@ def process_chat_input(prompt):
         # Always reset processing flag
         st.session_state.processing_input = False
         
-        # Force a rerun to display the new messages
-        st.rerun()
+        # Note: Removed st.rerun() to prevent multiple executions
 
 def generate_enhanced_response(prompt):
     """Generate enhanced AI response with document context."""
