@@ -149,7 +149,14 @@ def render_homepage():
     </style>
     """, unsafe_allow_html=True)
     
-    # Main header
+    # Logo and main header
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        try:
+            st.image("pharmGPT.png", width=200)
+        except:
+            pass  # Continue without logo if not found
+    
     st.markdown("""
     <div class="main-header">
         <h1>💊 PharmGPT</h1>

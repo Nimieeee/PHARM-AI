@@ -29,9 +29,9 @@ def authenticate_admin():
         col1, col2, col3 = st.columns([1, 2, 1])
         with col2:
             try:
-                st.image("pharmGPT.png", width=200)
+                st.image("pharmGPT.png", width=150)
             except:
-                pass
+                st.markdown("# 💊 PharmGPT Admin")  # Fallback if logo not found
         
         st.markdown("### Enter Admin Credentials")
         
@@ -65,9 +65,9 @@ def main():
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         try:
-            st.image("pharmGPT.png", width=200)
+            st.image("pharmGPT.png", width=150)
         except:
-            pass
+            st.markdown("# 💊 PharmGPT Admin")  # Fallback if logo not found
     
     st.title("🛠️ PharmGPT Admin Dashboard")
     st.caption("Secure Admin Access - Support Ticket Management")
