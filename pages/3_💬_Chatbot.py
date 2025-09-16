@@ -1027,21 +1027,19 @@ def generate_enhanced_response(prompt):
         # Get document context
         document_context = get_conversation_context(prompt)
         
-        # Prepare enhanced system prompt
+        # SIMPLIFIED APPROACH - Remove document context temporarily to isolate the issue
+        # Use basic system prompt only
         enhanced_system_prompt = pharmacology_system_prompt
-        if document_context and is_useful_document_context(document_context):
-            enhanced_system_prompt += f"\n\n--- DOCUMENT CONTEXT ---\n{document_context}\n\nIMPORTANT: Use the above document context to enhance your pharmacology responses when relevant. If the documents contain error messages or are not related to pharmacology, focus on providing expert pharmacology knowledge based on the user's question instead."
         
-        # Prepare messages for API (exclude the current user message to avoid duplication)
-        api_messages = [{"role": "system", "content": enhanced_system_prompt}]
+        # Prepare messages for API - SIMPLIFIED (no conversation history for now)
+        api_messages = [
+            {"role": "system", "content": enhanced_system_prompt},
+            {"role": "user", "content": prompt}
+        ]
         
-        # Add recent conversation history (last 8 messages, excluding the just-added user message)
-        recent_messages = st.session_state.chat_messages[:-1][-8:]  # Exclude the last message (current user input)
-        for msg in recent_messages:
-            api_messages.append({"role": msg["role"], "content": msg["content"]})
-        
-        # Add the current user message
-        api_messages.append({"role": "user", "content": prompt})
+        logger.info(f"Sending to model: {model}")
+        logger.info(f"System prompt length: {len(enhanced_system_prompt)}")
+        logger.info(f"User prompt: {prompt[:100]}...")
         
         # Generate the response (non-streaming for stability)
         full_response = chat_completion(model, api_messages)
@@ -1053,31 +1051,7 @@ def generate_enhanced_response(prompt):
         logger.error(f"Error in generate_enhanced_response: {e}")
         return f"Sorry, I encountered an error: {str(e)}"
 
-def get_conversation_context(prompt):
-    """Get document context for the current conversation."""
-    try:
-        # Check if we have documents in the current conversation
-        conv_id = st.session_state.get('current_conversation_id')
-        if not conv_id or 'conversation_documents' not in st.session_state:
-            return ""
-        
-        documents = st.session_state.conversation_documents.get(conv_id, [])
-        if not documents:
-            return ""
-        
-        # Build context from uploaded documents
-        context_parts = []
-        for doc in documents:
-            filename = doc.get('filename', 'Unknown')
-            content = doc.get('content', '')
-            if content and len(content.strip()) > 50:
-                context_parts.append(f"=== {filename} ===\n{content[:2000]}...")
-        
-        return "\n\n".join(context_parts) if context_parts else ""
-        
-    except Exception as e:
-        logger.error(f"Error getting conversation context: {e}")
-        return ""
+
 
 def is_useful_document_context(context):
     """Check if document context is useful and not just error messages."""
@@ -1131,73 +1105,36 @@ def clean_document_content(content):
     return cleaned_content
 
 def get_conversation_context(user_query=""):
-    """Get document context for current conversation."""
+    """Get document context for current conversation - simplified version."""
     try:
         conv_id = st.session_state.get('current_conversation_id')
         if not conv_id:
             return ""
         
-        # Try RAG system first
-        try:
-            from services.rag_service import RAGService
-            from services.user_service import user_service
-            
-            # Get user UUID
-            user_data = run_async_operation(user_service.get_user_by_id(st.session_state.user_id))
-            if user_data:
-                rag_service = RAGService()
-                
-                # Get full document context (default behavior)
-                full_context = run_async_operation(rag_service.get_full_document_context(
-                    conv_id, user_data['id'], max_context_length=15000
-                ))
-                
-                if full_context:
-                    return f"\n\n--- DOCUMENT KNOWLEDGE BASE ---\n{full_context}\n"
-                    
-        except Exception as rag_error:
-            logger.warning(f"RAG system unavailable: {rag_error}")
-        
-        # Fallback to session-based documents
+        # Use simple session-based documents only (avoid RAG complexity for now)
         if 'conversation_documents' in st.session_state:
             documents = st.session_state.conversation_documents.get(conv_id, [])
             if documents:
-                context = "\n\n--- CONVERSATION DOCUMENTS ---\n"
-                useful_docs = 0
+                context_parts = []
                 
                 for doc in documents:
-                    content = doc['content']
+                    content = doc.get('content', '')
+                    filename = doc.get('filename', 'Unknown')
                     
-                    # Filter out documents that are mostly error messages
-                    if is_useful_document_context(content):
-                        # Limit content length and clean it
-                        clean_content = clean_document_content(content[:2000])
-                        context += f"\n[Document: {doc['filename']}]\n{clean_content}\n"
-                        useful_docs += 1
-                    else:
-                        # For non-useful documents (like failed OCR), provide basic info
-                        context += f"\n[Document: {doc['filename']} - Visual content uploaded but text not extractable]\n"
+                    # Only include documents with useful content
+                    if content and len(content.strip()) > 50 and is_useful_document_context(content):
+                        # Limit content length
+                        clean_content = clean_document_content(content[:1500])
+                        context_parts.append(f"=== {filename} ===\n{clean_content}")
                 
-                if useful_docs > 0:
-                    return context
-                else:
-                    # No useful document content, return empty to avoid confusing the AI
-                    return ""
+                if context_parts:
+                    return "\n\n".join(context_parts)
         
         return ""
         
     except Exception as e:
         logger.error(f"Error getting conversation context: {e}")
         return ""
-
-def run_async_operation(coro):
-    """Run async operation with proper event loop handling."""
-    import asyncio
-    try:
-        loop = asyncio.get_event_loop()
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
     
     return loop.run_until_complete(coro)
 
