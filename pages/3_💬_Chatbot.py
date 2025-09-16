@@ -831,22 +831,37 @@ def render_bottom_input_area():
 def render_document_upload():
     """Render enhanced document upload area."""
     with st.expander("📎 Upload Documents (PDF, DOCX, Images)", expanded=False):
-        st.info("📷 **Image OCR**: Only text content will be extracted from images for processing. Charts, graphs, and visual elements will not be analyzed.")
-        uploaded_file = st.file_uploader(
-            "Choose files to enhance your conversation",
+        # Determine upload limits based on user type
+        is_admin = st.session_state.get('username') == 'admin'
+        max_files = 10 if is_admin else 3
+        user_type = "Admin" if is_admin else "User"
+        
+        st.info(f"📷 **Image OCR**: Only text content will be extracted from images for processing. Charts, graphs, and visual elements will not be analyzed.")
+        st.info(f"📊 **{user_type} Upload Limit**: You can upload up to {max_files} documents at a time.")
+        
+        uploaded_files = st.file_uploader(
+            f"Choose up to {max_files} files to enhance your conversation",
             type=['txt', 'pdf', 'docx', 'md', 'pptx', 'png', 'jpg', 'jpeg'],
-            help="Upload documents, presentations, or images for context-aware responses",
+            help=f"Upload documents, presentations, or images for context-aware responses (Max: {max_files} files)",
+            accept_multiple_files=True,
             key=f"doc_upload_{st.session_state.get('current_conversation_id', 'new')}"
         )
         
-        if uploaded_file is not None:
-            # Check file size limit
-            file_size_mb = uploaded_file.size / (1024 * 1024)
-            if file_size_mb > MAX_FILE_SIZE_MB:
-                st.error(f"❌ File too large! Maximum size allowed is {MAX_FILE_SIZE_MB}MB. Your file is {file_size_mb:.1f}MB.")
+        if uploaded_files:
+            # Check file count limit
+            if len(uploaded_files) > max_files:
+                st.error(f"❌ Too many files! {user_type}s can upload up to {max_files} files at a time. You selected {len(uploaded_files)} files.")
                 return
             
-            process_document_upload(uploaded_file)
+            # Process each uploaded file
+            for uploaded_file in uploaded_files:
+                # Check file size limit
+                file_size_mb = uploaded_file.size / (1024 * 1024)
+                if file_size_mb > MAX_FILE_SIZE_MB:
+                    st.error(f"❌ File too large! Maximum size allowed is {MAX_FILE_SIZE_MB}MB. File '{uploaded_file.name}' is {file_size_mb:.1f}MB.")
+                    continue
+                
+                process_document_upload(uploaded_file)
         
         # Show current documents
         show_current_documents()
