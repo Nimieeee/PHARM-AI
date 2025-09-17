@@ -33,12 +33,23 @@ class OCRManager:
             from google.cloud import vision
             import json
             
-            # Check for credentials
-            google_creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+            # Check for credentials in Streamlit secrets or environment
+            import streamlit as st
+            
+            try:
+                google_creds = st.secrets.get("GOOGLE_APPLICATION_CREDENTIALS_JSON", 
+                                            os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
+                google_creds_file = st.secrets.get("GOOGLE_APPLICATION_CREDENTIALS", 
+                                                 os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"))
+            except Exception:
+                # Fallback to environment variables if secrets not available
+                google_creds = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+                google_creds_file = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+            
             if google_creds:
                 # Credentials provided as JSON string
                 return True
-            elif os.environ.get("GOOGLE_APPLICATION_CREDENTIALS"):
+            elif google_creds_file:
                 # Credentials provided as file path
                 return True
             else:
@@ -128,9 +139,15 @@ class OCRManager:
         """Get Google Vision client with proper authentication."""
         from google.cloud import vision
         import json
+        import streamlit as st
         
-        # Check for JSON credentials in environment variable
-        google_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        # Check for JSON credentials in Streamlit secrets or environment variable
+        try:
+            google_creds_json = st.secrets.get("GOOGLE_APPLICATION_CREDENTIALS_JSON", 
+                                             os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON"))
+        except Exception:
+            google_creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        
         if google_creds_json:
             # Parse JSON credentials and create client
             import tempfile

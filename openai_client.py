@@ -22,10 +22,20 @@ except ImportError:
     pass
 
 def get_api_keys():
-    """Get API keys from environment variables."""
-    groq_key = os.environ.get("GROQ_API_KEY")
-    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-    mistral_key = os.environ.get("MISTRAL_API_KEY")
+    """Get API keys from Streamlit secrets or environment variables (fallback)."""
+    import streamlit as st
+    
+    # Try Streamlit secrets first, fallback to environment variables
+    try:
+        groq_key = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY"))
+        openrouter_key = st.secrets.get("OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY"))
+        mistral_key = st.secrets.get("MISTRAL_API_KEY", os.environ.get("MISTRAL_API_KEY"))
+    except Exception:
+        # Fallback to environment variables if secrets not available
+        groq_key = os.environ.get("GROQ_API_KEY")
+        openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        mistral_key = os.environ.get("MISTRAL_API_KEY")
+    
     return groq_key, openrouter_key, mistral_key
 
 def get_model_configs():

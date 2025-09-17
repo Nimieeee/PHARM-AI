@@ -38,13 +38,21 @@ class SimpleSupabaseManager:
         }
     
     def _get_credentials(self):
-        """Get Supabase credentials from environment."""
-        url = os.environ.get("SUPABASE_URL")
-        key = os.environ.get("SUPABASE_ANON_KEY")
+        """Get Supabase credentials from Streamlit secrets or environment variables (fallback)."""
+        import streamlit as st
+        
+        # Try Streamlit secrets first, fallback to environment variables
+        try:
+            url = st.secrets.get("SUPABASE_URL", os.environ.get("SUPABASE_URL"))
+            key = st.secrets.get("SUPABASE_ANON_KEY", os.environ.get("SUPABASE_ANON_KEY"))
+        except Exception:
+            # Fallback to environment variables if secrets not available
+            url = os.environ.get("SUPABASE_URL")
+            key = os.environ.get("SUPABASE_ANON_KEY")
         
         if not url or not key:
             logger.error("Missing Supabase credentials")
-            raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY must be set")
+            raise ValueError("SUPABASE_URL and SUPABASE_ANON_KEY must be set in Streamlit secrets or environment")
         
         return url, key
     
