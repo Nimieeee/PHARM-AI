@@ -178,71 +178,74 @@ def get_user_legacy_id(username: str) -> Optional[str]:
         return None
 
 def initialize_auth_session():
-    """Initialize authentication session state."""
+    """Initialize authentication session state - CONVERSATION FRIENDLY VERSION."""
     logger.info("Initializing auth session")
 
-    # Check if we're in a valid session first
-    if st.session_state.get('authenticated') and st.session_state.get('session_id'):
-        # Validate existing session
-        username = validate_session(st.session_state.session_id)
-        if username:
-            # Session is still valid, update user info
-            st.session_state.username = username
-            st.session_state.user_id = get_user_legacy_id(username)
-            logger.info(f"Existing session validated for user: {username}")
-            return
-        else:
-            # Session expired, clear state
-            logger.info("Session expired, clearing authentication state")
-            st.session_state.authenticated = False
-            st.session_state.username = None
-            st.session_state.user_id = None
-            st.session_state.session_id = None
-
-    # Attempt to retrieve session_id from query parameters first
-    query_params = st.query_params
-    if "session_id" in query_params and query_params["session_id"]:
-        st.session_state.session_id = query_params["session_id"]
-        logger.info(f"Retrieved session_id from URL: {st.session_state.session_id}")
-    elif "session_id" not in st.session_state or st.session_state.session_id is None:
-        st.session_state.session_id = None
-        logger.info("Initializing new session_id as None")
-
-    # Initialize session state variables
+    # Initialize session state variables if they don't exist
     if "session_id" not in st.session_state:
         st.session_state.session_id = None
-
     if "authenticated" not in st.session_state:
         st.session_state.authenticated = False
-
     if "username" not in st.session_state:
         st.session_state.username = None
-
     if "user_id" not in st.session_state:
         st.session_state.user_id = None
 
-    # Validate existing session
-    if st.session_state.session_id:
-        logger.info(f"Validating existing session: {st.session_state.session_id}")
-        username = validate_session(st.session_state.session_id)
-        if username:
-            logger.info(f"Session valid for user: {username}")
-            st.session_state.authenticated = True
-            st.session_state.username = username
-            st.session_state.user_id = get_user_legacy_id(username)
-            # Ensure session_id is in URL if valid
-            st.query_params["session_id"] = st.session_state.session_id
-        else:
-            logger.warning(f"Session invalid for {st.session_state.session_id}, clearing state")
-            # Invalid session, clear state
+    # Attempt to retrieve session_id from query parameters
+    query_params = st.query_params
+    if "session_id" in query_params and query_params["session_id"]:
+        url_session_id = query_params["session_id"]
+        if url_session_id != st.session_state.session_id:
+            st.session_state.session_id = url_session_id
+            logger.info(f"Updated session_id from URL: {url_session_id}")
+
+    # If user is already authenticated with basic info, don't be too aggressive
+    if st.session_state.get('authenticated') and st.session_state.get('username') and st.session_state.get('user_id'):
+        logger.info(f"User already authenticated: {st.session_state.username}")
+        
+        # Optional session validation - don't fail if it doesn't work
+        if st.session_state.get('session_id'):
+            try:
+                username = validate_session(st.session_state.session_id)
+                if username and username == st.session_state.username:
+                    logger.info(f"Session validation passed for: {username}")
+                    # Ensure session_id is in URL
+                    st.query_params["session_id"] = st.session_state.session_id
+                else:
+                    logger.warning(f"Session validation failed, but keeping user authenticated")
+                    # Don't clear authentication - just clear the invalid session_id
+                    st.session_state.session_id = None
+                    if "session_id" in st.query_params:
+                        del st.query_params["session_id"]
+            except Exception as e:
+                logger.warning(f"Session validation error (non-critical): {e}")
+        
+        return  # Keep user authenticated
+
+    # If we have a session_id but no authentication, try to validate it
+    if st.session_state.session_id and not st.session_state.get('authenticated'):
+        logger.info(f"Validating session: {st.session_state.session_id}")
+        try:
+            username = validate_session(st.session_state.session_id)
+            if username:
+                logger.info(f"Session valid, authenticating user: {username}")
+                st.session_state.authenticated = True
+                st.session_state.username = username
+                st.session_state.user_id = get_user_legacy_id(username)
+                # Ensure session_id is in URL
+                st.query_params["session_id"] = st.session_state.session_id
+            else:
+                logger.info(f"Session invalid: {st.session_state.session_id}")
+                # Clear invalid session
+                st.session_state.session_id = None
+                if "session_id" in st.query_params:
+                    del st.query_params["session_id"]
+        except Exception as e:
+            logger.warning(f"Session validation failed: {e}")
             st.session_state.session_id = None
-            st.session_state.authenticated = False
-            st.session_state.username = None
-            st.session_state.user_id = None
-            if "session_id" in st.query_params:
-                del st.query_params["session_id"]
-    else:
-        logger.info("No session_id to validate")
+    
+    if not st.session_state.get('authenticated'):
+        logger.info("No valid authentication found")
 
 def login_user(username: str, password: str) -> bool:
     """Login user and create session."""
