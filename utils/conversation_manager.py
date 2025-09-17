@@ -186,13 +186,13 @@ async def add_message_to_current_conversation(role: str, content: str) -> bool:
                     updates["title"] = title
                 
                 secure_update_conversation(conv_id, updates)
-                    
-                    # Update title in database
-                    await conversation_service.update_conversation_title(
-                        user_data['id'],
-                        st.session_state.current_conversation_id,
-                        title
-                    )
+                
+                # Update title in database
+                await conversation_service.update_conversation_title(
+                    user_data['id'],
+                    st.session_state.current_conversation_id,
+                    title
+                )
             
             logger.info(f"✅ Message added successfully")
             return True

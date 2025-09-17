@@ -151,6 +151,11 @@ def render_enhanced_sidebar():
         # New conversation button
         if st.button("➕ New Conversation", use_container_width=True, type="primary"):
             create_new_conversation()
+            # Force refresh the conversation list
+            from fix_user_isolation import load_user_conversations_safely, secure_update_conversations
+            fresh_conversations = load_user_conversations_safely()
+            if fresh_conversations:
+                secure_update_conversations(fresh_conversations)
         
         # Model selection
         st.markdown("### ⚙️ Settings")
@@ -169,11 +174,36 @@ def render_enhanced_sidebar():
         render_conversation_info()
 
 def create_new_conversation():
-    """Create a new conversation."""
-    st.session_state.chat_messages = []
-    st.session_state.current_conversation_id = None
-    if 'conversation_documents' in st.session_state:
-        st.session_state.conversation_documents = {}
+    """Create a new conversation and save it to database immediately."""
+    try:
+        # Create conversation in database immediately
+        from utils.conversation_manager import run_async, create_new_conversation as create_db_conversation
+        
+        conversation_id = run_async(create_db_conversation())
+        if conversation_id:
+            st.session_state.current_conversation_id = conversation_id
+            st.session_state.chat_messages = []
+            if 'conversation_documents' in st.session_state:
+                st.session_state.conversation_documents = {}
+            
+            logger.info(f"Created new conversation: {conversation_id}")
+            st.success("✅ New conversation created!")
+        else:
+            # Fallback to old behavior
+            st.session_state.chat_messages = []
+            st.session_state.current_conversation_id = None
+            if 'conversation_documents' in st.session_state:
+                st.session_state.conversation_documents = {}
+            logger.warning("Failed to create conversation in database, using fallback")
+            
+    except Exception as e:
+        logger.error(f"Error creating new conversation: {e}")
+        # Fallback to old behavior
+        st.session_state.chat_messages = []
+        st.session_state.current_conversation_id = None
+        if 'conversation_documents' in st.session_state:
+            st.session_state.conversation_documents = {}
+    
     st.rerun()
 
 def render_conversation_list():
