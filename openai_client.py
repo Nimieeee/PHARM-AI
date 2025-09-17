@@ -45,17 +45,17 @@ def get_model_configs():
     
     return {
         "normal": {
-            "model": "mistral-medium",
+            "model": "mistral-medium-latest",
             "api_key": mistral_key,
             "base_url": "https://api.mistral.ai/v1",
             "description": "Mistral Medium (Balanced Performance)",
             "use_native_groq": False
         },
         "turbo": {
-            "model": "mistral-large-2",
+            "model": "mistral-large-latest",
             "api_key": mistral_key,
             "base_url": "https://api.mistral.ai/v1", 
-            "description": "Mistral Large 2 (High Performance)",
+            "description": "Mistral Large (High Performance)",
             "use_native_groq": False
         }
     }
@@ -128,7 +128,7 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
             stream = client.chat.completions.create(
                 model=model,
                 messages=messages,
-                temperature=1,
+                temperature=0.5,
                 max_completion_tokens=65536,
                 top_p=1,
                 reasoning_effort="medium",
@@ -145,7 +145,7 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                 model=model,
                 messages=messages,
                 stream=True,
-                temperature=0.7,
+                temperature=0.5,
                 max_tokens=max_tokens,
                 top_p=0.95,
                 frequency_penalty=0.0,
@@ -223,7 +223,7 @@ def chat_completion(model: str, messages: List[Dict]) -> str:
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
-                temperature=1,
+                temperature=0.5,
                 max_completion_tokens=65536,
                 top_p=1,
                 reasoning_effort="medium",
@@ -237,7 +237,7 @@ def chat_completion(model: str, messages: List[Dict]) -> str:
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
-                temperature=0.7,
+                temperature=0.5,
                 max_tokens=max_tokens,
                 top_p=0.95,
                 frequency_penalty=0.0,
@@ -258,6 +258,7 @@ def test_api_connection(model: str) -> bool:
         response = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": "Hello"}],
+            temperature=0.5,
             max_tokens=10
         )
         
