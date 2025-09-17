@@ -8,29 +8,41 @@ def get_light_theme_css():
     """Get clean light theme CSS for maximum readability."""
     return """
     <style>
+        /* Apple San Francisco Font */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        /* Global font family - Apple San Francisco with fallbacks */
+        * {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
+        }
+        
         /* Force light mode for everything */
         .stApp {
             background-color: #ffffff !important;
             color: #1a202c !important;
             color-scheme: light !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
         .stSidebar {
             background-color: #f8fafc !important;
             border-right: 1px solid #e2e8f0 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
         .stSidebar .stMarkdown {
             color: #2d3748 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
-        /* Clean button styling */
+        /* Clean button styling with San Francisco Font */
         .stButton > button {
             background-color: #ffffff !important;
             color: #2d3748 !important;
             border: 1px solid #d1d5db !important;
             border-radius: 8px !important;
             font-weight: 500 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
             transition: all 0.2s ease !important;
         }
         
@@ -63,13 +75,14 @@ def get_light_theme_css():
             border-color: #9ca3af !important;
         }
         
-        /* Form elements */
+        /* Form elements with San Francisco Font */
         .stTextInput > div > div > input {
             background-color: #ffffff !important;
             color: #1a202c !important;
             border: 1px solid #d1d5db !important;
             border-radius: 8px !important;
             font-size: 14px !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
         .stTextInput > div > div > input:focus {
@@ -83,6 +96,7 @@ def get_light_theme_css():
             border: 1px solid #d1d5db !important;
             border-radius: 8px !important;
             font-size: 14px !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
         .stTextArea > div > div > textarea:focus {
@@ -139,7 +153,7 @@ def get_light_theme_css():
             color: #d97706 !important;
         }
         
-        /* Chat messages */
+        /* Chat messages with San Francisco Font */
         .stChatMessage {
             background-color: #f8fafc !important;
             border: 1px solid #e5e7eb !important;
@@ -147,6 +161,7 @@ def get_light_theme_css():
             color: #1a202c !important;
             margin: 8px 0 !important;
             padding: 12px !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
@@ -173,20 +188,44 @@ def get_light_theme_css():
             font-weight: 500 !important;
         }
         
-        /* Typography */
+        /* Typography with San Francisco Font */
         .stMarkdown {
             color: #374151 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
         .stMarkdown p {
             color: #374151 !important;
             line-height: 1.6 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
         h1, h2, h3, h4, h5, h6 {
             color: #1a202c !important;
             font-weight: 600 !important;
             line-height: 1.3 !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", "Inter", system-ui, sans-serif !important;
+        }
+        
+        /* Specific heading weights for San Francisco style */
+        h1 {
+            font-weight: 700 !important;
+            font-size: 2.25rem !important;
+        }
+        
+        h2 {
+            font-weight: 600 !important;
+            font-size: 1.875rem !important;
+        }
+        
+        h3 {
+            font-weight: 600 !important;
+            font-size: 1.5rem !important;
+        }
+        
+        h4 {
+            font-weight: 500 !important;
+            font-size: 1.25rem !important;
         }
         
         /* Code blocks */
