@@ -111,17 +111,49 @@ def get_light_theme_css():
             border-radius: 8px !important;
         }
         
-        /* File uploader */
+        /* File uploader - Fixed overlapping text */
         .stFileUploader > div {
             background-color: #f8fafc !important;
             border: 2px dashed #9ca3af !important;
             border-radius: 8px !important;
             color: #374151 !important;
+            position: relative !important;
+            padding: 20px !important;
+            min-height: 60px !important;
         }
         
         .stFileUploader > div:hover {
             border-color: #667eea !important;
             background-color: #f1f5f9 !important;
+        }
+        
+        /* Fix file uploader text positioning */
+        .stFileUploader label {
+            position: relative !important;
+            z-index: 2 !important;
+            display: block !important;
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
+        }
+        
+        /* Hide or fix overlapping elements */
+        .stFileUploader [data-testid="stFileUploaderDropzone"] {
+            position: relative !important;
+            overflow: hidden !important;
+        }
+        
+        /* Fix any icon overlapping */
+        .stFileUploader svg {
+            position: relative !important;
+            z-index: 1 !important;
+            margin-right: 8px !important;
+        }
+        
+        /* Ensure text is properly positioned */
+        .stFileUploader span {
+            position: relative !important;
+            z-index: 2 !important;
+            display: inline-block !important;
+            vertical-align: middle !important;
         }
         
         /* Alert boxes */
@@ -307,9 +339,32 @@ def get_light_theme_css():
             border-radius: 8px !important;
         }
         
-        /* Ensure all text is readable */
+        /* Ensure all text is readable and properly positioned */
         * {
             color-scheme: light !important;
+        }
+        
+        /* Fix any general text overlap issues */
+        .stApp * {
+            position: relative !important;
+        }
+        
+        /* Ensure proper text rendering */
+        .stApp {
+            text-rendering: optimizeLegibility !important;
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+        }
+        
+        /* Fix button text positioning */
+        .stButton button span {
+            position: relative !important;
+            z-index: 1 !important;
+        }
+        
+        /* Fix any pseudo-element overlaps */
+        *::before, *::after {
+            z-index: 0 !important;
         }
         
         /* Override any dark mode preferences */
