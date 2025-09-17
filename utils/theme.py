@@ -52,34 +52,42 @@ def get_dark_theme_css():
     """Get dark theme CSS optimized for readability and mobile."""
     return """
     <style>
-        /* Dark Mode Styles - Improved Readability */
+        /* Dark Mode Styles - Maximum Readability */
         .stApp {
-            background-color: #111827 !important;
-            color: #f9fafb !important;
+            background-color: #0f172a !important;
+            color: #f8fafc !important;
             color-scheme: dark !important;
         }
         
         .stSidebar {
-            background-color: #1f2937 !important;
-            border-right: 1px solid #4b5563 !important;
+            background-color: #1e293b !important;
+            border-right: 1px solid #475569 !important;
         }
         
         .stSidebar .stMarkdown {
-            color: #f3f4f6 !important;
+            color: #f1f5f9 !important;
         }
         
-        /* Dark mode buttons - Better contrast */
+        /* Fix all white containers in dark mode */
+        .stContainer,
+        .element-container,
+        .stColumn,
+        .block-container {
+            background-color: transparent !important;
+        }
+        
+        /* Dark mode buttons - Maximum contrast */
         .stButton > button {
-            background-color: #374151 !important;
-            color: #f9fafb !important;
-            border: 1px solid #6b7280 !important;
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border: 1px solid #475569 !important;
             border-radius: 8px !important;
-            padding: 0.75rem 1.5rem !important;
+            padding: 16px 24px !important;
         }
         
         .stButton > button:hover {
-            background-color: #4b5563 !important;
-            border-color: #8b5cf6 !important;
+            background-color: #334155 !important;
+            border-color: #6366f1 !important;
             color: #ffffff !important;
         }
         
@@ -93,83 +101,87 @@ def get_dark_theme_css():
             background-color: #6d28d9 !important;
         }
         
-        /* Dark mode form elements - Better readability */
+        /* Dark mode form elements - Maximum readability */
         .stTextInput > div > div > input {
-            background-color: #374151 !important;
-            color: #f9fafb !important;
-            border: 1px solid #6b7280 !important;
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border: 1px solid #475569 !important;
             border-radius: 8px !important;
             padding: 16px !important;
         }
         
         .stTextInput > div > div > input:focus {
-            border-color: #8b5cf6 !important;
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3) !important;
-            background-color: #4b5563 !important;
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3) !important;
+            background-color: #334155 !important;
         }
         
         .stTextArea > div > div > textarea {
-            background-color: #374151 !important;
-            color: #f9fafb !important;
-            border: 1px solid #6b7280 !important;
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border: 1px solid #475569 !important;
             border-radius: 8px !important;
             padding: 16px !important;
         }
         
         .stTextArea > div > div > textarea:focus {
-            border-color: #8b5cf6 !important;
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3) !important;
-            background-color: #4b5563 !important;
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3) !important;
+            background-color: #334155 !important;
         }
         
         .stSelectbox > div > div {
-            background-color: #374151 !important;
-            color: #f9fafb !important;
-            border: 1px solid #6b7280 !important;
+            background-color: #1e293b !important;
+            color: #ffffff !important;
+            border: 1px solid #475569 !important;
             padding: 16px !important;
             border-radius: 8px !important;
         }
         
-        /* Dark mode chat messages - Enhanced readability */
+        /* Dark mode chat messages - Maximum readability */
         .stChatMessage {
-            background-color: #374151 !important;
-            border: 1px solid #6b7280 !important;
-            color: #f9fafb !important;
+            background-color: #1e293b !important;
+            border: 1px solid #475569 !important;
+            color: #ffffff !important;
             padding: 20px 24px !important;
             margin: 16px 0 !important;
-            line-height: 1.7 !important;
+            line-height: 1.8 !important;
             font-size: 16px !important;
             border-radius: 12px !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
-            background-color: #3730a3 !important;
-            border-color: #4f46e5 !important;
-            color: #e0e7ff !important;
+            background-color: #1e40af !important;
+            border-color: #3b82f6 !important;
+            color: #ffffff !important;
         }
         
         .stChatMessage[data-testid="chat-message-assistant"] {
-            background-color: #065f46 !important;
+            background-color: #047857 !important;
             border-color: #10b981 !important;
-            color: #d1fae5 !important;
+            color: #ffffff !important;
         }
         
-        /* Dark mode file uploader - Better visibility */
+        /* Dark mode file uploader - Maximum visibility */
         .stFileUploader > div {
-            background-color: #374151 !important;
-            border: 2px dashed #9ca3af !important;
-            color: #f3f4f6 !important;
-            padding: 1.5rem !important;
+            background-color: #1e293b !important;
+            border: 2px dashed #6b7280 !important;
+            color: #ffffff !important;
+            padding: 24px !important;
         }
         
         .stFileUploader > div:hover {
-            border-color: #8b5cf6 !important;
-            background-color: #4b5563 !important;
+            border-color: #6366f1 !important;
+            background-color: #334155 !important;
         }
         
-        /* Dark mode typography - Enhanced readability */
+        .stFileUploader * {
+            color: #ffffff !important;
+        }
+        
+        /* Dark mode typography - Maximum readability */
         .stMarkdown {
-            color: #f8fafc !important;
+            color: #ffffff !important;
             line-height: 1.8 !important;
             font-size: 16px !important;
         }
@@ -178,6 +190,7 @@ def get_dark_theme_css():
             margin-bottom: 1.25rem !important;
             font-size: 16px !important;
             line-height: 1.8 !important;
+            color: #ffffff !important;
         }
         
         h1, h2, h3, h4, h5, h6 {
@@ -187,14 +200,19 @@ def get_dark_theme_css():
             font-weight: 600 !important;
         }
         
-        /* Better text contrast */
+        /* Maximum text contrast */
         .stMarkdown strong {
             color: #ffffff !important;
-            font-weight: 600 !important;
+            font-weight: 700 !important;
         }
         
         .stMarkdown em {
-            color: #e2e8f0 !important;
+            color: #f1f5f9 !important;
+        }
+        
+        /* Fix any remaining text elements */
+        .stMarkdown * {
+            color: #ffffff !important;
         }
         
         /* Better code blocks in dark mode */
@@ -256,16 +274,22 @@ def get_dark_theme_css():
                 box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2) !important;
             }
             
-            /* Better mobile readability in dark mode */
+            /* Maximum mobile readability in dark mode */
             .stChatMessage {
-                padding: 1.25rem !important;
-                margin: 1rem 0 !important;
+                padding: 20px !important;
+                margin: 16px 0 !important;
                 font-size: 16px !important;
+                color: #ffffff !important;
             }
             
             .stMarkdown {
-                font-size: 15px !important;
-                line-height: 1.7 !important;
+                font-size: 16px !important;
+                line-height: 1.8 !important;
+                color: #ffffff !important;
+            }
+            
+            .stMarkdown * {
+                color: #ffffff !important;
             }
         }
     </style>
