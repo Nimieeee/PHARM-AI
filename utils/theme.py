@@ -5,110 +5,143 @@ Responsive Theme System with Dark Mode Support
 import streamlit as st
 
 def get_dark_theme_css():
-    """Get dark theme CSS optimized for mobile and desktop."""
+    """Get dark theme CSS optimized for readability and mobile."""
     return """
     <style>
-        /* Dark Mode Styles */
+        /* Dark Mode Styles - Improved Readability */
         .stApp {
-            background-color: #0f172a !important;
-            color: #f1f5f9 !important;
+            background-color: #111827 !important;
+            color: #f9fafb !important;
             color-scheme: dark !important;
         }
         
         .stSidebar {
-            background-color: #1e293b !important;
-            border-right: 1px solid #334155 !important;
+            background-color: #1f2937 !important;
+            border-right: 1px solid #4b5563 !important;
         }
         
         .stSidebar .stMarkdown {
-            color: #e2e8f0 !important;
+            color: #f3f4f6 !important;
         }
         
-        /* Dark mode buttons */
+        /* Dark mode buttons - Better contrast */
         .stButton > button {
-            background-color: #1e293b !important;
-            color: #f1f5f9 !important;
-            border: 1px solid #475569 !important;
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+            border: 1px solid #6b7280 !important;
             border-radius: 8px !important;
+            padding: 0.75rem 1.5rem !important;
         }
         
         .stButton > button:hover {
-            background-color: #334155 !important;
-            border-color: #6366f1 !important;
+            background-color: #4b5563 !important;
+            border-color: #8b5cf6 !important;
+            color: #ffffff !important;
         }
         
         .stButton > button[kind="primary"] {
-            background-color: #6366f1 !important;
+            background-color: #7c3aed !important;
             color: #ffffff !important;
-            border: 1px solid #6366f1 !important;
+            border: 1px solid #7c3aed !important;
         }
         
         .stButton > button[kind="primary"]:hover {
-            background-color: #4f46e5 !important;
+            background-color: #6d28d9 !important;
         }
         
-        /* Dark mode form elements */
+        /* Dark mode form elements - Better readability */
         .stTextInput > div > div > input {
-            background-color: #1e293b !important;
-            color: #f1f5f9 !important;
-            border: 1px solid #475569 !important;
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+            border: 1px solid #6b7280 !important;
             border-radius: 8px !important;
+            padding: 0.75rem 1rem !important;
         }
         
         .stTextInput > div > div > input:focus {
-            border-color: #6366f1 !important;
-            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+            border-color: #8b5cf6 !important;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3) !important;
+            background-color: #4b5563 !important;
         }
         
         .stTextArea > div > div > textarea {
-            background-color: #1e293b !important;
-            color: #f1f5f9 !important;
-            border: 1px solid #475569 !important;
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+            border: 1px solid #6b7280 !important;
             border-radius: 8px !important;
+            padding: 0.75rem 1rem !important;
+        }
+        
+        .stTextArea > div > div > textarea:focus {
+            border-color: #8b5cf6 !important;
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.3) !important;
+            background-color: #4b5563 !important;
         }
         
         .stSelectbox > div > div {
-            background-color: #1e293b !important;
-            color: #f1f5f9 !important;
-            border: 1px solid #475569 !important;
+            background-color: #374151 !important;
+            color: #f9fafb !important;
+            border: 1px solid #6b7280 !important;
+            padding: 0.5rem 1rem !important;
         }
         
-        /* Dark mode chat messages */
+        /* Dark mode chat messages - Enhanced readability */
         .stChatMessage {
-            background-color: #1e293b !important;
-            border: 1px solid #334155 !important;
-            color: #f1f5f9 !important;
+            background-color: #374151 !important;
+            border: 1px solid #6b7280 !important;
+            color: #f9fafb !important;
+            padding: 1rem 1.25rem !important;
+            margin: 0.75rem 0 !important;
+            line-height: 1.6 !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
-            background-color: #312e81 !important;
-            border-color: #4338ca !important;
+            background-color: #3730a3 !important;
+            border-color: #4f46e5 !important;
+            color: #e0e7ff !important;
         }
         
         .stChatMessage[data-testid="chat-message-assistant"] {
-            background-color: #064e3b !important;
-            border-color: #059669 !important;
+            background-color: #065f46 !important;
+            border-color: #10b981 !important;
+            color: #d1fae5 !important;
         }
         
-        /* Dark mode file uploader */
+        /* Dark mode file uploader - Better visibility */
         .stFileUploader > div {
-            background-color: #1e293b !important;
-            border: 2px dashed #64748b !important;
-            color: #e2e8f0 !important;
+            background-color: #374151 !important;
+            border: 2px dashed #9ca3af !important;
+            color: #f3f4f6 !important;
+            padding: 1.5rem !important;
         }
         
         .stFileUploader > div:hover {
-            border-color: #6366f1 !important;
-            background-color: #334155 !important;
+            border-color: #8b5cf6 !important;
+            background-color: #4b5563 !important;
         }
         
-        /* Dark mode typography */
+        /* Dark mode typography - High contrast */
         .stMarkdown {
-            color: #e2e8f0 !important;
+            color: #f3f4f6 !important;
+            line-height: 1.7 !important;
+        }
+        
+        .stMarkdown p {
+            margin-bottom: 1rem !important;
         }
         
         h1, h2, h3, h4, h5, h6 {
-            color: #f1f5f9 !important;
+            color: #ffffff !important;
+            margin-bottom: 0.75rem !important;
+            margin-top: 1.5rem !important;
+        }
+        
+        /* Better code blocks in dark mode */
+        code {
+            background-color: #4b5563 !important;
+            color: #f9fafb !important;
+            padding: 0.25rem 0.5rem !important;
+            border-radius: 4px !important;
         }
         
         /* Dark mode alerts */
@@ -139,12 +172,24 @@ def get_dark_theme_css():
         /* Mobile dark mode optimizations */
         @media (max-width: 768px) {
             .stApp {
-                background-color: #020617 !important;
+                background-color: #0f172a !important;
             }
             
             .stChatInputContainer {
-                background: #0f172a !important;
-                border-top: 1px solid #334155 !important;
+                background: #111827 !important;
+                border-top: 1px solid #4b5563 !important;
+            }
+            
+            /* Better mobile readability in dark mode */
+            .stChatMessage {
+                padding: 1.25rem !important;
+                margin: 1rem 0 !important;
+                font-size: 16px !important;
+            }
+            
+            .stMarkdown {
+                font-size: 15px !important;
+                line-height: 1.7 !important;
             }
         }
     </style>
@@ -161,16 +206,40 @@ def get_responsive_theme_css():
             color-scheme: light !important;
         }
         
+        /* Enhanced padding and spacing */
+        .main .block-container {
+            padding-top: 2rem !important;
+            padding-left: 2rem !important;
+            padding-right: 2rem !important;
+            padding-bottom: 2rem !important;
+        }
+        
+        /* Better component spacing */
+        .stButton > button {
+            padding: 0.75rem 1.5rem !important;
+            margin: 0.25rem 0 !important;
+        }
+        
+        .stTextInput > div > div > input,
+        .stTextArea > div > div > textarea {
+            padding: 0.75rem 1rem !important;
+        }
+        
+        .stChatMessage {
+            padding: 1rem 1.25rem !important;
+            margin: 0.75rem 0 !important;
+        }
+        
         /* Mobile viewport optimization */
         @media (max-width: 768px) {
             .stApp {
-                padding: 0.5rem !important;
+                padding: 0.75rem !important;
             }
             
             .main .block-container {
-                padding-top: 1rem !important;
-                padding-left: 1rem !important;
-                padding-right: 1rem !important;
+                padding-top: 1.5rem !important;
+                padding-left: 1.5rem !important;
+                padding-right: 1.5rem !important;
                 max-width: 100% !important;
             }
             
@@ -211,16 +280,29 @@ def get_responsive_theme_css():
             
             /* Mobile chat message improvements */
             .stChatMessage {
-                margin: 0.5rem 0 !important;
-                padding: 0.75rem !important;
-                font-size: 14px !important;
-                line-height: 1.5 !important;
+                margin: 0.75rem 0 !important;
+                padding: 1rem !important;
+                font-size: 15px !important;
+                line-height: 1.6 !important;
             }
             
             /* Mobile file uploader */
             .stFileUploader > div {
+                padding: 1.5rem !important;
+                min-height: 80px !important;
+            }
+            
+            /* Mobile form improvements */
+            .stTextInput > div > div > input,
+            .stTextArea > div > div > textarea {
                 padding: 1rem !important;
-                min-height: 60px !important;
+                font-size: 16px !important;
+            }
+            
+            /* Mobile button improvements */
+            .stButton > button {
+                padding: 1rem 1.5rem !important;
+                margin: 0.5rem 0 !important;
             }
         }
         
