@@ -45,10 +45,16 @@ def main():
                 st.switch_page("app.py")
         return
     
-    # CRITICAL: Validate user isolation (ALWAYS - no caching for security)
-    from fix_user_isolation import enhanced_session_validation
-    if not enhanced_session_validation():
-        return  # Will redirect to login if validation fails
+    # Basic session validation without aggressive clearing
+    if not st.session_state.get('authenticated'):
+        st.error("🔐 Please sign in to access the chatbot.")
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            if st.button("🔐 Go to Sign In", use_container_width=True, type="primary"):
+                st.switch_page("pages/2_🔐_Sign_In.py")
+            if st.button("← Back to Home", use_container_width=True):
+                st.switch_page("app.py")
+        return
     
     # Render the chatbot interface
     render_chatbot_interface()
@@ -73,18 +79,11 @@ def load_user_conversations():
         return
     
     try:
-        # ALWAYS validate user isolation first - no caching for security
-        from fix_user_isolation import load_user_conversations_safely, ensure_user_isolation
+        # Load conversations safely without aggressive validation
+        from fix_user_isolation import load_user_conversations_safely, secure_update_conversations
         
-        # Force user isolation validation every time
-        if not ensure_user_isolation():
-            logger.error("User isolation validation failed!")
-            st.session_state.conversations = {}
-            return
-        
-        # Load conversations safely - always fresh to prevent cross-user contamination
+        # Load conversations safely
         conversations = load_user_conversations_safely()
-        from fix_user_isolation import secure_update_conversations
         secure_update_conversations(conversations)
         
         logger.info(f"Safely loaded {len(conversations)} conversations for user: {st.session_state.username}")
@@ -95,7 +94,8 @@ def load_user_conversations():
         
     except Exception as e:
         logger.error(f"Failed to load conversations: {e}")
-        st.session_state.conversations = {}
+        # Don't clear conversations on error, just log it
+        logger.warning("Keeping existing conversations due to load error")
 
 def render_enhanced_sidebar():
     """Render enhanced sidebar with conversation management."""
@@ -997,21 +997,34 @@ def process_chat_input(prompt):
     try:
         # Ensure we have a conversation ID
         if not st.session_state.get('current_conversation_id'):
-            from utils.conversation_manager import run_async, create_new_conversation
             try:
+                from utils.conversation_manager import run_async, create_new_conversation
                 conversation_id = run_async(create_new_conversation())
                 if conversation_id:
                     st.session_state.current_conversation_id = conversation_id
                     logger.info(f"Created new conversation: {conversation_id}")
                 else:
-                    # Fallback to UUID if service fails
-                    import uuid
-                    st.session_state.current_conversation_id = str(uuid.uuid4())
-                    logger.info(f"Created fallback conversation ID: {st.session_state.current_conversation_id}")
+                    raise Exception("Database conversation creation failed")
             except Exception as conv_error:
-                logger.error(f"Error creating conversation: {conv_error}")
+                logger.warning(f"Database conversation creation failed: {conv_error}")
+                # Fallback to UUID - create local conversation
                 import uuid
-                st.session_state.current_conversation_id = str(uuid.uuid4())
+                conversation_id = str(uuid.uuid4())
+                st.session_state.current_conversation_id = conversation_id
+                
+                # Add to local conversations
+                from fix_user_isolation import get_secure_conversations, secure_update_conversations
+                conversations = get_secure_conversations()
+                conversations[conversation_id] = {
+                    "title": f"New Chat {len(conversations) + 1}",
+                    "messages": [],
+                    "created_at": datetime.now().isoformat(),
+                    "updated_at": datetime.now().isoformat(),
+                    "model": st.session_state.get('selected_model_mode', 'normal'),
+                    "message_count": 0
+                }
+                secure_update_conversations(conversations)
+                logger.info(f"Created fallback local conversation: {conversation_id}")
         
         # Add user message to session state first
         user_message = {

@@ -196,22 +196,12 @@ def load_user_conversations():
     if not st.session_state.authenticated or not st.session_state.user_id:
         return
     
-    # CRITICAL: Always clear conversations first to prevent cross-user contamination
-    st.session_state.conversations = {}
-    
     try:
-        # Use the secure loading function instead of auth.py
-        from fix_user_isolation import load_user_conversations_safely, ensure_user_isolation
-        
-        # Validate user isolation first
-        if not ensure_user_isolation():
-            logger.error("User isolation validation failed in session manager!")
-            st.session_state.conversations = {}
-            return
+        # Use the secure loading function
+        from fix_user_isolation import load_user_conversations_safely, secure_update_conversations
         
         # Load conversations safely
         conversations = load_user_conversations_safely()
-        from fix_user_isolation import secure_update_conversations
         if secure_update_conversations(conversations):
             st.session_state.conversation_counter = len(conversations)
             logger.info(f"Loaded {len(conversations)} conversations for user: {st.session_state.username}")
@@ -219,4 +209,4 @@ def load_user_conversations():
             logger.error("Failed to securely update conversations in session manager")
     except Exception as e:
         logger.error(f"Failed to load conversations: {e}")
-        st.session_state.conversations = {}
+        # Don't clear existing conversations on error

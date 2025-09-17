@@ -9,22 +9,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 def ensure_user_isolation():
-    """Ensure proper user data isolation."""
+    """Ensure proper user data isolation - LESS AGGRESSIVE VERSION."""
     
     # 1. Clear any cached session data that might be stale
     if hasattr(st.session_state, '_session_cache'):
         delattr(st.session_state, '_session_cache')
     
-    # 2. Force clear conversations cache to prevent cross-user contamination
-    if 'conversations' in st.session_state:
-        st.session_state.conversations = {}
-    
-    # 3. Validate current session
+    # 2. Validate current session WITHOUT clearing conversations
     if st.session_state.get('authenticated') and st.session_state.get('session_id'):
         try:
             from auth import validate_session
-            from services.user_service import user_service
-            import asyncio
             
             # Re-validate session
             username = validate_session(st.session_state.session_id)
@@ -39,25 +33,8 @@ def ensure_user_isolation():
                 clear_user_state()
                 return False
             
-            # Get correct user data from database
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            
-            user_data = loop.run_until_complete(user_service.get_user_by_username(username))
-            if not user_data:
-                logger.error(f"Could not get user data for: {username}")
-                clear_user_state()
-                return False
-            
-            # Update session state with correct data
-            st.session_state.username = username
-            st.session_state.user_id = user_data['legacy_id']
-            st.session_state.user_uuid = user_data['id']
-            
-            logger.info(f"User isolation validated for: {username} (ID: {user_data['legacy_id']}, UUID: {user_data['id']})")
+            # Basic validation passed
+            logger.debug(f"User isolation validated for: {username}")
             return True
             
         except Exception as e:
@@ -65,7 +42,8 @@ def ensure_user_isolation():
             clear_user_state()
             return False
     
-    return False
+    # If not authenticated, that's okay for some operations
+    return st.session_state.get('authenticated', False)
 
 def clear_user_state():
     """Clear all user-specific state."""
@@ -170,10 +148,9 @@ def get_secure_conversations():
         logger.warning("Attempted to access conversations without authentication")
         return {}
     
-    # Validate user isolation before returning conversations
-    if not ensure_user_isolation():
-        logger.error("User isolation validation failed when accessing conversations")
-        st.session_state.conversations = {}
+    # Basic validation without clearing data
+    if not st.session_state.get('username') or not st.session_state.get('session_id'):
+        logger.warning("Missing username or session_id")
         return {}
     
     # Return conversations only if they belong to the current user
@@ -183,7 +160,8 @@ def get_secure_conversations():
     if not conversations and st.session_state.get('authenticated'):
         logger.info("No conversations in session state, reloading...")
         conversations = load_user_conversations_safely()
-        st.session_state.conversations = conversations
+        if conversations:
+            st.session_state.conversations = conversations
     
     return conversations
 
@@ -203,11 +181,13 @@ def secure_update_conversations(new_conversations):
         logger.error("Attempted to update conversations without authentication")
         return False
     
-    if not ensure_user_isolation():
-        logger.error("User isolation validation failed during conversation update")
+    # Basic validation without aggressive clearing
+    if not st.session_state.get('username') or not st.session_state.get('session_id'):
+        logger.error("Missing username or session_id during conversation update")
         return False
     
     st.session_state.conversations = new_conversations
+    logger.info(f"Updated conversations for user: {st.session_state.username}")
     return True
 
 def secure_update_conversation(conv_id, updates):

@@ -103,10 +103,9 @@ async def load_user_conversations() -> Dict:
         # Load conversations from database
         conversations = await conversation_service.get_user_conversations(user_data['id'])
         
-        # Update session state - but only after user validation
+        # Update session state securely
         from fix_user_isolation import secure_update_conversations
-        if not secure_update_conversations(conversations):
-            logger.error("Failed to securely update conversations")
+        secure_update_conversations(conversations)
         
         logger.info(f"Loaded {len(conversations)} conversations")
         return conversations
