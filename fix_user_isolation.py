@@ -164,6 +164,72 @@ def clear_all_user_data():
     
     logger.info("All user data cleared for secure session initialization")
 
+def get_secure_conversations():
+    """Get conversations with user validation - use this instead of direct session state access."""
+    if not st.session_state.get('authenticated') or not st.session_state.get('user_id'):
+        logger.warning("Attempted to access conversations without authentication")
+        return {}
+    
+    # Validate user isolation before returning conversations
+    if not ensure_user_isolation():
+        logger.error("User isolation validation failed when accessing conversations")
+        st.session_state.conversations = {}
+        return {}
+    
+    # Return conversations only if they belong to the current user
+    conversations = st.session_state.get('conversations', {})
+    
+    # Additional validation: check if conversations are empty and reload if needed
+    if not conversations and st.session_state.get('authenticated'):
+        logger.info("No conversations in session state, reloading...")
+        conversations = load_user_conversations_safely()
+        st.session_state.conversations = conversations
+    
+    return conversations
+
+def get_secure_current_conversation():
+    """Get current conversation with user validation."""
+    conversations = get_secure_conversations()
+    current_id = st.session_state.get('current_conversation_id')
+    
+    if current_id and current_id in conversations:
+        return conversations[current_id]
+    
+    return None
+
+def secure_update_conversations(new_conversations):
+    """Securely update conversations after user validation."""
+    if not st.session_state.get('authenticated') or not st.session_state.get('user_id'):
+        logger.error("Attempted to update conversations without authentication")
+        return False
+    
+    if not ensure_user_isolation():
+        logger.error("User isolation validation failed during conversation update")
+        return False
+    
+    st.session_state.conversations = new_conversations
+    return True
+
+def secure_update_conversation(conv_id, updates):
+    """Securely update a specific conversation."""
+    conversations = get_secure_conversations()
+    
+    if conv_id in conversations:
+        conversations[conv_id].update(updates)
+        return secure_update_conversations(conversations)
+    
+    return False
+
+def secure_delete_conversation(conv_id):
+    """Securely delete a conversation."""
+    conversations = get_secure_conversations()
+    
+    if conv_id in conversations:
+        del conversations[conv_id]
+        return secure_update_conversations(conversations)
+    
+    return False
+
 # Add this to your session initialization
 def enhanced_session_validation():
     """Enhanced session validation with user isolation checks."""

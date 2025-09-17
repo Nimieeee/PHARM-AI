@@ -74,10 +74,12 @@ def render_sidebar():
                 st.error("Failed to create conversation")
         
         # List conversations
-        if st.session_state.conversations:
+        from fix_user_isolation import get_secure_conversations
+        conversations = get_secure_conversations()
+        if conversations:
             # Sort conversations by creation date (newest first)
             sorted_conversations = sorted(
-                st.session_state.conversations.items(),
+                conversations.items(),
                 key=lambda x: x[1].get('created_at', ''),
                 reverse=True
             )
@@ -113,7 +115,7 @@ def render_sidebar():
                             success = run_async(delete_conversation(conv_id))
                             if success:
                                 # Check if we need to create a new conversation
-                                if not st.session_state.conversations:
+                                if not conversations:
                                     # No conversations left, create a new one automatically
                                     new_conv_id = run_async(create_new_conversation())
                                     if new_conv_id:

@@ -60,7 +60,8 @@ def get_user_stats():
 def get_recent_conversations():
     """Get recent conversations for the homepage."""
     try:
-        conversations = st.session_state.get('conversations', {})
+        from fix_user_isolation import get_secure_conversations
+        conversations = get_secure_conversations()
         
         # Sort by updated_at (most recent first)
         sorted_conversations = sorted(

@@ -57,7 +57,8 @@ def render_chatbot_interface():
     """Render the enhanced chatbot interface with optimized performance."""
     
     # Load user conversations only when needed (lazy loading)
-    if not st.session_state.get('conversations'):
+    from fix_user_isolation import get_secure_conversations
+    if not get_secure_conversations():
         load_user_conversations()
     
     # Enhanced sidebar for conversation management
@@ -83,7 +84,8 @@ def load_user_conversations():
         
         # Load conversations safely - always fresh to prevent cross-user contamination
         conversations = load_user_conversations_safely()
-        st.session_state.conversations = conversations
+        from fix_user_isolation import secure_update_conversations
+        secure_update_conversations(conversations)
         
         logger.info(f"Safely loaded {len(conversations)} conversations for user: {st.session_state.username}")
         
@@ -156,7 +158,8 @@ def render_conversation_list():
     """Render the list of conversations."""
     st.markdown("### 💬 Conversations")
     
-    conversations = st.session_state.get('conversations', {})
+    from fix_user_isolation import get_secure_conversations
+    conversations = get_secure_conversations()
     
     if not conversations:
         st.info("No conversations yet. Start chatting to create your first conversation!")
@@ -230,7 +233,8 @@ def render_conversation_list():
 
 def load_conversation(conversation_id):
     """Load a specific conversation."""
-    conversations = st.session_state.get('conversations', {})
+    from fix_user_isolation import get_secure_conversations
+    conversations = get_secure_conversations()
     if conversation_id in conversations:
         st.session_state.current_conversation_id = conversation_id
         st.session_state.chat_messages = conversations[conversation_id].get('messages', [])
@@ -290,20 +294,21 @@ def delete_specific_conversation(conv_id: str):
         success = run_async(delete_conversation(conv_id))
         
         if success:
-            # Remove from session state
-            if conv_id in st.session_state.conversations:
-                del st.session_state.conversations[conv_id]
+            # Remove from session state securely
+            from fix_user_isolation import secure_delete_conversation, get_secure_conversations
+            secure_delete_conversation(conv_id)
             
             # Clean up confirmation state
             del st.session_state[f"confirm_delete_{conv_id}"]
             
             # If this was the current conversation, switch to another or clear
             if st.session_state.get('current_conversation_id') == conv_id:
-                remaining_conversations = list(st.session_state.conversations.keys())
+                remaining_conversations = list(get_secure_conversations().keys())
                 if remaining_conversations:
                     # Switch to the most recent conversation
                     st.session_state.current_conversation_id = remaining_conversations[0]
-                    st.session_state.chat_messages = st.session_state.conversations[remaining_conversations[0]].get('messages', [])
+                    conversations = get_secure_conversations()
+                    st.session_state.chat_messages = conversations[remaining_conversations[0]].get('messages', [])
                 else:
                     # No conversations left
                     st.session_state.current_conversation_id = None
@@ -351,7 +356,8 @@ def render_rename_dialog():
         st.session_state.show_rename_dialog = False
         return
     
-    conversations = st.session_state.get('conversations', {})
+    from fix_user_isolation import get_secure_conversations
+    conversations = get_secure_conversations()
     current_title = conversations.get(conv_id, {}).get('title', 'Untitled Chat')
     
     st.markdown("**✏️ Rename Conversation**")
@@ -373,8 +379,9 @@ def render_rename_dialog():
                     success = run_async(update_conversation_title(conv_id, new_title.strip()))
                     
                     if success:
-                        # Update local state
-                        st.session_state.conversations[conv_id]['title'] = new_title.strip()
+                        # Update local state securely
+                        from fix_user_isolation import secure_update_conversation
+                        secure_update_conversation(conv_id, {'title': new_title.strip()})
                         st.success("✅ Conversation renamed!")
                         st.session_state.show_rename_dialog = False
                         st.rerun()
@@ -694,7 +701,8 @@ def render_chat_header():
     
     with col1:
         if st.session_state.get('current_conversation_id'):
-            conversations = st.session_state.get('conversations', {})
+            from fix_user_isolation import get_secure_conversations
+            conversations = get_secure_conversations()
             conv_id = st.session_state.current_conversation_id
             title = conversations.get(conv_id, {}).get('title', 'Untitled Chat')
             st.title(f"💊 {title}")
@@ -1245,17 +1253,16 @@ def save_conversation_to_database():
         ))
         
         if success:
-            # Update local conversations cache
-            if 'conversations' not in st.session_state:
-                st.session_state.conversations = {}
-            
-            st.session_state.conversations[st.session_state.current_conversation_id] = {
+            # Update local conversations cache securely
+            from fix_user_isolation import get_secure_conversations, secure_update_conversation
+            conv_id = st.session_state.current_conversation_id
+            secure_update_conversation(conv_id, {
                 'title': generate_conversation_title(),
                 'messages': st.session_state.chat_messages.copy(),
                 'updated_at': datetime.now().isoformat(),
                 'model': st.session_state.get('selected_model_mode', 'normal'),
                 'message_count': len(st.session_state.chat_messages)
-            }
+            })
             
             logger.info(f"Conversation saved successfully: {len(st.session_state.chat_messages)} messages")
             return True

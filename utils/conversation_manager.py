@@ -57,11 +57,10 @@ async def create_new_conversation(title: str = None) -> Optional[str]:
             st.session_state.get('selected_model_mode', 'normal')
         )
         
-        # Update local session state
-        if 'conversations' not in st.session_state:
-            st.session_state.conversations = {}
-        
-        st.session_state.conversations[conversation_id] = {
+        # Update local session state securely
+        from fix_user_isolation import get_secure_conversations, secure_update_conversations
+        conversations = get_secure_conversations()
+        conversations[conversation_id] = {
             "title": title,
             "messages": [],
             "created_at": datetime.now().isoformat(),
@@ -69,6 +68,7 @@ async def create_new_conversation(title: str = None) -> Optional[str]:
             "model": st.session_state.get('selected_model_mode', 'normal'),
             "message_count": 0
         }
+        secure_update_conversations(conversations)
         
         # Set as current conversation
         st.session_state.current_conversation_id = conversation_id
@@ -103,8 +103,10 @@ async def load_user_conversations() -> Dict:
         # Load conversations from database
         conversations = await conversation_service.get_user_conversations(user_data['id'])
         
-        # Update session state
-        st.session_state.conversations = conversations
+        # Update session state - but only after user validation
+        from fix_user_isolation import secure_update_conversations
+        if not secure_update_conversations(conversations):
+            logger.error("Failed to securely update conversations")
         
         logger.info(f"Loaded {len(conversations)} conversations")
         return conversations
@@ -116,10 +118,10 @@ async def load_user_conversations() -> Dict:
 def get_current_messages() -> List[Dict]:
     """Get messages from current conversation."""
     try:
-        if (st.session_state.get('current_conversation_id') and 
-            st.session_state.get('conversations') and
-            st.session_state.current_conversation_id in st.session_state.conversations):
-            return st.session_state.conversations[st.session_state.current_conversation_id]["messages"]
+        from fix_user_isolation import get_secure_current_conversation
+        current_conv = get_secure_current_conversation()
+        if current_conv:
+            return current_conv.get("messages", [])
     except Exception as e:
         logger.error(f"Error getting current messages: {e}")
     
@@ -162,17 +164,29 @@ async def add_message_to_current_conversation(role: str, content: str) -> bool:
         )
         
         if success:
-            # Update local session state
-            if st.session_state.current_conversation_id in st.session_state.conversations:
-                st.session_state.conversations[st.session_state.current_conversation_id]["messages"].append(message)
-                st.session_state.conversations[st.session_state.current_conversation_id]["updated_at"] = datetime.now().isoformat()
-                st.session_state.conversations[st.session_state.current_conversation_id]["message_count"] += 1
+            # Update local session state securely
+            from fix_user_isolation import secure_update_conversation
+            conv_id = st.session_state.current_conversation_id
+            
+            # Get current conversation data
+            conversations = get_secure_conversations()
+            if conv_id in conversations:
+                current_conv = conversations[conv_id]
+                messages = current_conv.get("messages", [])
+                messages.append(message)
+                
+                updates = {
+                    "messages": messages,
+                    "updated_at": datetime.now().isoformat(),
+                    "message_count": len(messages)
+                }
                 
                 # Update conversation title based on first user message
-                if (role == "user" and 
-                    len(st.session_state.conversations[st.session_state.current_conversation_id]["messages"]) == 1):
+                if role == "user" and len(messages) == 1:
                     title = generate_smart_title(content)
-                    st.session_state.conversations[st.session_state.current_conversation_id]["title"] = title
+                    updates["title"] = title
+                
+                secure_update_conversation(conv_id, updates)
                     
                     # Update title in database
                     await conversation_service.update_conversation_title(
@@ -246,10 +260,12 @@ async def update_conversation_title(conversation_id: str, new_title: str) -> boo
         )
         
         if success:
-            # Update local session state
-            if conversation_id in st.session_state.conversations:
-                st.session_state.conversations[conversation_id]["title"] = new_title
-                st.session_state.conversations[conversation_id]["updated_at"] = datetime.now().isoformat()
+            # Update local session state securely
+            from fix_user_isolation import secure_update_conversation
+            secure_update_conversation(conversation_id, {
+                "title": new_title,
+                "updated_at": datetime.now().isoformat()
+            })
             
             logger.info(f"✅ Conversation title updated: {conversation_id}")
             return True
@@ -279,9 +295,9 @@ async def delete_conversation(conversation_id: str) -> bool:
         )
         
         if success:
-            # Clean up session state
-            if conversation_id in st.session_state.conversations:
-                del st.session_state.conversations[conversation_id]
+            # Clean up session state securely
+            from fix_user_isolation import secure_delete_conversation, get_secure_conversations
+            secure_delete_conversation(conversation_id)
             
             # Clean up conversation documents
             if 'conversation_documents' in st.session_state and conversation_id in st.session_state.conversation_documents:
@@ -290,10 +306,11 @@ async def delete_conversation(conversation_id: str) -> bool:
             # Handle current conversation
             if st.session_state.current_conversation_id == conversation_id:
                 # Switch to another conversation or clear current
-                if st.session_state.conversations:
+                conversations = get_secure_conversations()
+                if conversations:
                     # Switch to most recent conversation
                     sorted_conversations = sorted(
-                        st.session_state.conversations.items(),
+                        conversations.items(),
                         key=lambda x: x[1].get('updated_at', x[1].get('created_at', '')),
                         reverse=True
                     )
@@ -324,12 +341,14 @@ async def duplicate_conversation(conversation_id: str, new_title: str = None) ->
         if not user_data:
             return None
         
-        # Get original conversation
-        if conversation_id not in st.session_state.conversations:
+        # Get original conversation securely
+        from fix_user_isolation import get_secure_conversations
+        conversations = get_secure_conversations()
+        if conversation_id not in conversations:
             logger.error(f"Conversation not found: {conversation_id}")
             return None
         
-        original_conv = st.session_state.conversations[conversation_id]
+        original_conv = conversations[conversation_id]
         
         # Create new conversation with duplicated title
         if not new_title:
@@ -352,8 +371,10 @@ async def duplicate_conversation(conversation_id: str, new_title: str = None) ->
                 message
             )
         
-        # Update local session state
-        st.session_state.conversations[new_conversation_id] = {
+        # Update local session state securely
+        from fix_user_isolation import get_secure_conversations, secure_update_conversations
+        conversations = get_secure_conversations()
+        conversations[new_conversation_id] = {
             "title": new_title,
             "messages": original_conv.get('messages', []).copy(),
             "created_at": datetime.now().isoformat(),
@@ -361,6 +382,7 @@ async def duplicate_conversation(conversation_id: str, new_title: str = None) ->
             "model": original_conv.get('model', 'normal'),
             "message_count": len(original_conv.get('messages', []))
         }
+        secure_update_conversations(conversations)
         
         # Copy documents if any
         if 'conversation_documents' in st.session_state and conversation_id in st.session_state.conversation_documents:
@@ -376,7 +398,8 @@ async def duplicate_conversation(conversation_id: str, new_title: str = None) ->
 async def search_conversations(query: str) -> List[Dict]:
     """Search conversations by title and content."""
     try:
-        conversations = st.session_state.get('conversations', {})
+        from fix_user_isolation import get_secure_conversations
+        conversations = get_secure_conversations()
         results = []
         
         query_lower = query.lower()
@@ -416,7 +439,8 @@ async def search_conversations(query: str) -> List[Dict]:
 def get_conversation_stats() -> Dict:
     """Get statistics about user's conversations."""
     try:
-        conversations = st.session_state.get('conversations', {})
+        from fix_user_isolation import get_secure_conversations
+        conversations = get_secure_conversations()
         
         total_conversations = len(conversations)
         total_messages = sum(len(conv.get('messages', [])) for conv in conversations.values())

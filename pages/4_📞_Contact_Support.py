@@ -403,6 +403,7 @@ def render_contact_info():
 
 def render_system_info():
     """Render system information for troubleshooting."""
+    from fix_user_isolation import get_secure_conversations
     st.markdown("### 🔧 System Information")
     st.markdown("This information helps our support team troubleshoot issues more effectively.")
     
@@ -424,7 +425,9 @@ def render_system_info():
     col1, col2 = st.columns(2)
     
     with col1:
-        conversations_count = len(st.session_state.get('conversations', {}))
+        from fix_user_isolation import get_secure_conversations
+        conversations = get_secure_conversations()
+        conversations_count = len(conversations)
         st.info(f"**Total Conversations**: {conversations_count}")
         
         current_conv_id = st.session_state.get('current_conversation_id')
@@ -432,7 +435,7 @@ def render_system_info():
     
     with col2:
         total_messages = 0
-        for conv in st.session_state.get('conversations', {}).values():
+        for conv in conversations.values():
             total_messages += len(conv.get('messages', []))
         st.info(f"**Total Messages**: {total_messages}")
         
@@ -491,8 +494,8 @@ User Session:
 - Session ID: {st.session_state.get('session_id', 'Not available')}
 
 App Statistics:
-- Total Conversations: {len(st.session_state.get('conversations', {}))}
-- Total Messages: {sum(len(conv.get('messages', [])) for conv in st.session_state.get('conversations', {}).values())}
+- Total Conversations: {len(get_secure_conversations())}
+- Total Messages: {sum(len(conv.get('messages', [])) for conv in get_secure_conversations().values())}
 - Current Chat Messages: {len(st.session_state.get('chat_messages', []))}
 
 Environment:
