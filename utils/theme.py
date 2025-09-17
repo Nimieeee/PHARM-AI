@@ -278,6 +278,19 @@ def get_dark_theme_css():
             border-radius: 4px !important;
         }
         
+        /* Dark mode welcome card */
+        .welcome-card {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%) !important;
+            border-color: #475569 !important;
+            color: #f8fafc !important;
+        }
+        
+        .welcome-tag {
+            background: #374151 !important;
+            border-color: #6b7280 !important;
+            color: #f8fafc !important;
+        }
+        
         /* Dark mode alerts */
         .stSuccess {
             background-color: #064e3b !important;
@@ -315,18 +328,21 @@ def get_dark_theme_css():
                 padding: 16px 0 !important;
             }
             
-            /* Dark mode chat input field */
+            /* Dark mode chat input field - seamless background blend */
             .stChatInput > div > div > div > div {
-                background: #374151 !important;
-                border: 2px solid #6b7280 !important;
+                background: transparent !important;
+                border: none !important;
                 color: #f9fafb !important;
-                border-radius: 12px !important;
-                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                outline: none !important;
             }
             
             .stChatInput > div > div > div > div:focus {
-                border-color: #8b5cf6 !important;
-                box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2) !important;
+                background: transparent !important;
+                border: none !important;
+                box-shadow: none !important;
+                outline: none !important;
             }
             
             /* Maximum mobile readability in dark mode */
@@ -497,11 +513,15 @@ def get_responsive_theme_css():
                 line-height: 1.7 !important;
             }
             
-            /* Mobile chat input improvements */
+            /* Mobile chat input improvements - seamless blend */
             .stChatInput > div > div > div > div {
+                background: transparent !important;
+                border: none !important;
                 padding: 16px 20px !important;
                 font-size: 16px !important;
                 min-height: 48px !important;
+                box-shadow: none !important;
+                outline: none !important;
             }
             
             /* Mobile file uploader */
@@ -672,7 +692,7 @@ def get_responsive_theme_css():
             outline-offset: 2px !important;
         }
         
-        /* Seamless chat input - part of the page */
+        /* Seamless chat input - blends with background */
         .stChatInputContainer {
             background: transparent !important;
             border: none !important;
@@ -683,19 +703,22 @@ def get_responsive_theme_css():
             position: relative !important;
         }
         
-        /* Style the actual input field */
+        /* Style the actual input field - seamless background blend */
         .stChatInput > div > div > div > div {
-            background: #ffffff !important;
-            border: 2px solid #e5e7eb !important;
-            border-radius: 12px !important;
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
             padding: 16px 20px !important;
             font-size: 16px !important;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+            box-shadow: none !important;
+            outline: none !important;
         }
         
         .stChatInput > div > div > div > div:focus {
-            border-color: #6366f1 !important;
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
+            background: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            outline: none !important;
         }
         
         /* Accessibility improvements */

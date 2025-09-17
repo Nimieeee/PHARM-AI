@@ -41,9 +41,24 @@ def main():
     apply_theme()
     initialize_auth_session()
     
-    # Add mobile-specific enhancements
+    # Add mobile-specific enhancements and theme-aware styling
     st.markdown("""
     <style>
+        /* Enhanced toggle styling for model selection */
+        .stToggle > div > label {
+            font-weight: 500 !important;
+            font-size: 16px !important;
+        }
+        
+        /* Theme-aware welcome card styling */
+        .welcome-card {
+            transition: all 0.3s ease !important;
+        }
+        
+        .welcome-tag {
+            transition: all 0.3s ease !important;
+        }
+        
         /* Mobile chat optimizations */
         @media (max-width: 768px) {
             /* Hide sidebar toggle on mobile for cleaner look */
@@ -51,14 +66,14 @@ def main():
                 display: none !important;
             }
             
-            /* Optimize chat input for mobile */
+            /* Optimize chat input for mobile - seamless blend */
             .stChatInputContainer {
                 position: fixed !important;
                 bottom: 0 !important;
                 left: 0 !important;
                 right: 0 !important;
-                background: white !important;
-                border-top: 1px solid #e5e7eb !important;
+                background: transparent !important;
+                border: none !important;
                 padding: 0.5rem !important;
                 z-index: 1000 !important;
             }
@@ -72,6 +87,17 @@ def main():
             .stChatMessage {
                 word-wrap: break-word !important;
                 overflow-wrap: break-word !important;
+            }
+            
+            /* Mobile welcome card adjustments */
+            .welcome-card {
+                padding: 1.5rem !important;
+                margin: 0.5rem 0 !important;
+            }
+            
+            .welcome-tag {
+                padding: 0.4rem 0.8rem !important;
+                font-size: 14px !important;
             }
         }
         
@@ -227,17 +253,13 @@ def render_enhanced_sidebar():
         # Performance settings
         st.markdown("### ⚙️ Performance Settings")
         
-        # Model selection - 2 modes only
-        model_mode = st.selectbox(
-            "AI Model",
-            ["fast", "premium"],
-            index=0,  # Default to fast for speed
-            format_func=lambda x: {
-                "fast": "⚡ Fast Mode",
-                "premium": "💎 Premium Mode"
-            }[x]
+        # Model selection - Toggle between fast and premium
+        use_premium_model = st.toggle(
+            "💎 Premium Mode", 
+            value=st.session_state.get('selected_model_mode', 'fast') == 'premium',
+            help="Toggle between ⚡ Fast Mode (default) and 💎 Premium Mode for higher quality responses"
         )
-        st.session_state.selected_model_mode = model_mode
+        st.session_state.selected_model_mode = "premium" if use_premium_model else "fast"
         
         # Streaming toggle
         use_streaming = st.toggle(
@@ -852,14 +874,24 @@ def render_chat_header():
 def render_welcome_message():
     """Render welcome message for new conversations."""
     st.markdown("""
-    <div style="text-align: center; padding: 2rem; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border-radius: 10px; margin: 1rem 0;">
-        <h3>👋 Welcome to PharmGPT!</h3>
-        <p>I'm your AI pharmacology assistant. Ask me anything about:</p>
+    <div class="welcome-card" style="
+        text-align: center; 
+        padding: 2rem; 
+        background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); 
+        border-radius: 12px; 
+        margin: 1rem 0;
+        border: 1px solid #e0e7ff;
+        color: #1f2937;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    ">
+        <h3 style="color: inherit; margin-bottom: 1rem;">👋 Welcome to PharmGPT!</h3>
+        <p style="color: inherit; margin-bottom: 1.5rem;">I'm your AI pharmacology assistant. Ask me anything about:</p>
         <div style="display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
-            <span style="background: white; padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid #e0e7ff;">🧬 Drug Mechanisms</span>
-            <span style="background: white; padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid #e0e7ff;">⚗️ Interactions</span>
-            <span style="background: white; padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid #e0e7ff;">📊 Pharmacokinetics</span>
-            <span style="background: white; padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid #e0e7ff;">🏥 Clinical Applications</span>
+            <span class="welcome-tag" style="background: #ffffff; padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid #e0e7ff; color: inherit; transition: all 0.3s ease;">🧬 Drug Mechanisms</span>
+            <span class="welcome-tag" style="background: #ffffff; padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid #e0e7ff; color: inherit; transition: all 0.3s ease;">⚗️ Interactions</span>
+            <span class="welcome-tag" style="background: #ffffff; padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid #e0e7ff; color: inherit; transition: all 0.3s ease;">📊 Pharmacokinetics</span>
+            <span class="welcome-tag" style="background: #ffffff; padding: 0.5rem 1rem; border-radius: 20px; border: 1px solid #e0e7ff; color: inherit; transition: all 0.3s ease;">🏥 Clinical Applications</span>
         </div>
     </div>
     """, unsafe_allow_html=True)
@@ -936,15 +968,15 @@ def render_bottom_input_area():
     # Add spacing to push input to bottom
     st.markdown("<br>" * 2, unsafe_allow_html=True)
     
-    # Enhanced CSS for better input positioning
+    # Enhanced CSS for seamless input blending
     st.markdown("""
     <style>
     .stChatInput {
         position: sticky;
         bottom: 0;
-        background: white;
+        background: transparent;
         padding: 1rem 0;
-        border-top: 1px solid #e0e0e0;
+        border: none;
         z-index: 999;
         margin-top: 2rem;
     }
