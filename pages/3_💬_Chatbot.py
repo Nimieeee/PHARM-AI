@@ -26,12 +26,12 @@ from config import APP_TITLE, APP_ICON, MAX_FILE_SIZE_MB
 # Configure logging
 logger = logging.getLogger(__name__)
 
-# Page configuration
+# Mobile-responsive page configuration
 st.set_page_config(
     page_title=f"{APP_TITLE} - Chat",
     page_icon=APP_ICON,
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"  # Auto-collapse on mobile
 )
 
 def main():
@@ -40,6 +40,61 @@ def main():
     initialize_session_state()
     apply_theme()
     initialize_auth_session()
+    
+    # Add mobile-specific enhancements
+    st.markdown("""
+    <style>
+        /* Mobile chat optimizations */
+        @media (max-width: 768px) {
+            /* Hide sidebar toggle on mobile for cleaner look */
+            .stSidebarNav {
+                display: none !important;
+            }
+            
+            /* Optimize chat input for mobile */
+            .stChatInputContainer {
+                position: fixed !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+                background: white !important;
+                border-top: 1px solid #e5e7eb !important;
+                padding: 0.5rem !important;
+                z-index: 1000 !important;
+            }
+            
+            /* Add bottom padding to prevent content hiding behind fixed input */
+            .main .block-container {
+                padding-bottom: 80px !important;
+            }
+            
+            /* Mobile-friendly message display */
+            .stChatMessage {
+                word-wrap: break-word !important;
+                overflow-wrap: break-word !important;
+            }
+        }
+        
+        /* Touch-friendly improvements */
+        .stButton > button:active {
+            transform: scale(0.98) !important;
+            transition: transform 0.1s !important;
+        }
+        
+        /* Improve readability on small screens */
+        @media (max-width: 480px) {
+            .stMarkdown {
+                font-size: 14px !important;
+                line-height: 1.6 !important;
+            }
+            
+            h1, h2, h3 {
+                font-size: 1.2em !important;
+                margin-bottom: 0.5rem !important;
+            }
+        }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Check authentication first (faster than validation)
     if not st.session_state.get('authenticated'):

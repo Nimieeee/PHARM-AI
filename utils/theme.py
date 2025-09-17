@@ -4,15 +4,79 @@ Clean Light Theme System
 
 import streamlit as st
 
-def get_light_theme_css():
-    """Get clean light theme CSS for maximum readability."""
+def get_responsive_theme_css():
+    """Get responsive theme CSS optimized for mobile and desktop."""
     return """
     <style>
-        /* Force light mode for everything */
+        /* Mobile-First Responsive Design */
         .stApp {
             background-color: #ffffff !important;
             color: #1a202c !important;
             color-scheme: light !important;
+        }
+        
+        /* Mobile viewport optimization */
+        @media (max-width: 768px) {
+            .stApp {
+                padding: 0.5rem !important;
+            }
+            
+            .main .block-container {
+                padding-top: 1rem !important;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
+                max-width: 100% !important;
+            }
+            
+            /* Mobile sidebar improvements */
+            .stSidebar {
+                width: 100% !important;
+            }
+            
+            /* Mobile button improvements */
+            .stButton > button {
+                width: 100% !important;
+                padding: 0.75rem 1rem !important;
+                font-size: 16px !important; /* Prevents zoom on iOS */
+                min-height: 44px !important; /* Touch target size */
+            }
+            
+            /* Mobile input improvements */
+            .stTextInput > div > div > input,
+            .stTextArea > div > div > textarea {
+                font-size: 16px !important; /* Prevents zoom on iOS */
+                padding: 0.75rem !important;
+            }
+            
+            /* Mobile chat message improvements */
+            .stChatMessage {
+                margin: 0.5rem 0 !important;
+                padding: 0.75rem !important;
+                font-size: 14px !important;
+                line-height: 1.5 !important;
+            }
+            
+            /* Mobile file uploader */
+            .stFileUploader > div {
+                padding: 1rem !important;
+                min-height: 60px !important;
+            }
+        }
+        
+        /* Tablet optimizations */
+        @media (min-width: 769px) and (max-width: 1024px) {
+            .main .block-container {
+                max-width: 90% !important;
+                padding-left: 2rem !important;
+                padding-right: 2rem !important;
+            }
+        }
+        
+        /* Desktop optimizations */
+        @media (min-width: 1025px) {
+            .main .block-container {
+                max-width: 1200px !important;
+            }
         }
         
         .stSidebar {
@@ -296,5 +360,10 @@ def get_light_theme_css():
     """
 
 def apply_theme():
-    """Apply the clean light theme CSS."""
-    st.markdown(get_light_theme_css(), unsafe_allow_html=True)
+    """Apply the responsive theme CSS."""
+    st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
+
+# Keep backward compatibility
+def get_light_theme_css():
+    """Backward compatibility - returns responsive theme."""
+    return get_responsive_theme_css()
