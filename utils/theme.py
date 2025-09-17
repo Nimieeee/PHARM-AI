@@ -1,8 +1,154 @@
 """
-Clean Light Theme System
+Responsive Theme System with Dark Mode Support
 """
 
 import streamlit as st
+
+def get_dark_theme_css():
+    """Get dark theme CSS optimized for mobile and desktop."""
+    return """
+    <style>
+        /* Dark Mode Styles */
+        .stApp {
+            background-color: #0f172a !important;
+            color: #f1f5f9 !important;
+            color-scheme: dark !important;
+        }
+        
+        .stSidebar {
+            background-color: #1e293b !important;
+            border-right: 1px solid #334155 !important;
+        }
+        
+        .stSidebar .stMarkdown {
+            color: #e2e8f0 !important;
+        }
+        
+        /* Dark mode buttons */
+        .stButton > button {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border: 1px solid #475569 !important;
+            border-radius: 8px !important;
+        }
+        
+        .stButton > button:hover {
+            background-color: #334155 !important;
+            border-color: #6366f1 !important;
+        }
+        
+        .stButton > button[kind="primary"] {
+            background-color: #6366f1 !important;
+            color: #ffffff !important;
+            border: 1px solid #6366f1 !important;
+        }
+        
+        .stButton > button[kind="primary"]:hover {
+            background-color: #4f46e5 !important;
+        }
+        
+        /* Dark mode form elements */
+        .stTextInput > div > div > input {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border: 1px solid #475569 !important;
+            border-radius: 8px !important;
+        }
+        
+        .stTextInput > div > div > input:focus {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2) !important;
+        }
+        
+        .stTextArea > div > div > textarea {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border: 1px solid #475569 !important;
+            border-radius: 8px !important;
+        }
+        
+        .stSelectbox > div > div {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border: 1px solid #475569 !important;
+        }
+        
+        /* Dark mode chat messages */
+        .stChatMessage {
+            background-color: #1e293b !important;
+            border: 1px solid #334155 !important;
+            color: #f1f5f9 !important;
+        }
+        
+        .stChatMessage[data-testid="chat-message-user"] {
+            background-color: #312e81 !important;
+            border-color: #4338ca !important;
+        }
+        
+        .stChatMessage[data-testid="chat-message-assistant"] {
+            background-color: #064e3b !important;
+            border-color: #059669 !important;
+        }
+        
+        /* Dark mode file uploader */
+        .stFileUploader > div {
+            background-color: #1e293b !important;
+            border: 2px dashed #64748b !important;
+            color: #e2e8f0 !important;
+        }
+        
+        .stFileUploader > div:hover {
+            border-color: #6366f1 !important;
+            background-color: #334155 !important;
+        }
+        
+        /* Dark mode typography */
+        .stMarkdown {
+            color: #e2e8f0 !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            color: #f1f5f9 !important;
+        }
+        
+        /* Dark mode alerts */
+        .stSuccess {
+            background-color: #064e3b !important;
+            border: 1px solid #059669 !important;
+            color: #10b981 !important;
+        }
+        
+        .stError {
+            background-color: #7f1d1d !important;
+            border: 1px solid #dc2626 !important;
+            color: #f87171 !important;
+        }
+        
+        .stInfo {
+            background-color: #1e3a8a !important;
+            border: 1px solid #3b82f6 !important;
+            color: #60a5fa !important;
+        }
+        
+        .stWarning {
+            background-color: #92400e !important;
+            border: 1px solid #f59e0b !important;
+            color: #fbbf24 !important;
+        }
+        
+        /* Mobile dark mode optimizations */
+        @media (max-width: 768px) {
+            .stApp {
+                background-color: #020617 !important;
+            }
+            
+            .stChatInputContainer {
+                background: #0f172a !important;
+                border-top: 1px solid #334155 !important;
+            }
+        }
+    </style>
+    """
 
 def get_responsive_theme_css():
     """Get responsive theme CSS optimized for mobile and desktop."""
@@ -360,10 +506,33 @@ def get_responsive_theme_css():
     """
 
 def apply_theme():
-    """Apply the responsive theme CSS."""
-    st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
+    """Apply the selected theme (light or dark) with responsive design."""
+    # Get theme preference from session state
+    dark_mode = st.session_state.get('dark_mode', False)
+    
+    if dark_mode:
+        st.markdown(get_dark_theme_css(), unsafe_allow_html=True)
+    else:
+        st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
+
+def render_theme_toggle():
+    """Render theme toggle switch in sidebar."""
+    with st.sidebar:
+        st.markdown("---")
+        st.markdown("### 🎨 Appearance")
+        
+        dark_mode = st.toggle(
+            "🌙 Dark Mode",
+            value=st.session_state.get('dark_mode', False),
+            help="Switch between light and dark themes"
+        )
+        
+        # Update session state if changed
+        if dark_mode != st.session_state.get('dark_mode', False):
+            st.session_state.dark_mode = dark_mode
+            st.rerun()
 
 # Keep backward compatibility
 def get_light_theme_css():
-    """Backward compatibility - returns responsive theme."""
+    """Backward compatibility - returns responsive light theme."""
     return get_responsive_theme_css()

@@ -249,6 +249,10 @@ def render_enhanced_sidebar():
         
         # Current conversation info
         render_conversation_info()
+        
+        # Theme toggle
+        from utils.theme import render_theme_toggle
+        render_theme_toggle()
 
 def create_new_conversation():
     """Create a new conversation and save it to database immediately."""

@@ -28,6 +28,10 @@ def main():
     apply_theme()
     initialize_auth_session()
     
+    # Add theme toggle to sidebar
+    from utils.theme import render_theme_toggle
+    render_theme_toggle()
+    
     # If already authenticated, redirect to chatbot
     if st.session_state.get('authenticated'):
         st.success(f"Welcome back, {st.session_state.username}!")
