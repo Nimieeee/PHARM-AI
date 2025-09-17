@@ -1180,6 +1180,7 @@ def generate_streaming_response(prompt):
         document_context = get_conversation_context_cached(prompt, conversation_id)
         
         # Choose prompt based on performance settings
+        use_fast_prompt = selected_mode == 'fast'
         
         # Simplified prompt construction for speed
         if document_context and is_useful_document_context(document_context):
@@ -1235,6 +1236,7 @@ def generate_enhanced_response(prompt):
         document_context = get_conversation_context_cached(prompt, conversation_id)
         
         # Choose prompt based on performance settings
+        use_fast_prompt = selected_mode == 'fast'
         
         # Use RAG-enhanced prompt if we have document context
         if document_context and is_useful_document_context(document_context):
