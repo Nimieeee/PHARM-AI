@@ -133,7 +133,14 @@ def get_user_legacy_id(username: str) -> Optional[str]:
         from services.user_service import user_service
         user_data = run_async(user_service.get_user_by_username(username))
         if user_data:
-            return user_data['user_id']  # Return the legacy user_id (MD5 hash)
+            # Return legacy user_id if available, otherwise use UUID as fallback
+            legacy_id = user_data.get('user_id')
+            if legacy_id:
+                return legacy_id
+            else:
+                # For users without legacy_id (like admin), use UUID
+                logger.info(f"User {username} has no legacy_id, using UUID: {user_data['id']}")
+                return user_data['id']
         return None
     except Exception as e:
         logger.error(f"Error getting user legacy ID: {e}")

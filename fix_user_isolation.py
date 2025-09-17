@@ -72,22 +72,43 @@ def load_user_conversations_safely():
         from services.user_service import user_service
         import asyncio
         
-        # Ensure we have proper user identification
-        if not st.session_state.get('user_id'):
-            logger.error("No user_id in session state")
-            return {}
-        
-        # Get user UUID from legacy user_id
+        # Get user data - try multiple methods
         try:
             loop = asyncio.get_event_loop()
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
         
-        user_data = loop.run_until_complete(user_service.get_user_by_id(st.session_state.user_id))
+        user_data = None
+        user_id = st.session_state.get('user_id')
+        
+        # Method 1: Try by user_id - could be legacy_id or UUID
+        if user_id:
+            # First try as legacy_id
+            user_data = loop.run_until_complete(user_service.get_user_by_id(user_id))
+            
+            # If not found, try as UUID (for users like admin)
+            if not user_data:
+                try:
+                    user_data = loop.run_until_complete(user_service.get_user_by_uuid(user_id))
+                    logger.info(f"Found user by UUID: {user_id}")
+                except Exception:
+                    pass
+        
+        # Method 2: Try by username if user_id lookup failed
+        if not user_data and st.session_state.get('username'):
+            logger.info(f"Trying to find user by username: {st.session_state.username}")
+            user_data = loop.run_until_complete(user_service.get_user_by_username(st.session_state.username))
+        
+        # Method 3: Try by UUID if available
+        if not user_data and st.session_state.get('user_uuid'):
+            user_data = loop.run_until_complete(user_service.get_user_by_uuid(st.session_state.user_uuid))
+        
         if not user_data:
-            logger.error(f"User not found: {st.session_state.user_id}")
+            logger.error(f"User not found with any method. user_id: {st.session_state.get('user_id')}, username: {st.session_state.get('username')}")
             return {}
+        
+        logger.info(f"Found user: {user_data.get('username')} (UUID: {user_data['id']})")
         
         # Load conversations using the secure service with user UUID
         conversations = loop.run_until_complete(conversation_service.get_user_conversations(user_data['id']))
@@ -104,6 +125,8 @@ def load_user_conversations_safely():
         
     except Exception as e:
         logger.error(f"Error loading conversations safely: {e}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
         return {}
 
 def initialize_secure_session():
