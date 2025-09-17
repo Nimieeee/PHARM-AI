@@ -159,27 +159,28 @@ def get_dark_theme_css():
             background: #0f172a !important;
         }
         
-        /* Dark mode chat messages - Maximum readability */
+        /* Dark mode chat messages - Seamless background blend */
         .stChatMessage {
-            background-color: #1e293b !important;
-            border: 1px solid #475569 !important;
+            background-color: transparent !important;
+            border: none !important;
             color: #ffffff !important;
-            padding: 20px 24px !important;
+            padding: 20px 0px !important;
             margin: 16px 0 !important;
             line-height: 1.8 !important;
             font-size: 16px !important;
-            border-radius: 12px !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
-            background-color: #1e40af !important;
-            border-color: #3b82f6 !important;
+            background-color: transparent !important;
+            border: none !important;
             color: #ffffff !important;
         }
         
         .stChatMessage[data-testid="chat-message-assistant"] {
-            background-color: #047857 !important;
-            border-color: #10b981 !important;
+            background-color: transparent !important;
+            border: none !important;
             color: #ffffff !important;
         }
         
@@ -345,12 +346,15 @@ def get_dark_theme_css():
                 outline: none !important;
             }
             
-            /* Maximum mobile readability in dark mode */
+            /* Maximum mobile readability in dark mode - seamless blend */
             .stChatMessage {
-                padding: 20px !important;
+                background-color: transparent !important;
+                border: none !important;
+                padding: 20px 0px !important;
                 margin: 16px 0 !important;
                 font-size: 16px !important;
                 color: #ffffff !important;
+                box-shadow: none !important;
             }
             
             .stMarkdown {
@@ -441,8 +445,11 @@ def get_responsive_theme_css():
         }
         
         .stChatMessage {
-            padding: 16px 20px !important;
+            background-color: transparent !important;
+            border: none !important;
+            padding: 16px 0px !important;
             margin: 12px 0 !important;
+            box-shadow: none !important;
         }
         
         /* Mobile viewport optimization */
@@ -505,12 +512,15 @@ def get_responsive_theme_css():
                 padding: 0.75rem !important;
             }
             
-            /* Mobile chat message improvements */
+            /* Mobile chat message improvements - seamless blend */
             .stChatMessage {
+                background-color: transparent !important;
+                border: none !important;
                 margin: 16px 0 !important;
-                padding: 18px 20px !important;
+                padding: 18px 0px !important;
                 font-size: 16px !important;
                 line-height: 1.7 !important;
+                box-shadow: none !important;
             }
             
             /* Mobile chat input improvements - seamless blend */
@@ -854,26 +864,29 @@ def get_responsive_theme_css():
             color: #d97706 !important;
         }
         
-        /* Chat messages - Enhanced readability */
+        /* Chat messages - Seamless background blend */
         .stChatMessage {
-            background-color: #f8fafc !important;
-            border: 1px solid #e5e7eb !important;
-            border-radius: 12px !important;
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
             color: #1f2937 !important;
             margin: 16px 0 !important;
-            padding: 20px 24px !important;
+            padding: 20px 0px !important;
             font-size: 16px !important;
             line-height: 1.7 !important;
+            box-shadow: none !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
-            background-color: #eff6ff !important;
-            border-color: #bfdbfe !important;
+            background-color: transparent !important;
+            border: none !important;
+            color: #1f2937 !important;
         }
         
         .stChatMessage[data-testid="chat-message-assistant"] {
-            background-color: #f0fdf4 !important;
-            border-color: #bbf7d0 !important;
+            background-color: transparent !important;
+            border: none !important;
+            color: #1f2937 !important;
         }
         
         /* Toggle switches */
