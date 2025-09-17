@@ -68,12 +68,24 @@ def get_dark_theme_css():
             color: #f1f5f9 !important;
         }
         
-        /* Fix all white containers in dark mode */
-        .stContainer,
-        .element-container,
-        .stColumn,
-        .block-container {
+        /* Aggressively fix all white containers in dark mode */
+        .stApp .stContainer,
+        .stApp .element-container,
+        .stApp .stColumn,
+        .stApp .block-container,
+        .stApp div[data-testid="stVerticalBlock"],
+        .stApp div[data-testid="stHorizontalBlock"],
+        .stApp .main .block-container,
+        .stApp section[data-testid="stSidebar"] > div,
+        .stApp [data-testid="stAppViewContainer"],
+        .stApp [data-testid="stMain"] {
             background-color: transparent !important;
+            background: transparent !important;
+        }
+        
+        /* Force dark background on main containers */
+        .stApp [data-testid="stMain"] .main .block-container {
+            background-color: #0f172a !important;
         }
         
         /* Dark mode buttons - Maximum contrast */
@@ -136,6 +148,15 @@ def get_dark_theme_css():
             border: 1px solid #475569 !important;
             padding: 16px !important;
             border-radius: 8px !important;
+        }
+        
+        /* Override ALL white backgrounds aggressively */
+        .stApp div[style*="background-color: rgb(255, 255, 255)"],
+        .stApp div[style*="background-color: white"],
+        .stApp div[style*="background: white"],
+        .stApp div[style*="background: rgb(255, 255, 255)"] {
+            background-color: #0f172a !important;
+            background: #0f172a !important;
         }
         
         /* Dark mode chat messages - Maximum readability */
@@ -210,8 +231,42 @@ def get_dark_theme_css():
             color: #f1f5f9 !important;
         }
         
-        /* Fix any remaining text elements */
-        .stMarkdown * {
+        /* Nuclear option: Override ALL inline styles */
+        .stApp * {
+            color: #ffffff !important;
+        }
+        
+        /* But keep specific elements with their intended colors */
+        .stApp .stButton > button,
+        .stApp .stSelectbox,
+        .stApp .stTextInput,
+        .stApp .stTextArea,
+        .stApp .stChatMessage {
+            color: #ffffff !important;
+        }
+        
+        /* Aggressively fix ALL text elements */
+        .stApp .stMarkdown,
+        .stApp .stMarkdown *,
+        .stApp .stMarkdown p,
+        .stApp .stMarkdown span,
+        .stApp .stMarkdown div,
+        .stApp p,
+        .stApp span,
+        .stApp div:not(.stButton):not(.stSelectbox):not(.stTextInput):not(.stTextArea),
+        .stApp label,
+        .stApp .stText,
+        .stApp [data-testid="stText"],
+        .stApp .element-container p,
+        .stApp .element-container span {
+            color: #ffffff !important;
+        }
+        
+        /* Force white text on specific Streamlit elements */
+        .stApp [data-testid="stMarkdownContainer"] *,
+        .stApp [data-testid="stText"] *,
+        .stApp .stCaption,
+        .stApp .stCaption * {
             color: #ffffff !important;
         }
         
@@ -293,6 +348,39 @@ def get_dark_theme_css():
             }
         }
     </style>
+    
+    <script>
+    // Aggressive dark mode fix
+    function forceDarkMode() {
+        // Remove all white backgrounds
+        document.querySelectorAll('*').forEach(el => {
+            const computed = window.getComputedStyle(el);
+            if (computed.backgroundColor === 'rgb(255, 255, 255)' || 
+                computed.backgroundColor === 'white') {
+                el.style.setProperty('background-color', '#0f172a', 'important');
+            }
+            // Force white text on most elements
+            if (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && 
+                !el.classList.contains('stButton') &&
+                (computed.color === 'rgb(0, 0, 0)' || computed.color === 'black')) {
+                el.style.setProperty('color', '#ffffff', 'important');
+            }
+        });
+    }
+    
+    // Run multiple times to catch dynamic content
+    setTimeout(forceDarkMode, 100);
+    setTimeout(forceDarkMode, 500);
+    setTimeout(forceDarkMode, 1000);
+    
+    // Watch for changes
+    new MutationObserver(forceDarkMode).observe(document.body, {
+        childList: true, 
+        subtree: true, 
+        attributes: true, 
+        attributeFilter: ['style', 'class']
+    });
+    </script>
     """
 
 def get_responsive_theme_css():
