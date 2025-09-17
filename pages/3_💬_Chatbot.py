@@ -213,71 +213,8 @@ def render_conversation_list():
     from fix_user_isolation import get_secure_conversations
     conversations = get_secure_conversations()
     
-    # Enhanced debug info
-    logger.info(f"=== RENDER CONVERSATION LIST DEBUG ===")
-    logger.info(f"Conversations found: {len(conversations)}")
-    logger.info(f"Current user_id: {st.session_state.get('user_id', 'NOT SET')}")
-    logger.info(f"Current username: {st.session_state.get('username', 'NOT SET')}")
-    logger.info(f"Authenticated: {st.session_state.get('authenticated', False)}")
-    logger.info(f"Conversations type: {type(conversations)}")
-    logger.info(f"Conversations bool: {bool(conversations)}")
-    logger.info(f"not conversations: {not conversations}")
-    
-    if conversations:
-        logger.info("Conversation details:")
-        for conv_id, conv_data in conversations.items():
-            logger.info(f"  - {conv_id}: {conv_data.get('title', 'No title')} (loaded_for: {conv_data.get('_loaded_for_user', 'NOT SET')})")
-    
-    # Show debug info in UI too
-    with st.expander("🔍 Debug Info (Click to expand)", expanded=False):
-        st.write(f"**Conversations found**: {len(conversations)}")
-        st.write(f"**Type**: {type(conversations)}")
-        st.write(f"**Bool value**: {bool(conversations)}")
-        st.write(f"**not conversations**: {not conversations}")
-        st.write(f"**Username**: {st.session_state.get('username', 'NOT SET')}")
-        st.write(f"**User ID**: {st.session_state.get('user_id', 'NOT SET')}")
-        st.write(f"**Authenticated**: {st.session_state.get('authenticated', False)}")
-        
-        if conversations:
-            st.write("**Conversation IDs**:")
-            for conv_id in conversations.keys():
-                st.write(f"  - {conv_id}")
-    
     if not conversations:
         st.info("No conversations yet. Start chatting to create your first conversation!")
-        
-        # Add a debug button to force reload conversations
-        if st.button("🔄 Reload Conversations", help="Debug: Force reload conversations"):
-            from fix_user_isolation import load_user_conversations_safely, secure_update_conversations
-            
-            with st.spinner("Reloading conversations..."):
-                reloaded = load_user_conversations_safely()
-                
-            if reloaded:
-                success = secure_update_conversations(reloaded)
-                if success:
-                    st.success(f"Reloaded {len(reloaded)} conversations!")
-                    st.rerun()
-                else:
-                    st.error("Failed to update conversations in session state")
-            else:
-                st.warning("No conversations found in database")
-        
-        # Fix user_id button
-        if st.button("🔧 Fix User ID", help="Fix user_id if it's incorrect"):
-            from auth import get_user_legacy_id
-            username = st.session_state.get('username')
-            if username:
-                correct_user_id = get_user_legacy_id(username)
-                if correct_user_id:
-                    st.session_state.user_id = correct_user_id
-                    st.success(f"Fixed user_id to: {correct_user_id}")
-                    st.rerun()
-                else:
-                    st.error("Could not get correct user_id")
-            else:
-                st.error("No username in session")
-        
         return
     
     # Sort conversations by updated_at (most recent first)
@@ -377,19 +314,9 @@ def render_conversation_info():
     if doc_count > 0:
         st.metric("Documents", doc_count)
     
-    # Conversation actions
-    with st.expander("🔧 Actions"):
-        
-        # Other actions
-        if st.button("📋 Duplicate Chat", use_container_width=True):
-            duplicate_current_conversation()
-        
-        if st.button("✏️ Rename Chat", use_container_width=True):
-            st.session_state.show_rename_dialog = True
-        
-        # Show rename dialog if requested
-        if st.session_state.get('show_rename_dialog', False):
-            render_rename_dialog()
+    # Show rename dialog if requested
+    if st.session_state.get('show_rename_dialog', False):
+        render_rename_dialog()
 
 def delete_specific_conversation(conv_id: str):
     """Delete a specific conversation from the sidebar."""
