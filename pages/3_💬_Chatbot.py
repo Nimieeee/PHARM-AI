@@ -9,9 +9,11 @@ import logging
 from datetime import datetime
 import functools
 
-# Add the parent directory to the path so we can import from the main app
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# Get the absolute path to the parent directory
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, parent_dir)
 
+# Import required modules
 from utils.session_manager import initialize_session_state
 from utils.theme import apply_theme
 from auth import initialize_auth_session, logout_current_user
