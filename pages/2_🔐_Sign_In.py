@@ -45,11 +45,11 @@ def main():
     .auth-container {
         max-width: 500px;
         margin: 0 auto;
-        padding: 2rem;
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-        margin-top: 2rem;
+        padding: 0;
+        background: transparent;
+        border-radius: 0;
+        box-shadow: none;
+        margin-top: 0;
     }
     .auth-header {
         text-align: center;
@@ -68,7 +68,7 @@ def main():
     
     st.markdown("""
     <div class="auth-header">
-        <h1>🔐 PharmGPT Authentication</h1>
+        <h1>🔐 PharmGPT</h1>
         <p>Sign in to access your AI pharmacology assistant</p>
     </div>
     """, unsafe_allow_html=True)
