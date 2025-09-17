@@ -39,24 +39,36 @@ def get_api_keys():
     return groq_key, openrouter_key, mistral_key
 
 def get_model_configs():
-    """Get model configurations with API keys."""
+    """Get model configurations with API keys - optimized for speed."""
     groq_key, openrouter_key, mistral_key = get_api_keys()
-    mistral_key = os.environ.get("MISTRAL_API_KEY")
     
     return {
-        "normal": {
-            "model": "mistral-medium-latest",
-            "api_key": mistral_key,
-            "base_url": "https://api.mistral.ai/v1",
-            "description": "Mistral Medium (Balanced Performance)",
-            "use_native_groq": False
-        },
         "turbo": {
+            "model": "llama-3.1-70b-versatile",
+            "api_key": groq_key,
+            "base_url": "https://api.groq.com/openai/v1",
+            "description": "Llama 3.1 70B (Ultra Fast)",
+            "use_native_groq": False,
+            "max_tokens": 4096,
+            "temperature": 0.3
+        },
+        "normal": {
+            "model": "llama-3.1-8b-instant",
+            "api_key": groq_key,
+            "base_url": "https://api.groq.com/openai/v1",
+            "description": "Llama 3.1 8B Instant (Lightning Fast)",
+            "use_native_groq": False,
+            "max_tokens": 4096,
+            "temperature": 0.3
+        },
+        "premium": {
             "model": "mistral-large-latest",
             "api_key": mistral_key,
             "base_url": "https://api.mistral.ai/v1", 
-            "description": "Mistral Large (High Performance)",
-            "use_native_groq": False
+            "description": "Mistral Large (High Quality)",
+            "use_native_groq": False,
+            "max_tokens": 4096,
+            "temperature": 0.3
         }
     }
 
@@ -82,8 +94,14 @@ def get_model_token_limits() -> Dict:
     }
 
 def get_optimal_max_tokens(model: str, base_url: str) -> int:
-    """Get unified max_tokens for all models (7500 tokens)."""
-    return 7500  # Unified limit for both Normal and Turbo modes
+    """Get optimized max_tokens for speed."""
+    # Reduced tokens for faster generation
+    if "8b-instant" in model:
+        return 2048  # Very fast responses
+    elif "70b" in model:
+        return 3072  # Fast but comprehensive
+    else:
+        return 4096  # Standard
 
 def _get_client_for_model(model: str):
     """Get appropriate client for specific model (OpenAI or native Groq)."""
@@ -104,6 +122,42 @@ def _get_client_for_model(model: str):
                 )
     
     raise ValueError(f"Unknown model: {model}")
+
+def chat_completion_fast(model: str, messages: List[Dict]) -> str:
+    """Ultra-fast non-streaming completion for maximum speed."""
+    try:
+        client = _get_client_for_model(model)
+        model_configs = get_model_configs()
+        
+        # Find model config
+        model_config = None
+        for mode, config in model_configs.items():
+            if config["model"] == model:
+                model_config = config
+                break
+        
+        if not model_config:
+            raise ValueError(f"Model config not found for: {model}")
+        
+        # Fast completion without streaming
+        max_tokens = get_optimal_max_tokens(model, model_config["base_url"])
+        
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=model_config.get("temperature", 0.3),
+            max_tokens=max_tokens,
+            top_p=0.9,
+            frequency_penalty=0.0,
+            presence_penalty=0.0,
+            stream=False  # No streaming for maximum speed
+        )
+        
+        return response.choices[0].message.content
+        
+    except Exception as e:
+        logger.error(f"Error in fast completion: {e}")
+        return f"Error generating response: {str(e)}"
 
 def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
     """Generate ultra-fluid streaming chat completion with advanced features."""
@@ -137,22 +191,22 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                 tools=[{"type": "browser_search"}]
             )
         else:
-            # Standard OpenAI-compatible streaming
-            max_tokens = 7500
-            logger.info(f"Starting standard stream with {max_tokens} tokens for model: {model}")
+            # Optimized streaming for speed
+            max_tokens = get_optimal_max_tokens(model, model_config["base_url"])
+            logger.info(f"Starting optimized stream with {max_tokens} tokens for model: {model}")
             
             stream = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=True,
-                temperature=0.5,
+                temperature=model_config.get("temperature", 0.3),  # Lower temp for faster, focused responses
                 max_tokens=max_tokens,
-                top_p=0.95,
+                top_p=0.9,  # Slightly more focused
                 frequency_penalty=0.0,
                 presence_penalty=0.0
             )
         
-        # Smooth streaming with intelligent buffering
+        # Ultra-fast streaming with minimal buffering
         buffer = ""
         word_count = 0
         last_yield_time = time.time()
@@ -162,32 +216,25 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                 content = chunk.choices[0].delta.content
                 buffer += content
                 
-                # Count words in buffer
-                words_in_buffer = len(re.findall(r'\S+', buffer))
+                # Optimized yield conditions for maximum speed:
                 current_time = time.time()
                 time_since_last_yield = current_time - last_yield_time
                 
-                # Yield conditions for smooth streaming:
-                # 1. Buffer has 3-5 words (natural phrase chunks)
-                # 2. Or 150ms has passed (prevent long delays)
-                # 3. Or we hit sentence endings
-                # 4. Or buffer is getting long (20+ chars)
+                # Yield more aggressively for speed
                 should_yield = (
-                    words_in_buffer >= 3 or  # Natural word groupings
-                    time_since_last_yield >= 0.15 or  # Max 150ms delay
+                    len(buffer) >= 8 or  # Smaller chunks for faster display
+                    time_since_last_yield >= 0.08 or  # Faster max delay (80ms)
                     any(punct in buffer for punct in ['. ', '! ', '? ', '\n']) or  # Sentence breaks
-                    len(buffer) >= 20  # Prevent very long buffers
+                    ' ' in buffer and len(buffer) >= 4  # Word boundaries
                 )
                 
                 if should_yield and buffer.strip():
                     yield buffer
                     buffer = ""
-                    word_count += words_in_buffer
+                    word_count += len(re.findall(r'\S+', buffer))
                     last_yield_time = current_time
                     
-                    # Small delay for very fast responses to feel more natural
-                    if time_since_last_yield < 0.05:  # If chunk came very fast
-                        time.sleep(0.02)  # 20ms pause for readability
+                    # No artificial delays - maximum speed
             
             # Silent finish reason handling (no user-visible messages)
             if chunk.choices[0].finish_reason is not None:

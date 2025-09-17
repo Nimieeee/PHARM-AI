@@ -7,6 +7,7 @@ import sys
 import os
 import logging
 from datetime import datetime
+import functools
 
 # Add the parent directory to the path so we can import from the main app
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -157,15 +158,42 @@ def render_enhanced_sidebar():
             if fresh_conversations:
                 secure_update_conversations(fresh_conversations)
         
-        # Model selection
-        st.markdown("### ⚙️ Settings")
+        # Performance settings
+        st.markdown("### ⚙️ Performance Settings")
+        
+        # Model selection with speed focus
         model_mode = st.selectbox(
             "AI Model",
-            ["normal", "turbo"],
-            index=0 if st.session_state.get('selected_model_mode', 'normal') == 'normal' else 1,
-            format_func=lambda x: "🧠 Normal Mode" if x == "normal" else "⚡ Turbo Mode"
+            ["turbo", "normal", "premium"],
+            index=0,  # Default to turbo for speed
+            format_func=lambda x: {
+                "turbo": "⚡ Turbo (Ultra Fast)",
+                "normal": "🚀 Normal (Lightning Fast)", 
+                "premium": "💎 Premium (High Quality)"
+            }[x]
         )
         st.session_state.selected_model_mode = model_mode
+        
+        # Streaming toggle
+        use_streaming = st.toggle(
+            "🔄 Real-time Streaming", 
+            value=st.session_state.get('use_streaming', True),
+            help="Show responses as they're generated (faster perceived speed)"
+        )
+        st.session_state.use_streaming = use_streaming
+        
+        # Response length setting
+        response_length = st.selectbox(
+            "Response Length",
+            ["short", "medium", "long"],
+            index=0,  # Default to short for speed
+            format_func=lambda x: {
+                "short": "📝 Short (Fastest)",
+                "medium": "📄 Medium (Balanced)",
+                "long": "📚 Long (Detailed)"
+            }[x]
+        )
+        st.session_state.response_length = response_length
         
         # Conversation list
         render_conversation_list()
@@ -1079,10 +1107,17 @@ def process_chat_input(prompt):
         # Mark for refresh to show user message immediately
         st.session_state.force_refresh = True
         
-        # Generate assistant response
+        # Generate assistant response with streaming
         try:
-            # Generate response with enhanced context
-            full_response = generate_enhanced_response(prompt)
+            # Check if streaming is enabled
+            use_streaming = st.session_state.get('use_streaming', True)
+            
+            if use_streaming:
+                # Generate streaming response
+                full_response = generate_streaming_response(prompt)
+            else:
+                # Generate response with enhanced context (fast mode)
+                full_response = generate_enhanced_response(prompt)
             
             if not full_response or full_response.strip() == "":
                 full_response = "I apologize, but I couldn't generate a response. Please try again."
@@ -1096,7 +1131,7 @@ def process_chat_input(prompt):
             st.session_state.chat_messages.append(assistant_message)
             logger.info(f"Added assistant message to chat. Total messages: {len(st.session_state.chat_messages)}")
             
-            # Save to database asynchronously
+            # Save to database asynchronously (non-blocking)
             try:
                 from utils.conversation_manager import run_async, add_message_to_current_conversation
                 # Save user message
@@ -1127,12 +1162,69 @@ def process_chat_input(prompt):
         # Force rerun to display the response
         st.rerun()
 
-def generate_enhanced_response(prompt):
-    """Generate enhanced AI response with document context."""
+def generate_streaming_response(prompt):
+    """Generate streaming AI response for real-time display."""
     try:
         # Import AI functions
-        from openai_client import chat_completion, get_available_model_modes
+        from openai_client import chat_completion_stream, get_available_model_modes
         from prompts import pharmacology_system_prompt
+        
+        # Get available models
+        available_modes = get_available_model_modes()
+        if not available_modes:
+            return "❌ No AI models available. Please check your API keys."
+        
+        # Use selected model mode
+        selected_mode = st.session_state.get('selected_model_mode', 'turbo')  # Default to turbo for speed
+        if selected_mode not in available_modes:
+            selected_mode = list(available_modes.keys())[0]
+        
+        model = available_modes[selected_mode]["model"]
+        
+        # Get document context (cached for speed)
+        conversation_id = st.session_state.get('current_conversation_id', 'default')
+        document_context = get_conversation_context_cached(prompt, conversation_id)
+        
+        # Choose prompt based on performance settings
+        response_length = st.session_state.get('response_length', 'short')
+        use_fast_prompt = response_length == 'short' or selected_mode == 'turbo'
+        
+        # Simplified prompt construction for speed
+        if document_context and is_useful_document_context(document_context):
+            from prompts import get_rag_enhanced_prompt
+            enhanced_system_prompt = get_rag_enhanced_prompt(prompt, document_context)
+            api_messages = [{"role": "system", "content": enhanced_system_prompt}]
+        else:
+            base_prompt = pharmacology_fast_prompt if use_fast_prompt else pharmacology_system_prompt
+            api_messages = [
+                {"role": "system", "content": base_prompt},
+                {"role": "user", "content": prompt}
+            ]
+        
+        # Create placeholder for streaming response
+        response_placeholder = st.empty()
+        full_response = ""
+        
+        # Stream the response
+        for chunk in chat_completion_stream(model, api_messages):
+            full_response += chunk
+            response_placeholder.markdown(full_response + "▋")  # Show cursor
+        
+        # Remove cursor and show final response
+        response_placeholder.markdown(full_response)
+        
+        return full_response
+        
+    except Exception as e:
+        logger.error(f"Error in streaming response: {e}")
+        return f"Sorry, I encountered an error: {str(e)}"
+
+def generate_enhanced_response(prompt):
+    """Generate enhanced AI response with document context (fast mode)."""
+    try:
+        # Import AI functions
+        from openai_client import chat_completion_fast, get_available_model_modes
+        from prompts import pharmacology_system_prompt, pharmacology_fast_prompt
         
         # Get available models
         available_modes = get_available_model_modes()
@@ -1146,8 +1238,13 @@ def generate_enhanced_response(prompt):
         
         model = available_modes[selected_mode]["model"]
         
-        # Get document context
-        document_context = get_conversation_context(prompt)
+        # Get document context (cached for performance)
+        conversation_id = st.session_state.get('current_conversation_id', 'default')
+        document_context = get_conversation_context_cached(prompt, conversation_id)
+        
+        # Choose prompt based on performance settings
+        response_length = st.session_state.get('response_length', 'short')
+        use_fast_prompt = response_length == 'short' or selected_mode == 'turbo'
         
         # Use RAG-enhanced prompt if we have document context
         if document_context and is_useful_document_context(document_context):
@@ -1159,10 +1256,10 @@ def generate_enhanced_response(prompt):
                 {"role": "system", "content": enhanced_system_prompt}
             ]
         else:
-            # Use basic pharmacology prompt
-            enhanced_system_prompt = pharmacology_system_prompt
+            # Use appropriate prompt based on speed settings
+            base_prompt = pharmacology_fast_prompt if use_fast_prompt else pharmacology_system_prompt
             api_messages = [
-                {"role": "system", "content": enhanced_system_prompt},
+                {"role": "system", "content": base_prompt},
                 {"role": "user", "content": prompt}
             ]
         
@@ -1170,8 +1267,9 @@ def generate_enhanced_response(prompt):
         logger.info(f"System prompt length: {len(enhanced_system_prompt)}")
         logger.info(f"User prompt: {prompt[:100]}...")
         
-        # Generate the response (non-streaming for stability)
-        full_response = chat_completion(model, api_messages)
+        # Use fast completion for maximum speed
+        from openai_client import chat_completion_fast
+        full_response = chat_completion_fast(model, api_messages)
         
         logger.info(f"Generated response: {len(full_response)} characters")
         return full_response
@@ -1233,7 +1331,12 @@ def clean_document_content(content):
     
     return cleaned_content
 
-def get_conversation_context(user_query=""):
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def get_conversation_context_cached(user_query, conversation_id):
+    """Get document context for current conversation (cached)."""
+    return get_conversation_context_uncached(user_query)
+
+def get_conversation_context_uncached(user_query=""):
     """Get document context for current conversation - simplified version."""
     try:
         conv_id = st.session_state.get('current_conversation_id')
