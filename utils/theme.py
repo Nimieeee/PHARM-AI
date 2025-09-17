@@ -4,6 +4,21 @@ Responsive Theme System with Dark Mode Support
 
 import streamlit as st
 
+def get_system_aware_theme_css():
+    """Get CSS that respects system dark/light mode preference."""
+    return """
+    <style>
+        /* System-aware theme that follows device preference */
+        @media (prefers-color-scheme: light) {
+            """ + get_responsive_theme_css().replace('<style>', '').replace('</style>', '') + """
+        }
+        
+        @media (prefers-color-scheme: dark) {
+            """ + get_dark_theme_css().replace('<style>', '').replace('</style>', '') + """
+        }
+    </style>
+    """
+
 def get_dark_theme_css():
     """Get dark theme CSS optimized for readability and mobile."""
     return """
@@ -120,20 +135,34 @@ def get_dark_theme_css():
             background-color: #4b5563 !important;
         }
         
-        /* Dark mode typography - High contrast */
+        /* Dark mode typography - Enhanced readability */
         .stMarkdown {
-            color: #f3f4f6 !important;
-            line-height: 1.7 !important;
+            color: #f8fafc !important;
+            line-height: 1.8 !important;
+            font-size: 16px !important;
         }
         
         .stMarkdown p {
-            margin-bottom: 1rem !important;
+            margin-bottom: 1.25rem !important;
+            font-size: 16px !important;
+            line-height: 1.8 !important;
         }
         
         h1, h2, h3, h4, h5, h6 {
             color: #ffffff !important;
-            margin-bottom: 0.75rem !important;
-            margin-top: 1.5rem !important;
+            margin-bottom: 1rem !important;
+            margin-top: 2rem !important;
+            font-weight: 600 !important;
+        }
+        
+        /* Better text contrast */
+        .stMarkdown strong {
+            color: #ffffff !important;
+            font-weight: 600 !important;
+        }
+        
+        .stMarkdown em {
+            color: #e2e8f0 !important;
         }
         
         /* Better code blocks in dark mode */
@@ -176,8 +205,10 @@ def get_dark_theme_css():
             }
             
             .stChatInputContainer {
-                background: #111827 !important;
-                border-top: 1px solid #4b5563 !important;
+                background: #1f2937 !important;
+                border: 1px solid #4b5563 !important;
+                border-radius: 12px !important;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
             }
             
             /* Better mobile readability in dark mode */
@@ -443,12 +474,45 @@ def get_responsive_theme_css():
             }
         }
         
+        /* Enhanced readability for light mode */
+        .stMarkdown {
+            font-size: 16px !important;
+            line-height: 1.8 !important;
+            color: #1f2937 !important;
+        }
+        
+        .stMarkdown p {
+            margin-bottom: 1.25rem !important;
+            font-size: 16px !important;
+            line-height: 1.8 !important;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            margin-bottom: 1rem !important;
+            margin-top: 2rem !important;
+            font-weight: 600 !important;
+            color: #111827 !important;
+        }
+        
         /* Better focus indicators */
         .stButton > button:focus,
         .stTextInput > div > div > input:focus,
         .stTextArea > div > div > textarea:focus {
             outline: 2px solid #6366f1 !important;
             outline-offset: 2px !important;
+        }
+        
+        /* Better chat input positioning */
+        .stChatInputContainer {
+            position: sticky !important;
+            bottom: 16px !important;
+            background: white !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+            margin: 16px 0 !important;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+            z-index: 100 !important;
         }
         
         /* Accessibility improvements */
@@ -741,41 +805,42 @@ def get_responsive_theme_css():
     """
 
 def apply_theme():
-    """Apply the selected theme (light or dark) with responsive design."""
-    # Get theme preference from session state
-    dark_mode = st.session_state.get('dark_mode', False)
+    """Apply theme based on user preference or system setting."""
+    # Check if user has manually set a preference
+    user_preference = st.session_state.get('theme_preference', 'system')
     
-    if dark_mode:
+    if user_preference == 'system':
+        # Use CSS to detect system preference
+        st.markdown(get_system_aware_theme_css(), unsafe_allow_html=True)
+    elif user_preference == 'dark':
         st.markdown(get_dark_theme_css(), unsafe_allow_html=True)
-    else:
+    else:  # light
         st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
 
 def render_theme_toggle():
-    """Render easily accessible theme toggle."""
+    """Render theme selector with system preference option."""
     with st.sidebar:
-        # Move theme toggle to top for easy access
         st.markdown("### 🎨 Theme")
         
-        # Create columns for better mobile layout
-        col1, col2 = st.columns([3, 1])
+        theme_options = {
+            "system": "🔄 System Default",
+            "light": "☀️ Light Mode", 
+            "dark": "🌙 Dark Mode"
+        }
         
-        with col1:
-            dark_mode = st.toggle(
-                "🌙 Dark Mode",
-                value=st.session_state.get('dark_mode', False),
-                help="Switch between light and dark themes"
-            )
+        current_preference = st.session_state.get('theme_preference', 'system')
         
-        with col2:
-            # Add quick theme indicator
-            if st.session_state.get('dark_mode', False):
-                st.markdown("🌙")
-            else:
-                st.markdown("☀️")
+        selected_theme = st.selectbox(
+            "Choose theme:",
+            options=list(theme_options.keys()),
+            format_func=lambda x: theme_options[x],
+            index=list(theme_options.keys()).index(current_preference),
+            help="System Default follows your device's theme setting"
+        )
         
         # Update session state if changed
-        if dark_mode != st.session_state.get('dark_mode', False):
-            st.session_state.dark_mode = dark_mode
+        if selected_theme != current_preference:
+            st.session_state.theme_preference = selected_theme
             st.rerun()
         
         st.markdown("---")

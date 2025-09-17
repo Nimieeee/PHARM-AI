@@ -50,7 +50,7 @@ def main():
     .auth-container {
         max-width: 500px;
         margin: 0 auto;
-        padding: 0;
+        padding: 16px;
         background: transparent;
         border-radius: 0;
         box-shadow: none;
@@ -60,6 +60,45 @@ def main():
         text-align: center;
         margin-bottom: 2rem;
         color: #333;
+        padding: 16px;
+    }
+    
+    /* Better tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px !important;
+        padding: 8px !important;
+        background-color: #f8fafc !important;
+        border-radius: 12px !important;
+        margin-bottom: 24px !important;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        padding: 16px 24px !important;
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        font-size: 16px !important;
+        min-height: 48px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background-color: #6366f1 !important;
+        color: white !important;
+        font-weight: 600 !important;
+        box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2) !important;
+    }
+    
+    .stTabs [aria-selected="false"] {
+        background-color: white !important;
+        color: #6b7280 !important;
+        border: 1px solid #e5e7eb !important;
+    }
+    
+    .stTabs [aria-selected="false"]:hover {
+        background-color: #f9fafb !important;
+        color: #374151 !important;
     }
     </style>
     """, unsafe_allow_html=True)
