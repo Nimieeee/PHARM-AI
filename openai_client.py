@@ -25,26 +25,28 @@ def get_api_keys():
     """Get API keys from environment variables."""
     groq_key = os.environ.get("GROQ_API_KEY")
     openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-    return groq_key, openrouter_key
+    mistral_key = os.environ.get("MISTRAL_API_KEY")
+    return groq_key, openrouter_key, mistral_key
 
 def get_model_configs():
     """Get model configurations with API keys."""
-    groq_key, openrouter_key = get_api_keys()
+    groq_key, openrouter_key, mistral_key = get_api_keys()
+    mistral_key = os.environ.get("MISTRAL_API_KEY")
     
     return {
         "normal": {
-            "model": "gemma2-9b-it",
-            "api_key": groq_key,
-            "base_url": "https://api.groq.com/openai/v1",
-            "description": "Gemma2 9B Instruct (Balanced)",
+            "model": "mistral-medium",
+            "api_key": mistral_key,
+            "base_url": "https://api.mistral.ai/v1",
+            "description": "Mistral Medium (Balanced Performance)",
             "use_native_groq": False
         },
         "turbo": {
-            "model": "openai/gpt-oss-20b",
-            "api_key": groq_key,
-            "base_url": "https://api.groq.com/openai/v1", 
-            "description": "GPT OSS 20B with Reasoning & Browser Search",
-            "use_native_groq": True
+            "model": "mistral-large-2",
+            "api_key": mistral_key,
+            "base_url": "https://api.mistral.ai/v1", 
+            "description": "Mistral Large 2 (High Performance)",
+            "use_native_groq": False
         }
     }
 
