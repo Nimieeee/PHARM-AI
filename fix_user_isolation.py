@@ -296,9 +296,9 @@ def secure_update_conversations(new_conversations):
         logger.error("Attempted to update conversations without authentication")
         return False
     
-    # Basic validation without aggressive clearing
-    if not st.session_state.get('username') or not st.session_state.get('session_id'):
-        logger.error("Missing username or session_id during conversation update")
+    # Basic validation - only require username and user_id (session_id is optional)
+    if not st.session_state.get('username'):
+        logger.error("Missing username during conversation update")
         return False
     
     # CRITICAL SECURITY FIX: Mark all conversations as belonging to current user

@@ -164,7 +164,7 @@ async def add_message_to_current_conversation(role: str, content: str) -> bool:
         
         if success:
             # Update local session state securely
-            from fix_user_isolation import secure_update_conversation
+            from fix_user_isolation import secure_update_conversation, get_secure_conversations
             conv_id = st.session_state.current_conversation_id
             
             # Get current conversation data
