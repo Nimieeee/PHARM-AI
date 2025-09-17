@@ -27,8 +27,9 @@ def main():
     initialize_session_state()
     initialize_auth_session()
     
-    # Add theme toggle to sidebar
-    from utils.theme import render_theme_toggle
+    # Add mobile optimizations
+    from utils.theme import render_theme_toggle, add_mobile_meta_tags
+    add_mobile_meta_tags()
     render_theme_toggle()
     
     # Apply theme

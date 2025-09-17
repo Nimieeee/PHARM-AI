@@ -250,8 +250,9 @@ def render_enhanced_sidebar():
         # Current conversation info
         render_conversation_info()
         
-        # Theme toggle
-        from utils.theme import render_theme_toggle
+        # Theme toggle and mobile optimizations
+        from utils.theme import render_theme_toggle, add_mobile_meta_tags
+        add_mobile_meta_tags()
         render_theme_toggle()
 
 def create_new_conversation():

@@ -174,6 +174,21 @@ def get_responsive_theme_css():
                 max-width: 100% !important;
             }
             
+            /* Hide Streamlit branding on mobile */
+            .stDeployButton {
+                display: none !important;
+            }
+            
+            /* Optimize header on mobile */
+            header[data-testid="stHeader"] {
+                height: 2.5rem !important;
+            }
+            
+            /* Mobile navigation improvements */
+            .stSidebarNav {
+                padding: 0.5rem !important;
+            }
+            
             /* Mobile sidebar improvements */
             .stSidebar {
                 width: 100% !important;
@@ -222,6 +237,52 @@ def get_responsive_theme_css():
         @media (min-width: 1025px) {
             .main .block-container {
                 max-width: 1200px !important;
+            }
+        }
+        
+        /* Performance optimizations */
+        * {
+            box-sizing: border-box !important;
+        }
+        
+        /* Smooth transitions */
+        .stButton > button,
+        .stTextInput > div > div > input,
+        .stTextArea > div > div > textarea,
+        .stSelectbox > div > div {
+            transition: all 0.2s ease !important;
+        }
+        
+        /* Optimize scrolling */
+        .main {
+            scroll-behavior: smooth !important;
+        }
+        
+        /* Reduce layout shift */
+        .stChatMessage {
+            min-height: 2rem !important;
+        }
+        
+        /* Optimize images */
+        img {
+            max-width: 100% !important;
+            height: auto !important;
+        }
+        
+        /* Better focus indicators */
+        .stButton > button:focus,
+        .stTextInput > div > div > input:focus,
+        .stTextArea > div > div > textarea:focus {
+            outline: 2px solid #6366f1 !important;
+            outline-offset: 2px !important;
+        }
+        
+        /* Accessibility improvements */
+        @media (prefers-reduced-motion: reduce) {
+            * {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
             }
         }
         
@@ -531,6 +592,44 @@ def render_theme_toggle():
         if dark_mode != st.session_state.get('dark_mode', False):
             st.session_state.dark_mode = dark_mode
             st.rerun()
+
+def create_responsive_columns(mobile_cols=1, tablet_cols=2, desktop_cols=3):
+    """Create responsive columns based on screen size."""
+    # Use CSS to detect screen size and adjust accordingly
+    st.markdown("""
+    <style>
+    .responsive-container {
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1fr;
+    }
+    
+    @media (min-width: 768px) {
+        .responsive-container {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    
+    @media (min-width: 1024px) {
+        .responsive-container {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Return standard Streamlit columns for now
+    return st.columns(desktop_cols)
+
+def add_mobile_meta_tags():
+    """Add mobile-specific meta tags for better mobile experience."""
+    st.markdown("""
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#6366f1">
+    """, unsafe_allow_html=True)
 
 # Keep backward compatibility
 def get_light_theme_css():
