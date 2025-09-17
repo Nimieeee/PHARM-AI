@@ -128,20 +128,51 @@ def get_user_uuid(username: str) -> Optional[str]:
         return None
 
 def get_user_legacy_id(username: str) -> Optional[str]:
-    """Get user legacy ID (user_id) for username."""
+    """Get user legacy ID (user_id) for username - FIXED VERSION."""
     try:
-        from services.user_service import user_service
-        user_data = run_async(user_service.get_user_by_username(username))
-        if user_data:
-            # Return legacy user_id if available, otherwise use UUID as fallback
-            legacy_id = user_data.get('user_id')
-            if legacy_id:
-                return legacy_id
-            else:
-                # For users without legacy_id (like admin), use UUID
-                logger.info(f"User {username} has no legacy_id, using UUID: {user_data['id']}")
-                return user_data['id']
-        return None
+        import concurrent.futures
+        
+        def get_user_in_thread():
+            """Get user data in separate thread to avoid event loop conflicts."""
+            import asyncio
+            from services.user_service import user_service
+            
+            # Create new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                user_data = loop.run_until_complete(user_service.get_user_by_username(username))
+                if user_data:
+                    # Return legacy user_id if available, otherwise use UUID as fallback
+                    legacy_id = user_data.get('user_id')
+                    if legacy_id:
+                        logger.info(f"Found legacy_id for {username}: {legacy_id}")
+                        return legacy_id
+                    else:
+                        # For users without legacy_id, use UUID
+                        logger.info(f"User {username} has no legacy_id, using UUID: {user_data['id']}")
+                        return user_data['id']
+                return None
+            except Exception as e:
+                logger.error(f"Error in user lookup thread: {e}")
+                return None
+            finally:
+                loop.close()
+        
+        # Run in thread pool with timeout
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(get_user_in_thread)
+            try:
+                result = future.result(timeout=5)  # 5 second timeout
+                return result
+            except concurrent.futures.TimeoutError:
+                logger.error(f"User lookup timed out for {username}")
+                return None
+            except Exception as e:
+                logger.error(f"Thread execution failed for {username}: {e}")
+                return None
+        
     except Exception as e:
         logger.error(f"Error getting user legacy ID: {e}")
         return None

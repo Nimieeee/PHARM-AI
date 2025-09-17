@@ -14,6 +14,8 @@ def initialize_session_state():
     """Initialize session state variables with optimized security checks."""
     # Check if already initialized to avoid redundant work
     if st.session_state.get('_session_initialized'):
+        # Just extend session activity
+        extend_session()
         return
     
     logger.info("Initializing session state with security checks")
@@ -29,6 +31,8 @@ def initialize_session_state():
             st.session_state._session_initialized = True
         else:
             logger.warning("Enhanced session validation failed")
+            # Still mark as initialized to avoid loops
+            st.session_state._session_initialized = True
             return
             
     except ImportError:

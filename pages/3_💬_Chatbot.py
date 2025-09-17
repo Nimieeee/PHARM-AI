@@ -62,16 +62,38 @@ def main():
 def render_chatbot_interface():
     """Render the enhanced chatbot interface with optimized performance."""
     
-    # Load user conversations only when needed (lazy loading)
-    from fix_user_isolation import get_secure_conversations
-    if not get_secure_conversations():
-        load_user_conversations()
+    # Ensure conversations are loaded and user_id is correct
+    ensure_conversations_loaded()
     
     # Enhanced sidebar for conversation management
     render_enhanced_sidebar()
     
     # Main chat area with improved layout
     render_main_chat_area()
+
+def ensure_conversations_loaded():
+    """Ensure conversations are properly loaded with correct user_id."""
+    try:
+        # Check if user_id is set correctly
+        username = st.session_state.get('username')
+        user_id = st.session_state.get('user_id')
+        
+        if username and not user_id:
+            logger.warning(f"Missing user_id for username: {username}, attempting to fix...")
+            from auth import get_user_legacy_id
+            correct_user_id = get_user_legacy_id(username)
+            if correct_user_id:
+                st.session_state.user_id = correct_user_id
+                logger.info(f"Fixed user_id to: {correct_user_id}")
+        
+        # Ensure conversations are loaded
+        from fix_user_isolation import get_secure_conversations
+        conversations = get_secure_conversations()
+        
+        logger.info(f"Conversations loaded: {len(conversations)}")
+        
+    except Exception as e:
+        logger.error(f"Error ensuring conversations loaded: {e}")
 
 def load_user_conversations():
     """Load user conversations from database with proper user isolation and caching."""
@@ -161,8 +183,45 @@ def render_conversation_list():
     from fix_user_isolation import get_secure_conversations
     conversations = get_secure_conversations()
     
+    # Debug info (remove this later)
+    logger.info(f"Rendering conversation list: {len(conversations)} conversations found")
+    logger.info(f"Current user_id: {st.session_state.get('user_id', 'NOT SET')}")
+    
     if not conversations:
         st.info("No conversations yet. Start chatting to create your first conversation!")
+        
+        # Add a debug button to force reload conversations
+        if st.button("🔄 Reload Conversations", help="Debug: Force reload conversations"):
+            from fix_user_isolation import load_user_conversations_safely, secure_update_conversations
+            reloaded = load_user_conversations_safely()
+            if reloaded:
+                secure_update_conversations(reloaded)
+                st.success(f"Reloaded {len(reloaded)} conversations!")
+                st.rerun()
+            else:
+                st.warning("No conversations found in database")
+        
+        # Add debug info
+        with st.expander("🔍 Debug Info"):
+            st.write(f"**Username**: {st.session_state.get('username', 'NOT SET')}")
+            st.write(f"**User ID**: {st.session_state.get('user_id', 'NOT SET')}")
+            st.write(f"**Authenticated**: {st.session_state.get('authenticated', False)}")
+            
+            # Fix user_id button
+            if st.button("🔧 Fix User ID", help="Fix user_id if it's incorrect"):
+                from auth import get_user_legacy_id
+                username = st.session_state.get('username')
+                if username:
+                    correct_user_id = get_user_legacy_id(username)
+                    if correct_user_id:
+                        st.session_state.user_id = correct_user_id
+                        st.success(f"Fixed user_id to: {correct_user_id}")
+                        st.rerun()
+                    else:
+                        st.error("Could not get correct user_id")
+                else:
+                    st.error("No username in session")
+        
         return
     
     # Sort conversations by updated_at (most recent first)

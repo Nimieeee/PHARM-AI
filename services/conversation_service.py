@@ -173,11 +173,17 @@ class ConversationService:
             return False
     
     async def update_conversation(self, user_uuid: str, conversation_id: str, data: Dict) -> bool:
-        """Update conversation data."""
+        """Update conversation data - SECURITY ENHANCED."""
         try:
+            # SECURITY FIX: First verify the conversation exists and belongs to the user
+            existing_conversation = await self.get_conversation(user_uuid, conversation_id)
+            if not existing_conversation:
+                logger.warning(f"SECURITY: Attempted to update non-existent or unauthorized conversation: {conversation_id} by user: {user_uuid}")
+                return False
+            
             # Remove fields that shouldn't be updated directly
             safe_data = {k: v for k, v in data.items() 
-                        if k not in ['id', 'conversation_id', 'user_id', 'created_at']}
+                        if k not in ['id', 'conversation_id', 'user_id', 'user_uuid', 'created_at']}
             
             if not safe_data:
                 return False
@@ -202,17 +208,26 @@ class ConversationService:
             )
             
             if result.data:
-                logger.info(f"Conversation updated: {conversation_id}")
+                logger.info(f"Conversation updated: {conversation_id} by user: {user_uuid}")
                 return True
-            return False
+            else:
+                logger.warning(f"SECURITY: Update operation returned no data for conversation: {conversation_id}")
+                return False
             
         except Exception as e:
             logger.error(f"Error updating conversation {conversation_id}: {str(e)}")
             return False
     
     async def delete_conversation(self, user_uuid: str, conversation_id: str) -> bool:
-        """Delete a conversation permanently."""
+        """Delete a conversation permanently - SECURITY ENHANCED."""
         try:
+            # SECURITY FIX: First verify the conversation exists and belongs to the user
+            existing_conversation = await self.get_conversation(user_uuid, conversation_id)
+            if not existing_conversation:
+                logger.warning(f"SECURITY: Attempted to delete non-existent or unauthorized conversation: {conversation_id} by user: {user_uuid}")
+                return False
+            
+            # Now delete the conversation
             result = await self.db.execute_query(
                 'conversations',
                 'delete',
@@ -222,8 +237,13 @@ class ConversationService:
                 }
             )
             
-            logger.info(f"Conversation deleted: {conversation_id}")
-            return True
+            # Verify deletion was successful by checking affected rows
+            if result.data is not None:
+                logger.info(f"Conversation successfully deleted: {conversation_id} by user: {user_uuid}")
+                return True
+            else:
+                logger.warning(f"SECURITY: Delete operation returned no data for conversation: {conversation_id}")
+                return False
             
         except Exception as e:
             logger.error(f"Error deleting conversation {conversation_id}: {str(e)}")

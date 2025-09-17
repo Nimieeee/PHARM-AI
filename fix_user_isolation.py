@@ -63,65 +63,99 @@ def clear_user_state():
     logger.info("User state cleared")
 
 def load_user_conversations_safely():
-    """Load conversations with proper user isolation checks."""
+    """Load conversations with proper user isolation checks - FIXED VERSION."""
     if not st.session_state.get('authenticated'):
         return {}
     
     try:
-        from services.conversation_service import conversation_service
-        from services.user_service import user_service
-        import asyncio
+        import concurrent.futures
+        import threading
         
-        # Get user data - try multiple methods
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        user_data = None
+        # Get user identification
         user_id = st.session_state.get('user_id')
+        username = st.session_state.get('username')
         
-        # Method 1: Try by user_id - could be legacy_id or UUID
-        if user_id:
-            # First try as legacy_id
-            user_data = loop.run_until_complete(user_service.get_user_by_id(user_id))
-            
-            # If not found, try as UUID (for users like admin)
-            if not user_data:
-                try:
-                    user_data = loop.run_until_complete(user_service.get_user_by_uuid(user_id))
-                    logger.info(f"Found user by UUID: {user_id}")
-                except Exception:
-                    pass
-        
-        # Method 2: Try by username if user_id lookup failed
-        if not user_data and st.session_state.get('username'):
-            logger.info(f"Trying to find user by username: {st.session_state.username}")
-            user_data = loop.run_until_complete(user_service.get_user_by_username(st.session_state.username))
-        
-        # Method 3: Try by UUID if available
-        if not user_data and st.session_state.get('user_uuid'):
-            user_data = loop.run_until_complete(user_service.get_user_by_uuid(st.session_state.user_uuid))
-        
-        if not user_data:
-            logger.error(f"User not found with any method. user_id: {st.session_state.get('user_id')}, username: {st.session_state.get('username')}")
+        if not user_id or not username:
+            logger.error("Missing user_id or username in session state")
             return {}
         
-        logger.info(f"Found user: {user_data.get('username')} (UUID: {user_data['id']})")
+        logger.info(f"Loading conversations for user: {username} (ID: {user_id})")
         
-        # Load conversations using the secure service with user UUID
-        conversations = loop.run_until_complete(conversation_service.get_user_conversations(user_data['id']))
+        # Use thread pool to run async code safely
+        def run_async_in_thread():
+            """Run async operations in a separate thread to avoid event loop conflicts."""
+            import asyncio
+            from services.conversation_service import conversation_service
+            from services.user_service import user_service
+            
+            # Create new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            try:
+                # Get user data first
+                user_data = None
+                
+                # Try by UUID first (for users like admin)
+                try:
+                    user_data = loop.run_until_complete(user_service.get_user_by_uuid(user_id))
+                    if user_data:
+                        logger.info(f"Found user by UUID: {user_id}")
+                except Exception:
+                    pass
+                
+                # Try by legacy_id if UUID failed
+                if not user_data:
+                    try:
+                        user_data = loop.run_until_complete(user_service.get_user_by_id(user_id))
+                        if user_data:
+                            logger.info(f"Found user by legacy_id: {user_id}")
+                    except Exception:
+                        pass
+                
+                # Try by username as fallback
+                if not user_data:
+                    try:
+                        user_data = loop.run_until_complete(user_service.get_user_by_username(username))
+                        if user_data:
+                            logger.info(f"Found user by username: {username}")
+                    except Exception:
+                        pass
+                
+                if not user_data:
+                    logger.error(f"Could not find user: {username} (ID: {user_id})")
+                    return {}
+                
+                # Load conversations
+                conversations = loop.run_until_complete(conversation_service.get_user_conversations(user_data['id']))
+                
+                # Validate conversations
+                validated_conversations = {}
+                for conv_id, conv_data in conversations.items():
+                    if isinstance(conv_data, dict) and 'messages' in conv_data:
+                        validated_conversations[conv_id] = conv_data
+                
+                logger.info(f"Successfully loaded {len(validated_conversations)} conversations")
+                return validated_conversations
+                
+            except Exception as e:
+                logger.error(f"Error in async thread: {e}")
+                return {}
+            finally:
+                loop.close()
         
-        # Additional validation - ensure all conversations belong to this user
-        validated_conversations = {}
-        for conv_id, conv_data in conversations.items():
-            # Only include conversations that have proper structure
-            if isinstance(conv_data, dict) and 'messages' in conv_data:
-                validated_conversations[conv_id] = conv_data
-        
-        logger.info(f"Safely loaded {len(validated_conversations)} conversations for user: {st.session_state.username}")
-        return validated_conversations
+        # Run in thread pool with timeout
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(run_async_in_thread)
+            try:
+                conversations = future.result(timeout=10)  # 10 second timeout
+                return conversations
+            except concurrent.futures.TimeoutError:
+                logger.error("Conversation loading timed out")
+                return {}
+            except Exception as e:
+                logger.error(f"Thread execution failed: {e}")
+                return {}
         
     except Exception as e:
         logger.error(f"Error loading conversations safely: {e}")
@@ -130,15 +164,36 @@ def load_user_conversations_safely():
         return {}
 
 def initialize_secure_session():
-    """Initialize session with security checks."""
+    """Initialize session with security checks - ENHANCED SECURITY VERSION."""
     
-    # Clear ALL potentially stale data to prevent cross-user contamination
-    clear_all_user_data()
+    # Get current user info
+    current_user = st.session_state.get('username')
+    current_user_id = st.session_state.get('user_id')
+    last_validated_user = st.session_state.get('_last_validated_user')
+    last_validated_user_id = st.session_state.get('_last_validated_user_id')
+    
+    # CRITICAL SECURITY: Clear data if user change detected
+    if (current_user != last_validated_user or 
+        current_user_id != last_validated_user_id):
+        logger.warning(f"SECURITY: User change detected - clearing all data")
+        logger.info(f"Previous: {last_validated_user} ({last_validated_user_id})")
+        logger.info(f"Current: {current_user} ({current_user_id})")
+        clear_all_user_data()
     
     # Validate user isolation
     if ensure_user_isolation():
-        # Load user data safely
-        st.session_state.conversations = load_user_conversations_safely()
+        # Only load conversations if we don't have any or if user changed
+        if (not st.session_state.get('conversations') or 
+            current_user != last_validated_user or
+            current_user_id != last_validated_user_id):
+            
+            conversations = load_user_conversations_safely()
+            if secure_update_conversations(conversations):
+                logger.info(f"Loaded {len(conversations)} conversations for secure session")
+        
+        # Mark this user as validated with both username and user_id
+        st.session_state._last_validated_user = current_user
+        st.session_state._last_validated_user_id = current_user_id
         logger.info("Secure session initialized successfully")
     else:
         logger.info("Session validation failed, user not authenticated")
@@ -176,17 +231,35 @@ def get_secure_conversations():
         logger.warning("Missing username or session_id")
         return {}
     
-    # Return conversations only if they belong to the current user
+    # CRITICAL SECURITY FIX: Always validate conversations belong to current user
+    current_user_id = st.session_state.get('user_id')
+    current_username = st.session_state.get('username')
+    
+    # Get conversations from session state
     conversations = st.session_state.get('conversations', {})
     
-    # Additional validation: check if conversations are empty and reload if needed
-    if not conversations and st.session_state.get('authenticated'):
-        logger.info("No conversations in session state, reloading...")
+    # Validate that conversations in session state belong to current user
+    # This prevents session state contamination between users
+    validated_conversations = {}
+    for conv_id, conv_data in conversations.items():
+        # Only include conversations that were loaded for this specific user
+        # We'll track the user who loaded each conversation
+        if conv_data.get('_loaded_for_user') == current_user_id:
+            validated_conversations[conv_id] = conv_data
+    
+    # If no validated conversations and user is authenticated, reload from database
+    if not validated_conversations and st.session_state.get('authenticated'):
+        logger.info("No validated conversations in session state, reloading...")
         conversations = load_user_conversations_safely()
         if conversations:
+            # Mark conversations as loaded for this user
+            for conv_id, conv_data in conversations.items():
+                conv_data['_loaded_for_user'] = current_user_id
             st.session_state.conversations = conversations
+            validated_conversations = conversations
     
-    return conversations
+    logger.info(f"Returning {len(validated_conversations)} validated conversations for user: {current_username}")
+    return validated_conversations
 
 def get_secure_current_conversation():
     """Get current conversation with user validation."""
@@ -209,8 +282,16 @@ def secure_update_conversations(new_conversations):
         logger.error("Missing username or session_id during conversation update")
         return False
     
+    # CRITICAL SECURITY FIX: Mark all conversations as belonging to current user
+    current_user_id = st.session_state.get('user_id')
+    current_username = st.session_state.get('username')
+    
+    # Mark each conversation as loaded for this specific user
+    for conv_id, conv_data in new_conversations.items():
+        conv_data['_loaded_for_user'] = current_user_id
+    
     st.session_state.conversations = new_conversations
-    logger.info(f"Updated conversations for user: {st.session_state.username}")
+    logger.info(f"Updated {len(new_conversations)} conversations for user: {current_username}")
     return True
 
 def secure_update_conversation(conv_id, updates):
