@@ -917,32 +917,12 @@ def render_document_upload():
         st.info(f"📷 **Image OCR**: Only text content will be extracted from images for processing. Charts, graphs, and visual elements will not be analyzed.")
         st.info(f"📊 **{user_type} Upload Limit**: You can upload up to {max_files} documents at a time.")
         
-        # Custom styling to fix overlap issue
-        st.markdown("""
-        <style>
-        /* Specific fix for this file uploader */
-        div[data-testid="stFileUploader"] * {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif !important;
-        }
-        
-        /* Hide any Material Icons or keyboard text */
-        div[data-testid="stFileUploader"] *:contains("keyboard") {
-            display: none !important;
-        }
-        
-        div[data-testid="stFileUploader"] .material-icons {
-            display: none !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
-        
         uploaded_files = st.file_uploader(
-            "📁 Select Files",
+            f"Choose up to {max_files} files to enhance your conversation",
             type=['txt', 'pdf', 'docx', 'md', 'pptx', 'png', 'jpg', 'jpeg'],
-            help=f"Upload documents, presentations, or images (Max: {max_files} files)",
+            help=f"Upload documents, presentations, or images for context-aware responses (Max: {max_files} files)",
             accept_multiple_files=True,
-            key=f"doc_upload_{st.session_state.get('current_conversation_id', 'new')}",
-            label_visibility="visible"
+            key=f"doc_upload_{st.session_state.get('current_conversation_id', 'new')}"
         )
         
         if uploaded_files:
