@@ -27,7 +27,6 @@ pandas>=2.0.0
 
 # Image processing and OCR
 pytesseract>=0.3.10  # OCR text extraction from images (Tesseract pre-installed on Streamlit Cloud)
-google-cloud-vision>=3.4.0  # Google Vision API for advanced image processing
 Pillow>=10.0.0
 pdf2image>=1.16.0  # Convert PDF pages to images for OCR
 
