@@ -44,10 +44,10 @@ def get_model_configs():
     
     return {
         "fast": {
-            "model": "gemma2-9b-it",
-            "api_key": groq_key,
-            "base_url": "https://api.groq.com/openai/v1",
-            "description": "Gemma2 9B (Ultra Fast)",
+            "model": "mistral-small-latest",
+            "api_key": mistral_key,
+            "base_url": "https://api.mistral.ai/v1",
+            "description": "Fast Mode",
             "use_native_groq": False,
             "max_tokens": 3072,
             "temperature": 0.3
@@ -56,7 +56,7 @@ def get_model_configs():
             "model": "mistral-medium-latest",
             "api_key": mistral_key,
             "base_url": "https://api.mistral.ai/v1", 
-            "description": "Mistral Medium (High Quality)",
+            "description": "Premium Mode",
             "use_native_groq": False,
             "max_tokens": 4096,
             "temperature": 0.3
@@ -87,7 +87,7 @@ def get_model_token_limits() -> Dict:
 def get_optimal_max_tokens(model: str, base_url: str) -> int:
     """Get optimized max_tokens for speed."""
     # Optimized tokens for 2-mode system
-    if "gemma2" in model:
+    if "mistral-small" in model:
         return 3072  # Fast responses
     elif "mistral-medium" in model:
         return 4096  # Quality responses

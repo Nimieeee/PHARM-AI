@@ -169,8 +169,8 @@ def render_enhanced_sidebar():
             ["fast", "premium"],
             index=0,  # Default to fast for speed
             format_func=lambda x: {
-                "fast": "⚡ Fast (Gemma2 9B - Ultra Speed)",
-                "premium": "� Prremium (Mistral Medium - High Quality)"
+                "fast": "⚡ Fast Mode",
+                "premium": "💎 Premium Mode"
             }[x]
         )
         st.session_state.selected_model_mode = model_mode
@@ -183,18 +183,7 @@ def render_enhanced_sidebar():
         )
         st.session_state.use_streaming = use_streaming
         
-        # Response length setting
-        response_length = st.selectbox(
-            "Response Length",
-            ["short", "medium", "long"],
-            index=0,  # Default to short for speed
-            format_func=lambda x: {
-                "short": "📝 Short (Fastest)",
-                "medium": "📄 Medium (Balanced)",
-                "long": "📚 Long (Detailed)"
-            }[x]
-        )
-        st.session_state.response_length = response_length
+
         
         # Conversation list
         render_conversation_list()
@@ -1187,8 +1176,6 @@ def generate_streaming_response(prompt):
         document_context = get_conversation_context_cached(prompt, conversation_id)
         
         # Choose prompt based on performance settings
-        response_length = st.session_state.get('response_length', 'short')
-        use_fast_prompt = response_length == 'short' or selected_mode == 'fast'
         
         # Simplified prompt construction for speed
         if document_context and is_useful_document_context(document_context):
@@ -1244,8 +1231,6 @@ def generate_enhanced_response(prompt):
         document_context = get_conversation_context_cached(prompt, conversation_id)
         
         # Choose prompt based on performance settings
-        response_length = st.session_state.get('response_length', 'short')
-        use_fast_prompt = response_length == 'short' or selected_mode == 'fast'
         
         # Use RAG-enhanced prompt if we have document context
         if document_context and is_useful_document_context(document_context):
