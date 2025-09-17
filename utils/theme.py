@@ -8,14 +8,43 @@ def get_system_aware_theme_css():
     """Get CSS that respects system dark/light mode preference."""
     return """
     <style>
-        /* System-aware theme that follows device preference */
-        @media (prefers-color-scheme: light) {
-            """ + get_responsive_theme_css().replace('<style>', '').replace('</style>', '') + """
+        /* Default light theme */
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #1f2937;
+            --sidebar-bg: #f8fafc;
+            --border-color: #e5e7eb;
         }
         
+        /* Dark theme when system prefers dark */
         @media (prefers-color-scheme: dark) {
-            """ + get_dark_theme_css().replace('<style>', '').replace('</style>', '') + """
+            :root {
+                --bg-color: #111827;
+                --text-color: #f8fafc;
+                --sidebar-bg: #1f2937;
+                --border-color: #4b5563;
+            }
         }
+        
+        /* Apply CSS variables */
+        .stApp {
+            background-color: var(--bg-color) !important;
+            color: var(--text-color) !important;
+        }
+        
+        .stSidebar {
+            background-color: var(--sidebar-bg) !important;
+            border-right: 1px solid var(--border-color) !important;
+        }
+        
+        .stMarkdown {
+            color: var(--text-color) !important;
+            font-size: 16px !important;
+            line-height: 1.8 !important;
+        }
+        
+        /* Include base responsive styles */
+    """ + get_responsive_theme_css().replace('<style>', '').replace('</style>', '') + """
     </style>
     """
 
@@ -70,7 +99,7 @@ def get_dark_theme_css():
             color: #f9fafb !important;
             border: 1px solid #6b7280 !important;
             border-radius: 8px !important;
-            padding: 0.75rem 1rem !important;
+            padding: 16px !important;
         }
         
         .stTextInput > div > div > input:focus {
@@ -84,7 +113,7 @@ def get_dark_theme_css():
             color: #f9fafb !important;
             border: 1px solid #6b7280 !important;
             border-radius: 8px !important;
-            padding: 0.75rem 1rem !important;
+            padding: 16px !important;
         }
         
         .stTextArea > div > div > textarea:focus {
@@ -97,7 +126,8 @@ def get_dark_theme_css():
             background-color: #374151 !important;
             color: #f9fafb !important;
             border: 1px solid #6b7280 !important;
-            padding: 0.5rem 1rem !important;
+            padding: 16px !important;
+            border-radius: 8px !important;
         }
         
         /* Dark mode chat messages - Enhanced readability */
@@ -105,9 +135,11 @@ def get_dark_theme_css():
             background-color: #374151 !important;
             border: 1px solid #6b7280 !important;
             color: #f9fafb !important;
-            padding: 1rem 1.25rem !important;
-            margin: 0.75rem 0 !important;
-            line-height: 1.6 !important;
+            padding: 20px 24px !important;
+            margin: 16px 0 !important;
+            line-height: 1.7 !important;
+            font-size: 16px !important;
+            border-radius: 12px !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
@@ -205,10 +237,23 @@ def get_dark_theme_css():
             }
             
             .stChatInputContainer {
-                background: #1f2937 !important;
-                border: 1px solid #4b5563 !important;
+                background: transparent !important;
+                border: none !important;
+                padding: 16px 0 !important;
+            }
+            
+            /* Dark mode chat input field */
+            .stChatInput > div > div > div > div {
+                background: #374151 !important;
+                border: 2px solid #6b7280 !important;
+                color: #f9fafb !important;
                 border-radius: 12px !important;
-                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+            }
+            
+            .stChatInput > div > div > div > div:focus {
+                border-color: #8b5cf6 !important;
+                box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2) !important;
             }
             
             /* Better mobile readability in dark mode */
@@ -242,12 +287,18 @@ def get_responsive_theme_css():
             padding-top: 2rem !important;
             padding-left: 2rem !important;
             padding-right: 2rem !important;
-            padding-bottom: 2rem !important;
+            padding-bottom: 4rem !important;
+            max-width: none !important;
         }
         
-        /* 16px padding for key elements */
+        /* Remove app padding that creates boundaries */
         .stApp {
-            padding: 16px !important;
+            padding: 0 !important;
+        }
+        
+        /* Ensure full width for chat */
+        .stChatInput {
+            width: 100% !important;
         }
         
         /* Better component spacing */
@@ -328,10 +379,17 @@ def get_responsive_theme_css():
             
             /* Mobile chat message improvements */
             .stChatMessage {
-                margin: 0.75rem 0 !important;
-                padding: 1rem !important;
-                font-size: 15px !important;
-                line-height: 1.6 !important;
+                margin: 16px 0 !important;
+                padding: 18px 20px !important;
+                font-size: 16px !important;
+                line-height: 1.7 !important;
+            }
+            
+            /* Mobile chat input improvements */
+            .stChatInput > div > div > div > div {
+                padding: 16px 20px !important;
+                font-size: 16px !important;
+                min-height: 48px !important;
             }
             
             /* Mobile file uploader */
@@ -502,17 +560,30 @@ def get_responsive_theme_css():
             outline-offset: 2px !important;
         }
         
-        /* Better chat input positioning */
+        /* Seamless chat input - part of the page */
         .stChatInputContainer {
-            position: sticky !important;
-            bottom: 16px !important;
-            background: white !important;
-            border: 1px solid #e5e7eb !important;
+            background: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 16px 0 !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            position: relative !important;
+        }
+        
+        /* Style the actual input field */
+        .stChatInput > div > div > div > div {
+            background: #ffffff !important;
+            border: 2px solid #e5e7eb !important;
             border-radius: 12px !important;
-            padding: 16px !important;
-            margin: 16px 0 !important;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
-            z-index: 100 !important;
+            padding: 16px 20px !important;
+            font-size: 16px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+        }
+        
+        .stChatInput > div > div > div > div:focus {
+            border-color: #6366f1 !important;
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1) !important;
         }
         
         /* Accessibility improvements */
@@ -648,14 +719,16 @@ def get_responsive_theme_css():
             color: #d97706 !important;
         }
         
-        /* Chat messages */
+        /* Chat messages - Enhanced readability */
         .stChatMessage {
             background-color: #f8fafc !important;
             border: 1px solid #e5e7eb !important;
             border-radius: 12px !important;
-            color: #1a202c !important;
-            margin: 8px 0 !important;
-            padding: 12px !important;
+            color: #1f2937 !important;
+            margin: 16px 0 !important;
+            padding: 20px 24px !important;
+            font-size: 16px !important;
+            line-height: 1.7 !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
@@ -805,42 +878,36 @@ def get_responsive_theme_css():
     """
 
 def apply_theme():
-    """Apply theme based on user preference or system setting."""
-    # Check if user has manually set a preference
-    user_preference = st.session_state.get('theme_preference', 'system')
-    
-    if user_preference == 'system':
-        # Use CSS to detect system preference
+    """Apply the selected theme with system fallback."""
+    # Check if user has set a preference, otherwise use system
+    if 'dark_mode' in st.session_state:
+        # User has made a choice
+        if st.session_state.dark_mode:
+            st.markdown(get_dark_theme_css(), unsafe_allow_html=True)
+        else:
+            st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
+    else:
+        # No user preference, use system-aware theme
         st.markdown(get_system_aware_theme_css(), unsafe_allow_html=True)
-    elif user_preference == 'dark':
-        st.markdown(get_dark_theme_css(), unsafe_allow_html=True)
-    else:  # light
-        st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
 
 def render_theme_toggle():
-    """Render theme selector with system preference option."""
+    """Render simple and reliable theme toggle."""
     with st.sidebar:
         st.markdown("### 🎨 Theme")
         
-        theme_options = {
-            "system": "🔄 System Default",
-            "light": "☀️ Light Mode", 
-            "dark": "🌙 Dark Mode"
-        }
-        
-        current_preference = st.session_state.get('theme_preference', 'system')
-        
-        selected_theme = st.selectbox(
-            "Choose theme:",
-            options=list(theme_options.keys()),
-            format_func=lambda x: theme_options[x],
-            index=list(theme_options.keys()).index(current_preference),
-            help="System Default follows your device's theme setting"
+        # Simple toggle between light and dark
+        dark_mode = st.toggle(
+            "🌙 Dark Mode",
+            value=st.session_state.get('dark_mode', False),
+            help="Toggle between light and dark themes"
         )
         
         # Update session state if changed
-        if selected_theme != current_preference:
-            st.session_state.theme_preference = selected_theme
+        if dark_mode != st.session_state.get('dark_mode', False):
+            st.session_state.dark_mode = dark_mode
+            # Remove old theme preference
+            if 'theme_preference' in st.session_state:
+                del st.session_state.theme_preference
             st.rerun()
         
         st.markdown("---")
