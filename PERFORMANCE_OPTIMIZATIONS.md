@@ -2,16 +2,14 @@
 
 ## 🚀 Speed Improvements Implemented
 
-### 1. **Ultra-Fast AI Models**
-- **Turbo Mode**: Llama 3.1 70B Versatile (Ultra Fast)
-- **Normal Mode**: Llama 3.1 8B Instant (Lightning Fast)
-- **Premium Mode**: Mistral Large (High Quality)
-- Default to Turbo mode for maximum speed
+### 1. **Optimized AI Models (2-Mode System)**
+- **Fast Mode**: Gemma2 9B IT (Ultra Fast via Groq)
+- **Premium Mode**: Mistral Medium (High Quality)
+- Default to Fast mode for maximum speed
 
 ### 2. **Optimized Token Limits**
-- **8B Instant**: 2048 tokens (Very fast responses)
-- **70B Versatile**: 3072 tokens (Fast but comprehensive)
-- **Mistral Large**: 4096 tokens (Standard)
+- **Gemma2 9B**: 3072 tokens (Fast responses)
+- **Mistral Medium**: 4096 tokens (Quality responses)
 - Reduced from 7500 tokens for faster generation
 
 ### 3. **Enhanced Streaming**
@@ -28,7 +26,7 @@
 - Response length controls (Short/Medium/Long)
 
 ### 5. **Performance Settings UI**
-- **Model Selection**: Turbo/Normal/Premium modes
+- **Model Selection**: Fast (Gemma2) / Premium (Mistral) modes
 - **Streaming Toggle**: Real-time vs batch responses
 - **Response Length**: Short (fastest) to Long (detailed)
 - **Smart Defaults**: Optimized for speed out-of-the-box
@@ -64,32 +62,27 @@
 ## 🎯 Usage Recommendations
 
 ### For Maximum Speed:
-- Use **Turbo Mode** with **8B Instant**
+- Use **Fast Mode** with **Gemma2 9B**
 - Enable **Real-time Streaming**
 - Set **Response Length** to **Short**
 
-### For Balanced Performance:
-- Use **Normal Mode** with **70B Versatile**
-- Keep **Streaming** enabled
-- Use **Medium** response length
-
 ### For Highest Quality:
-- Use **Premium Mode** with **Mistral Large**
-- Can disable streaming for batch responses
-- Set **Response Length** to **Long**
+- Use **Premium Mode** with **Mistral Medium**
+- Keep **Streaming** enabled for best UX
+- Set **Response Length** to **Medium** or **Long**
 
 ## 🔧 Technical Details
 
 ### Model Configurations:
 ```python
-"turbo": {
-    "model": "llama-3.1-70b-versatile",
+"fast": {
+    "model": "gemma2-9b-it",
     "max_tokens": 3072,
     "temperature": 0.3
 }
-"normal": {
-    "model": "llama-3.1-8b-instant", 
-    "max_tokens": 2048,
+"premium": {
+    "model": "mistral-medium-latest", 
+    "max_tokens": 4096,
     "temperature": 0.3
 }
 ```

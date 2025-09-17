@@ -39,33 +39,24 @@ def get_api_keys():
     return groq_key, openrouter_key, mistral_key
 
 def get_model_configs():
-    """Get model configurations with API keys - optimized for speed."""
+    """Get model configurations with API keys - 2 optimized modes."""
     groq_key, openrouter_key, mistral_key = get_api_keys()
     
     return {
-        "turbo": {
-            "model": "llama-3.1-70b-versatile",
+        "fast": {
+            "model": "gemma2-9b-it",
             "api_key": groq_key,
             "base_url": "https://api.groq.com/openai/v1",
-            "description": "Llama 3.1 70B (Ultra Fast)",
+            "description": "Gemma2 9B (Ultra Fast)",
             "use_native_groq": False,
-            "max_tokens": 4096,
-            "temperature": 0.3
-        },
-        "normal": {
-            "model": "llama-3.1-8b-instant",
-            "api_key": groq_key,
-            "base_url": "https://api.groq.com/openai/v1",
-            "description": "Llama 3.1 8B Instant (Lightning Fast)",
-            "use_native_groq": False,
-            "max_tokens": 4096,
+            "max_tokens": 3072,
             "temperature": 0.3
         },
         "premium": {
-            "model": "mistral-large-latest",
+            "model": "mistral-medium-latest",
             "api_key": mistral_key,
             "base_url": "https://api.mistral.ai/v1", 
-            "description": "Mistral Large (High Quality)",
+            "description": "Mistral Medium (High Quality)",
             "use_native_groq": False,
             "max_tokens": 4096,
             "temperature": 0.3
@@ -95,13 +86,13 @@ def get_model_token_limits() -> Dict:
 
 def get_optimal_max_tokens(model: str, base_url: str) -> int:
     """Get optimized max_tokens for speed."""
-    # Reduced tokens for faster generation
-    if "8b-instant" in model:
-        return 2048  # Very fast responses
-    elif "70b" in model:
-        return 3072  # Fast but comprehensive
+    # Optimized tokens for 2-mode system
+    if "gemma2" in model:
+        return 3072  # Fast responses
+    elif "mistral-medium" in model:
+        return 4096  # Quality responses
     else:
-        return 4096  # Standard
+        return 3072  # Default fast
 
 def _get_client_for_model(model: str):
     """Get appropriate client for specific model (OpenAI or native Groq)."""

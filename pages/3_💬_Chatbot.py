@@ -161,15 +161,14 @@ def render_enhanced_sidebar():
         # Performance settings
         st.markdown("### ⚙️ Performance Settings")
         
-        # Model selection with speed focus
+        # Model selection - 2 modes only
         model_mode = st.selectbox(
             "AI Model",
-            ["turbo", "normal", "premium"],
-            index=0,  # Default to turbo for speed
+            ["fast", "premium"],
+            index=0,  # Default to fast for speed
             format_func=lambda x: {
-                "turbo": "⚡ Turbo (Ultra Fast)",
-                "normal": "🚀 Normal (Lightning Fast)", 
-                "premium": "💎 Premium (High Quality)"
+                "fast": "⚡ Fast (Gemma2 9B - Ultra Speed)",
+                "premium": "� Prremium (Mistral Medium - High Quality)"
             }[x]
         )
         st.session_state.selected_model_mode = model_mode
@@ -1175,7 +1174,7 @@ def generate_streaming_response(prompt):
             return "❌ No AI models available. Please check your API keys."
         
         # Use selected model mode
-        selected_mode = st.session_state.get('selected_model_mode', 'turbo')  # Default to turbo for speed
+        selected_mode = st.session_state.get('selected_model_mode', 'fast')  # Default to fast for speed
         if selected_mode not in available_modes:
             selected_mode = list(available_modes.keys())[0]
         
@@ -1187,7 +1186,7 @@ def generate_streaming_response(prompt):
         
         # Choose prompt based on performance settings
         response_length = st.session_state.get('response_length', 'short')
-        use_fast_prompt = response_length == 'short' or selected_mode == 'turbo'
+        use_fast_prompt = response_length == 'short' or selected_mode == 'fast'
         
         # Simplified prompt construction for speed
         if document_context and is_useful_document_context(document_context):
@@ -1232,7 +1231,7 @@ def generate_enhanced_response(prompt):
             return "❌ No AI models available. Please check your API keys."
         
         # Use selected model mode
-        selected_mode = st.session_state.get('selected_model_mode', 'normal')
+        selected_mode = st.session_state.get('selected_model_mode', 'fast')
         if selected_mode not in available_modes:
             selected_mode = list(available_modes.keys())[0]
         
@@ -1244,7 +1243,7 @@ def generate_enhanced_response(prompt):
         
         # Choose prompt based on performance settings
         response_length = st.session_state.get('response_length', 'short')
-        use_fast_prompt = response_length == 'short' or selected_mode == 'turbo'
+        use_fast_prompt = response_length == 'short' or selected_mode == 'fast'
         
         # Use RAG-enhanced prompt if we have document context
         if document_context and is_useful_document_context(document_context):
