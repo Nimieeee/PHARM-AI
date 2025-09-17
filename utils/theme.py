@@ -111,7 +111,7 @@ def get_light_theme_css():
             border-radius: 8px !important;
         }
         
-        /* File uploader - Fixed overlapping text */
+        /* File uploader - Aggressive fix for overlapping text */
         .stFileUploader > div {
             background-color: #f8fafc !important;
             border: 2px dashed #9ca3af !important;
@@ -119,7 +119,8 @@ def get_light_theme_css():
             color: #374151 !important;
             position: relative !important;
             padding: 20px !important;
-            min-height: 60px !important;
+            min-height: 80px !important;
+            overflow: visible !important;
         }
         
         .stFileUploader > div:hover {
@@ -127,33 +128,49 @@ def get_light_theme_css():
             background-color: #f1f5f9 !important;
         }
         
-        /* Fix file uploader text positioning */
-        .stFileUploader label {
-            position: relative !important;
-            z-index: 2 !important;
-            display: block !important;
+        /* Hide Material Icons text that's causing overlap */
+        .stFileUploader *[class*="material-icons"],
+        .stFileUploader *:contains("keyboard_arrow_down"),
+        .stFileUploader span:contains("keyboard_arrow_down") {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+        }
+        
+        /* Alternative: Hide any text containing keyboard */
+        .stFileUploader * {
             font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", "Inter", system-ui, sans-serif !important;
         }
         
-        /* Hide or fix overlapping elements */
+        .stFileUploader *:not([data-testid]):not([class*="upload"]):not([class*="file"]) {
+            color: transparent !important;
+        }
+        
+        /* Force proper text display for upload text only */
         .stFileUploader [data-testid="stFileUploaderDropzone"] {
             position: relative !important;
-            overflow: hidden !important;
+            background: transparent !important;
         }
         
-        /* Fix any icon overlapping */
-        .stFileUploader svg {
-            position: relative !important;
-            z-index: 1 !important;
-            margin-right: 8px !important;
+        .stFileUploader [data-testid="stFileUploaderDropzone"] * {
+            color: #374151 !important;
         }
         
-        /* Ensure text is properly positioned */
-        .stFileUploader span {
+        /* Hide any pseudo-elements that might contain the keyboard text */
+        .stFileUploader *::before,
+        .stFileUploader *::after {
+            content: none !important;
+            display: none !important;
+        }
+        
+        /* Specific fix for the upload text */
+        .stFileUploader label,
+        .stFileUploader [data-testid="stFileUploaderDropzone"] > div {
             position: relative !important;
-            z-index: 2 !important;
-            display: inline-block !important;
-            vertical-align: middle !important;
+            z-index: 10 !important;
+            background: #f8fafc !important;
+            padding: 10px !important;
+            border-radius: 4px !important;
         }
         
         /* Alert boxes */
@@ -347,6 +364,28 @@ def get_light_theme_css():
         /* Fix any general text overlap issues */
         .stApp * {
             position: relative !important;
+        }
+        
+        /* Aggressive fix: Hide any element containing keyboard text */
+        *:contains("keyboard") {
+            display: none !important;
+        }
+        
+        /* Hide Material Icons font */
+        .material-icons,
+        [class*="material-icons"],
+        span[class*="material"],
+        i[class*="material"] {
+            display: none !important;
+            visibility: hidden !important;
+        }
+        
+        /* Hide any arrow down elements */
+        *[class*="arrow"],
+        *[class*="down"],
+        *:contains("arrow_down"),
+        *:contains("keyboard_arrow") {
+            display: none !important;
         }
         
         /* Ensure proper text rendering */
