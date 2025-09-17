@@ -1166,7 +1166,7 @@ def generate_streaming_response(prompt):
     try:
         # Import AI functions
         from openai_client import chat_completion_stream, get_available_model_modes
-        from prompts import pharmacology_system_prompt
+        from prompts import pharmacology_system_prompt, pharmacology_fast_prompt
         
         # Get available models
         available_modes = get_available_model_modes()
