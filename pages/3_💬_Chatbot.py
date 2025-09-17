@@ -8,10 +8,14 @@ import os
 import logging
 from datetime import datetime
 import functools
+from pathlib import Path
 
-# Get the absolute path to the parent directory
-parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, parent_dir)
+# Get parent directory path
+current_dir = Path(__file__).parent
+parent_dir = current_dir.parent
+
+# Add to Python path
+sys.path.insert(0, str(parent_dir))
 
 # Import required modules
 from utils.session_manager import initialize_session_state
