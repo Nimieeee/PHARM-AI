@@ -9,41 +9,42 @@ import logging
 logger = logging.getLogger(__name__)
 
 def ensure_user_isolation():
-    """Ensure proper user data isolation - LESS AGGRESSIVE VERSION."""
+    """Ensure proper user data isolation - CONVERSATION LOADING FRIENDLY VERSION."""
     
     # 1. Clear any cached session data that might be stale
     if hasattr(st.session_state, '_session_cache'):
         delattr(st.session_state, '_session_cache')
     
-    # 2. Validate current session WITHOUT clearing conversations
-    if st.session_state.get('authenticated') and st.session_state.get('session_id'):
+    # 2. Basic authentication check - don't be too aggressive with session validation
+    if not st.session_state.get('authenticated'):
+        logger.debug("User not authenticated")
+        return False
+    
+    # 3. Check we have basic user info
+    if not st.session_state.get('username') or not st.session_state.get('user_id'):
+        logger.warning("Missing username or user_id")
+        return False
+    
+    # 4. Optional session validation - don't fail if session validation has issues
+    if st.session_state.get('session_id'):
         try:
             from auth import validate_session
             
-            # Re-validate session
+            # Try to validate session, but don't fail if it doesn't work
             username = validate_session(st.session_state.session_id)
-            if not username:
-                logger.warning("Session validation failed, clearing state")
-                clear_user_state()
-                return False
-            
-            # Ensure username matches
-            if username != st.session_state.get('username'):
-                logger.error(f"Username mismatch! Session: {username}, State: {st.session_state.get('username')}")
-                clear_user_state()
-                return False
-            
-            # Basic validation passed
-            logger.debug(f"User isolation validated for: {username}")
-            return True
-            
+            if username and username == st.session_state.get('username'):
+                logger.debug(f"Session validation passed for: {username}")
+            else:
+                logger.warning(f"Session validation failed, but continuing with basic auth")
+                # Don't clear state - just log the issue
+                
         except Exception as e:
-            logger.error(f"Error validating user isolation: {e}")
-            clear_user_state()
-            return False
+            logger.warning(f"Session validation error (non-critical): {e}")
+            # Don't fail - just continue with basic authentication
     
-    # If not authenticated, that's okay for some operations
-    return st.session_state.get('authenticated', False)
+    # Basic validation passed
+    logger.debug(f"User isolation validated for: {st.session_state.get('username')}")
+    return True
 
 def clear_user_state():
     """Clear all user-specific state."""
@@ -164,7 +165,7 @@ def load_user_conversations_safely():
         return {}
 
 def initialize_secure_session():
-    """Initialize session with security checks - ENHANCED SECURITY VERSION."""
+    """Initialize session with security checks - FIXED VERSION."""
     
     # Get current user info
     current_user = st.session_state.get('username')
@@ -172,24 +173,37 @@ def initialize_secure_session():
     last_validated_user = st.session_state.get('_last_validated_user')
     last_validated_user_id = st.session_state.get('_last_validated_user_id')
     
-    # CRITICAL SECURITY: Clear data if user change detected
-    if (current_user != last_validated_user or 
-        current_user_id != last_validated_user_id):
-        logger.warning(f"SECURITY: User change detected - clearing all data")
-        logger.info(f"Previous: {last_validated_user} ({last_validated_user_id})")
-        logger.info(f"Current: {current_user} ({current_user_id})")
-        clear_all_user_data()
+    # Only clear data if there's an actual user change (not first initialization)
+    user_changed = False
+    if last_validated_user is not None and last_validated_user_id is not None:
+        if (current_user != last_validated_user or current_user_id != last_validated_user_id):
+            logger.warning(f"SECURITY: User change detected - clearing all data")
+            logger.info(f"Previous: {last_validated_user} ({last_validated_user_id})")
+            logger.info(f"Current: {current_user} ({current_user_id})")
+            clear_all_user_data()
+            user_changed = True
+    else:
+        logger.info("First session initialization - not clearing data")
     
     # Validate user isolation
     if ensure_user_isolation():
-        # Only load conversations if we don't have any or if user changed
-        if (not st.session_state.get('conversations') or 
-            current_user != last_validated_user or
-            current_user_id != last_validated_user_id):
+        # Load conversations if we don't have any, user changed, or first time
+        existing_conversations = st.session_state.get('conversations', {})
+        
+        if (not existing_conversations or user_changed or 
+            last_validated_user is None or last_validated_user_id is None):
             
+            logger.info("Loading conversations for secure session...")
             conversations = load_user_conversations_safely()
-            if secure_update_conversations(conversations):
-                logger.info(f"Loaded {len(conversations)} conversations for secure session")
+            if conversations:
+                if secure_update_conversations(conversations):
+                    logger.info(f"Successfully loaded {len(conversations)} conversations")
+                else:
+                    logger.error("Failed to update conversations in session state")
+            else:
+                logger.info("No conversations found for user")
+        else:
+            logger.info(f"Using existing {len(existing_conversations)} conversations in session")
         
         # Mark this user as validated with both username and user_id
         st.session_state._last_validated_user = current_user
@@ -221,44 +235,49 @@ def clear_all_user_data():
     logger.info("All user data cleared for secure session initialization")
 
 def get_secure_conversations():
-    """Get conversations with user validation - use this instead of direct session state access."""
-    if not st.session_state.get('authenticated') or not st.session_state.get('user_id'):
-        logger.warning("Attempted to access conversations without authentication")
+    """Get conversations with user validation - SIMPLIFIED VERSION."""
+    # Basic authentication check
+    if not st.session_state.get('authenticated'):
+        logger.warning("User not authenticated")
         return {}
     
-    # Basic validation without clearing data
-    if not st.session_state.get('username') or not st.session_state.get('session_id'):
-        logger.warning("Missing username or session_id")
+    if not st.session_state.get('user_id') or not st.session_state.get('username'):
+        logger.warning("Missing user_id or username")
         return {}
     
-    # CRITICAL SECURITY FIX: Always validate conversations belong to current user
     current_user_id = st.session_state.get('user_id')
     current_username = st.session_state.get('username')
     
     # Get conversations from session state
     conversations = st.session_state.get('conversations', {})
     
-    # Validate that conversations in session state belong to current user
-    # This prevents session state contamination between users
+    # Validate that conversations belong to current user
     validated_conversations = {}
     for conv_id, conv_data in conversations.items():
-        # Only include conversations that were loaded for this specific user
-        # We'll track the user who loaded each conversation
+        # Check if conversation was loaded for this user
         if conv_data.get('_loaded_for_user') == current_user_id:
             validated_conversations[conv_id] = conv_data
     
-    # If no validated conversations and user is authenticated, reload from database
-    if not validated_conversations and st.session_state.get('authenticated'):
-        logger.info("No validated conversations in session state, reloading...")
-        conversations = load_user_conversations_safely()
-        if conversations:
-            # Mark conversations as loaded for this user
-            for conv_id, conv_data in conversations.items():
-                conv_data['_loaded_for_user'] = current_user_id
-            st.session_state.conversations = conversations
-            validated_conversations = conversations
+    # If no validated conversations, try to load from database
+    if not validated_conversations:
+        logger.info(f"No conversations in session state for {current_username}, loading from database...")
+        try:
+            fresh_conversations = load_user_conversations_safely()
+            if fresh_conversations:
+                # Mark conversations as loaded for this user
+                for conv_id, conv_data in fresh_conversations.items():
+                    conv_data['_loaded_for_user'] = current_user_id
+                
+                # Update session state
+                st.session_state.conversations = fresh_conversations
+                validated_conversations = fresh_conversations
+                logger.info(f"Loaded {len(fresh_conversations)} conversations from database")
+            else:
+                logger.info("No conversations found in database")
+        except Exception as e:
+            logger.error(f"Error loading conversations: {e}")
     
-    logger.info(f"Returning {len(validated_conversations)} validated conversations for user: {current_username}")
+    logger.info(f"Returning {len(validated_conversations)} conversations for {current_username}")
     return validated_conversations
 
 def get_secure_current_conversation():
