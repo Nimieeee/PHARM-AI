@@ -206,7 +206,7 @@ def get_responsive_theme_css():
             color-scheme: light !important;
         }
         
-        /* Enhanced padding and spacing */
+        /* Enhanced padding and spacing - 16px base */
         .main .block-container {
             padding-top: 2rem !important;
             padding-left: 2rem !important;
@@ -214,20 +214,25 @@ def get_responsive_theme_css():
             padding-bottom: 2rem !important;
         }
         
+        /* 16px padding for key elements */
+        .stApp {
+            padding: 16px !important;
+        }
+        
         /* Better component spacing */
         .stButton > button {
-            padding: 0.75rem 1.5rem !important;
-            margin: 0.25rem 0 !important;
+            padding: 16px 24px !important;
+            margin: 8px 0 !important;
         }
         
         .stTextInput > div > div > input,
         .stTextArea > div > div > textarea {
-            padding: 0.75rem 1rem !important;
+            padding: 16px !important;
         }
         
         .stChatMessage {
-            padding: 1rem 1.25rem !important;
-            margin: 0.75rem 0 !important;
+            padding: 16px 20px !important;
+            margin: 12px 0 !important;
         }
         
         /* Mobile viewport optimization */
@@ -255,7 +260,19 @@ def get_responsive_theme_css():
             
             /* Mobile navigation improvements */
             .stSidebarNav {
-                padding: 0.5rem !important;
+                padding: 16px !important;
+            }
+            
+            /* Better mobile menu */
+            .stSidebar .stButton > button {
+                width: 100% !important;
+                text-align: left !important;
+                justify-content: flex-start !important;
+            }
+            
+            /* Mobile-friendly toggles */
+            .stToggle {
+                padding: 8px 0 !important;
             }
             
             /* Mobile sidebar improvements */
@@ -292,17 +309,30 @@ def get_responsive_theme_css():
                 min-height: 80px !important;
             }
             
-            /* Mobile form improvements */
+            /* Mobile form improvements - 16px base */
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea {
-                padding: 1rem !important;
+                padding: 16px !important;
                 font-size: 16px !important;
+                min-height: 48px !important; /* Better touch targets */
             }
             
-            /* Mobile button improvements */
+            /* Mobile button improvements - 16px base */
             .stButton > button {
-                padding: 1rem 1.5rem !important;
-                margin: 0.5rem 0 !important;
+                padding: 16px 24px !important;
+                margin: 8px 0 !important;
+                min-height: 48px !important; /* Better touch targets */
+            }
+            
+            /* Mobile sidebar improvements */
+            .stSidebar {
+                padding: 16px !important;
+            }
+            
+            /* Mobile selectbox improvements */
+            .stSelectbox > div > div {
+                padding: 16px !important;
+                min-height: 48px !important;
             }
         }
         
@@ -349,6 +379,68 @@ def get_responsive_theme_css():
         img {
             max-width: 100% !important;
             height: auto !important;
+        }
+        
+        /* Mobile-optimized tables */
+        .stDataFrame {
+            overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+        }
+        
+        @media (max-width: 768px) {
+            /* Mobile table optimizations */
+            .stDataFrame table {
+                font-size: 12px !important;
+                min-width: 100% !important;
+            }
+            
+            .stDataFrame th,
+            .stDataFrame td {
+                padding: 0.5rem 0.25rem !important;
+                white-space: nowrap !important;
+            }
+            
+            /* Stack table cells on very small screens */
+            @media (max-width: 480px) {
+                .stDataFrame table,
+                .stDataFrame thead,
+                .stDataFrame tbody,
+                .stDataFrame th,
+                .stDataFrame td,
+                .stDataFrame tr {
+                    display: block !important;
+                }
+                
+                .stDataFrame thead tr {
+                    position: absolute !important;
+                    top: -9999px !important;
+                    left: -9999px !important;
+                }
+                
+                .stDataFrame tr {
+                    border: 1px solid #e5e7eb !important;
+                    margin-bottom: 0.5rem !important;
+                    padding: 0.5rem !important;
+                    border-radius: 8px !important;
+                }
+                
+                .stDataFrame td {
+                    border: none !important;
+                    position: relative !important;
+                    padding-left: 50% !important;
+                    white-space: normal !important;
+                }
+                
+                .stDataFrame td:before {
+                    content: attr(data-label) ": " !important;
+                    position: absolute !important;
+                    left: 6px !important;
+                    width: 45% !important;
+                    padding-right: 10px !important;
+                    white-space: nowrap !important;
+                    font-weight: bold !important;
+                }
+            }
         }
         
         /* Better focus indicators */
@@ -659,21 +751,34 @@ def apply_theme():
         st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
 
 def render_theme_toggle():
-    """Render theme toggle switch in sidebar."""
+    """Render easily accessible theme toggle."""
     with st.sidebar:
-        st.markdown("---")
-        st.markdown("### 🎨 Appearance")
+        # Move theme toggle to top for easy access
+        st.markdown("### 🎨 Theme")
         
-        dark_mode = st.toggle(
-            "🌙 Dark Mode",
-            value=st.session_state.get('dark_mode', False),
-            help="Switch between light and dark themes"
-        )
+        # Create columns for better mobile layout
+        col1, col2 = st.columns([3, 1])
+        
+        with col1:
+            dark_mode = st.toggle(
+                "🌙 Dark Mode",
+                value=st.session_state.get('dark_mode', False),
+                help="Switch between light and dark themes"
+            )
+        
+        with col2:
+            # Add quick theme indicator
+            if st.session_state.get('dark_mode', False):
+                st.markdown("🌙")
+            else:
+                st.markdown("☀️")
         
         # Update session state if changed
         if dark_mode != st.session_state.get('dark_mode', False):
             st.session_state.dark_mode = dark_mode
             st.rerun()
+        
+        st.markdown("---")
 
 def create_responsive_columns(mobile_cols=1, tablet_cols=2, desktop_cols=3):
     """Create responsive columns based on screen size."""

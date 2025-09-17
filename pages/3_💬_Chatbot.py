@@ -184,6 +184,11 @@ def load_user_conversations():
 def render_enhanced_sidebar():
     """Render enhanced sidebar with conversation management."""
     with st.sidebar:
+        # Theme toggle at the top for easy access
+        from utils.theme import render_theme_toggle, add_mobile_meta_tags
+        add_mobile_meta_tags()
+        render_theme_toggle()
+        
         st.markdown("### 💊 PharmGPT")
         st.markdown(f"**Welcome, {st.session_state.username}!**")
         
@@ -250,10 +255,7 @@ def render_enhanced_sidebar():
         # Current conversation info
         render_conversation_info()
         
-        # Theme toggle and mobile optimizations
-        from utils.theme import render_theme_toggle, add_mobile_meta_tags
-        add_mobile_meta_tags()
-        render_theme_toggle()
+
 
 def create_new_conversation():
     """Create a new conversation and save it to database immediately."""
@@ -895,13 +897,7 @@ def render_chat_messages():
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
             
-            # Add timestamp for messages
-            if "timestamp" in message:
-                try:
-                    timestamp = datetime.fromisoformat(message["timestamp"].replace('Z', '+00:00'))
-                    st.caption(f"🕒 {timestamp.strftime('%H:%M:%S')}")
-                except:
-                    st.caption(f"🕒 Message {i+1}")
+            # Timestamps removed for cleaner mobile experience
             
             # Add regenerate button for the last assistant message
             if (message["role"] == "assistant" and 
