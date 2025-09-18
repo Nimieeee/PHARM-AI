@@ -79,6 +79,77 @@ def main():
             scroll-margin-bottom: 20px !important;
         }
         
+        /* Horizontal scrollable tables */
+        .stMarkdown table {
+            display: block !important;
+            overflow-x: auto !important;
+            white-space: nowrap !important;
+            max-width: 100% !important;
+            border-collapse: collapse !important;
+            margin: 1rem 0 !important;
+        }
+        
+        .stMarkdown table thead,
+        .stMarkdown table tbody,
+        .stMarkdown table tr {
+            display: table !important;
+            width: 100% !important;
+            table-layout: fixed !important;
+        }
+        
+        .stMarkdown table th,
+        .stMarkdown table td {
+            padding: 8px 12px !important;
+            border: 1px solid #e5e7eb !important;
+            text-align: left !important;
+            min-width: 120px !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+        }
+        
+        .stMarkdown table th {
+            background-color: #f8fafc !important;
+            font-weight: 600 !important;
+            position: sticky !important;
+            top: 0 !important;
+        }
+        
+        /* Dark mode table styling */
+        @media (prefers-color-scheme: dark) {
+            .stMarkdown table th,
+            .stMarkdown table td {
+                border-color: #475569 !important;
+            }
+            
+            .stMarkdown table th {
+                background-color: #1e293b !important;
+                color: #f8fafc !important;
+            }
+            
+            .stMarkdown table td {
+                color: #f8fafc !important;
+            }
+        }
+        
+        /* Table container with scroll indicators */
+        .stMarkdown table {
+            box-shadow: 0 0 0 1px #e5e7eb !important;
+            border-radius: 8px !important;
+        }
+        
+        /* Scroll hint for tables */
+        .stMarkdown table::after {
+            content: "← Scroll horizontally to see more →" !important;
+            display: block !important;
+            text-align: center !important;
+            font-size: 12px !important;
+            color: #6b7280 !important;
+            padding: 8px !important;
+            background-color: #f9fafb !important;
+            border-top: 1px solid #e5e7eb !important;
+        }
+        
         /* Mobile chat optimizations */
         @media (max-width: 768px) {
             /* Hide sidebar toggle on mobile for cleaner look */
@@ -1327,32 +1398,67 @@ def generate_streaming_response(prompt):
             response_placeholder = st.empty()
             full_response = ""
             
-            # Add auto-scroll JavaScript
+            # Add improved auto-scroll JavaScript
             scroll_script = """
             <script>
+            let scrollInterval;
+            let isScrolling = false;
+            
             function autoScrollToBottom() {
-                // Scroll to bottom of the page
+                if (isScrolling) return;
+                isScrolling = true;
+                
+                // Multiple scroll targets for better compatibility
+                const targets = [
+                    document.documentElement,
+                    document.body,
+                    document.querySelector('.main'),
+                    document.querySelector('[data-testid="stAppViewContainer"]'),
+                    document.querySelector('.stApp')
+                ];
+                
+                targets.forEach(target => {
+                    if (target) {
+                        target.scrollTo({
+                            top: target.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+                
+                // Also try window scroll
                 window.scrollTo({
-                    top: document.body.scrollHeight,
+                    top: Math.max(
+                        document.body.scrollHeight,
+                        document.documentElement.scrollHeight
+                    ),
                     behavior: 'smooth'
                 });
                 
-                // Also try to scroll the main content area
-                const mainContent = document.querySelector('.main');
-                if (mainContent) {
-                    mainContent.scrollTo({
-                        top: mainContent.scrollHeight,
-                        behavior: 'smooth'
-                    });
-                }
+                setTimeout(() => { isScrolling = false; }, 100);
             }
             
-            // Auto-scroll every 200ms during streaming (less frequent to avoid issues)
-            const scrollInterval = setInterval(autoScrollToBottom, 200);
+            // Start auto-scrolling
+            scrollInterval = setInterval(autoScrollToBottom, 300);
             
             // Stop auto-scrolling after 30 seconds (safety measure)
             setTimeout(() => {
-                clearInterval(scrollInterval);
+                if (scrollInterval) {
+                    clearInterval(scrollInterval);
+                }
+            }, 30000);
+            
+            // Also scroll on content changes
+            const observer = new MutationObserver(autoScrollToBottom);
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true,
+                characterData: true
+            });
+            
+            // Stop observer after 30 seconds
+            setTimeout(() => {
+                observer.disconnect();
             }, 30000);
             </script>
             """
@@ -1372,12 +1478,36 @@ def generate_streaming_response(prompt):
             final_scroll = """
             <script>
             // Final scroll after streaming is complete
-            setTimeout(() => {
+            function finalScroll() {
+                const targets = [
+                    document.documentElement,
+                    document.body,
+                    document.querySelector('.main'),
+                    document.querySelector('[data-testid="stAppViewContainer"]')
+                ];
+                
+                targets.forEach(target => {
+                    if (target) {
+                        target.scrollTo({
+                            top: target.scrollHeight,
+                            behavior: 'smooth'
+                        });
+                    }
+                });
+                
                 window.scrollTo({
-                    top: document.body.scrollHeight,
+                    top: Math.max(
+                        document.body.scrollHeight,
+                        document.documentElement.scrollHeight
+                    ),
                     behavior: 'smooth'
                 });
-            }, 200);
+            }
+            
+            // Multiple attempts to ensure scroll works
+            setTimeout(finalScroll, 100);
+            setTimeout(finalScroll, 500);
+            setTimeout(finalScroll, 1000);
             </script>
             """
             st.markdown(final_scroll, unsafe_allow_html=True)
