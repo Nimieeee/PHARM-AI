@@ -1305,12 +1305,8 @@ def process_chat_input(prompt):
             # Check if streaming is enabled
             use_streaming = st.session_state.get('use_streaming', True)
             
-            if use_streaming:
-                # Generate streaming response
-                full_response = generate_streaming_response(prompt)
-            else:
-                # Generate response with enhanced context (fast mode)
-                full_response = generate_enhanced_response(prompt)
+            # Use the simplified response generation (streaming removed for stability)
+            full_response = generate_streaming_response(prompt)
             
             if not full_response or full_response.strip() == "":
                 full_response = "I apologize, but I couldn't generate a response. Please try again."
@@ -1393,125 +1389,11 @@ def generate_streaming_response(prompt):
                 {"role": "user", "content": prompt}
             ]
         
-        # Create a container for the streaming response in the correct location
-        with st.chat_message("assistant"):
-            response_placeholder = st.empty()
-            full_response = ""
-            
-            # Add improved auto-scroll JavaScript
-            scroll_script = """
-            <script>
-            let scrollInterval;
-            let isScrolling = false;
-            
-            function autoScrollToBottom() {
-                if (isScrolling) return;
-                isScrolling = true;
-                
-                // Multiple scroll targets for better compatibility
-                const targets = [
-                    document.documentElement,
-                    document.body,
-                    document.querySelector('.main'),
-                    document.querySelector('[data-testid="stAppViewContainer"]'),
-                    document.querySelector('.stApp')
-                ];
-                
-                targets.forEach(target => {
-                    if (target) {
-                        target.scrollTo({
-                            top: target.scrollHeight,
-                            behavior: 'smooth'
-                        });
-                    }
-                });
-                
-                // Also try window scroll
-                window.scrollTo({
-                    top: Math.max(
-                        document.body.scrollHeight,
-                        document.documentElement.scrollHeight
-                    ),
-                    behavior: 'smooth'
-                });
-                
-                setTimeout(() => { isScrolling = false; }, 100);
-            }
-            
-            // Start auto-scrolling
-            scrollInterval = setInterval(autoScrollToBottom, 300);
-            
-            // Stop auto-scrolling after 30 seconds (safety measure)
-            setTimeout(() => {
-                if (scrollInterval) {
-                    clearInterval(scrollInterval);
-                }
-            }, 30000);
-            
-            // Also scroll on content changes
-            const observer = new MutationObserver(autoScrollToBottom);
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true,
-                characterData: true
-            });
-            
-            // Stop observer after 30 seconds
-            setTimeout(() => {
-                observer.disconnect();
-            }, 30000);
-            </script>
-            """
-            
-            # Inject the scroll script
-            st.markdown(scroll_script, unsafe_allow_html=True)
-            
-            # Stream the response
-            for chunk in chat_completion_stream(model, api_messages):
-                full_response += chunk
-                response_placeholder.markdown(full_response + "▋")  # Show cursor
-            
-            # Remove cursor and show final response
-            response_placeholder.markdown(full_response)
-            
-            # Final scroll to ensure everything is visible
-            final_scroll = """
-            <script>
-            // Final scroll after streaming is complete
-            function finalScroll() {
-                const targets = [
-                    document.documentElement,
-                    document.body,
-                    document.querySelector('.main'),
-                    document.querySelector('[data-testid="stAppViewContainer"]')
-                ];
-                
-                targets.forEach(target => {
-                    if (target) {
-                        target.scrollTo({
-                            top: target.scrollHeight,
-                            behavior: 'smooth'
-                        });
-                    }
-                });
-                
-                window.scrollTo({
-                    top: Math.max(
-                        document.body.scrollHeight,
-                        document.documentElement.scrollHeight
-                    ),
-                    behavior: 'smooth'
-                });
-            }
-            
-            // Multiple attempts to ensure scroll works
-            setTimeout(finalScroll, 100);
-            setTimeout(finalScroll, 500);
-            setTimeout(finalScroll, 1000);
-            </script>
-            """
-            st.markdown(final_scroll, unsafe_allow_html=True)
+        # Use fast completion instead of streaming to avoid UI conflicts
+        from openai_client import chat_completion_fast
+        full_response = chat_completion_fast(model, api_messages)
         
+        logger.info(f"Generated response: {len(full_response)} characters")
         return full_response
         
     except Exception as e:
