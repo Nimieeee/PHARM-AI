@@ -197,7 +197,7 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                 presence_penalty=0.0
             )
         
-        # Ultra-fast streaming with minimal buffering
+        # Controlled streaming at ~6 tokens per second
         buffer = ""
         word_count = 0
         last_yield_time = time.time()
@@ -207,16 +207,16 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                 content = chunk.choices[0].delta.content
                 buffer += content
                 
-                # Optimized yield conditions for maximum speed:
+                # Controlled yield conditions for ~6 tokens per second:
                 current_time = time.time()
                 time_since_last_yield = current_time - last_yield_time
                 
-                # Yield more aggressively for speed
+                # Yield at controlled rate for smooth reading experience
                 should_yield = (
-                    len(buffer) >= 8 or  # Smaller chunks for faster display
-                    time_since_last_yield >= 0.08 or  # Faster max delay (80ms)
+                    len(buffer) >= 6 or  # ~6 characters per chunk (roughly 1 token)
+                    time_since_last_yield >= 0.167 or  # ~6 tokens per second (1000ms/6 = 167ms)
                     any(punct in buffer for punct in ['. ', '! ', '? ', '\n']) or  # Sentence breaks
-                    ' ' in buffer and len(buffer) >= 4  # Word boundaries
+                    ' ' in buffer and len(buffer) >= 3  # Word boundaries
                 )
                 
                 if should_yield and buffer.strip():
@@ -225,7 +225,8 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                     word_count += len(re.findall(r'\S+', buffer))
                     last_yield_time = current_time
                     
-                    # No artificial delays - maximum speed
+                    # Small delay for controlled streaming speed
+                    time.sleep(0.02)  # 20ms additional delay for smoother appearance
             
             # Silent finish reason handling (no user-visible messages)
             if chunk.choices[0].finish_reason is not None:

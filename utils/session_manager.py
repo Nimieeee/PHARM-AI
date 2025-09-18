@@ -43,7 +43,11 @@ def initialize_session_state():
     
     # Initialize other session variables
     if "theme_mode" not in st.session_state:
-        st.session_state.theme_mode = "light"
+        st.session_state.theme_mode = "dark"
+    
+    # Set dark mode as default
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = True
     
     if "current_page" not in st.session_state:
         if st.session_state.authenticated:

@@ -1061,32 +1061,30 @@ def get_responsive_theme_css():
     """
 
 def apply_theme():
-    """Apply the selected theme with system fallback."""
-    # Check if user has set a preference, otherwise use system
-    if 'dark_mode' in st.session_state:
-        # User has made a choice
-        if st.session_state.dark_mode:
-            st.markdown(get_dark_theme_css(), unsafe_allow_html=True)
-        else:
-            st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
+    """Apply the selected theme with dark mode as default."""
+    # Default to dark mode if no preference is set
+    dark_mode = st.session_state.get('dark_mode', True)
+    
+    if dark_mode:
+        st.markdown(get_dark_theme_css(), unsafe_allow_html=True)
     else:
-        # No user preference, use system-aware theme
-        st.markdown(get_system_aware_theme_css(), unsafe_allow_html=True)
+        st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
 
 def render_theme_toggle():
     """Render simple and reliable theme toggle."""
     with st.sidebar:
         st.markdown("### 🎨 Theme")
         
-        # Simple toggle between light and dark
-        dark_mode = st.toggle(
-            "🌙 Dark Mode",
-            value=st.session_state.get('dark_mode', False),
-            help="Toggle between light and dark themes"
+        # Simple toggle between dark and light (dark mode is default)
+        light_mode = st.toggle(
+            "☀️ Light Mode",
+            value=st.session_state.get('dark_mode', True) == False,
+            help="Toggle to light theme (dark mode is default)"
         )
         
-        # Update session state if changed
-        if dark_mode != st.session_state.get('dark_mode', False):
+        # Update session state - dark mode is default (True), light mode sets it to False
+        dark_mode = not light_mode
+        if dark_mode != st.session_state.get('dark_mode', True):
             st.session_state.dark_mode = dark_mode
             # Remove old theme preference
             if 'theme_preference' in st.session_state:

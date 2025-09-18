@@ -215,6 +215,22 @@ def render_enhanced_sidebar():
         add_mobile_meta_tags()
         render_theme_toggle()
         
+        # Performance settings right after theme toggle
+        st.markdown("### ⚙️ Performance Settings")
+        
+        # Model selection - Toggle between fast and premium
+        use_premium_model = st.toggle(
+            "💎 Premium Mode", 
+            value=st.session_state.get('selected_model_mode', 'fast') == 'premium',
+            help="Toggle between ⚡ Fast Mode (default) and 💎 Premium Mode for higher quality responses"
+        )
+        st.session_state.selected_model_mode = "premium" if use_premium_model else "fast"
+        
+        # Set streaming as default (always enabled, 6 tokens per second)
+        st.session_state.use_streaming = True
+        
+        st.markdown("---")
+        
         st.markdown("### 💊 PharmGPT")
         st.markdown(f"**Welcome, {st.session_state.username}!**")
         
@@ -249,25 +265,6 @@ def render_enhanced_sidebar():
             fresh_conversations = load_user_conversations_safely()
             if fresh_conversations:
                 secure_update_conversations(fresh_conversations)
-        
-        # Performance settings
-        st.markdown("### ⚙️ Performance Settings")
-        
-        # Model selection - Toggle between fast and premium
-        use_premium_model = st.toggle(
-            "💎 Premium Mode", 
-            value=st.session_state.get('selected_model_mode', 'fast') == 'premium',
-            help="Toggle between ⚡ Fast Mode (default) and 💎 Premium Mode for higher quality responses"
-        )
-        st.session_state.selected_model_mode = "premium" if use_premium_model else "fast"
-        
-        # Streaming toggle
-        use_streaming = st.toggle(
-            "🔄 Real-time Streaming", 
-            value=st.session_state.get('use_streaming', True),
-            help="Show responses as they're generated (faster perceived speed)"
-        )
-        st.session_state.use_streaming = use_streaming
         
 
         
