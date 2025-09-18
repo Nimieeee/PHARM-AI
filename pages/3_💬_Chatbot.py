@@ -83,11 +83,8 @@ def main():
                 padding-bottom: 80px !important;
             }
             
-            /* Mobile-friendly message display - seamless blend */
+            /* Mobile-friendly message display */
             .stChatMessage {
-                background-color: transparent !important;
-                border: none !important;
-                box-shadow: none !important;
                 word-wrap: break-word !important;
                 overflow-wrap: break-word !important;
             }

@@ -159,28 +159,27 @@ def get_dark_theme_css():
             background: #0f172a !important;
         }
         
-        /* Dark mode chat messages - Seamless background blend */
+        /* Dark mode chat messages - Maximum readability */
         .stChatMessage {
-            background-color: transparent !important;
-            border: none !important;
+            background-color: #1e293b !important;
+            border: 1px solid #475569 !important;
             color: #ffffff !important;
-            padding: 20px 0px !important;
+            padding: 20px 24px !important;
             margin: 16px 0 !important;
             line-height: 1.8 !important;
             font-size: 16px !important;
-            border-radius: 0 !important;
-            box-shadow: none !important;
+            border-radius: 12px !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
-            background-color: transparent !important;
-            border: none !important;
+            background-color: #1e40af !important;
+            border-color: #3b82f6 !important;
             color: #ffffff !important;
         }
         
         .stChatMessage[data-testid="chat-message-assistant"] {
-            background-color: transparent !important;
-            border: none !important;
+            background-color: #047857 !important;
+            border-color: #10b981 !important;
             color: #ffffff !important;
         }
         
@@ -330,7 +329,11 @@ def get_dark_theme_css():
             }
             
             /* Dark mode chat input field - seamless background blend */
-            .stChatInput > div > div > div > div {
+            .stChatInput > div > div > div > div,
+            .stChatInput input,
+            .stChatInput textarea,
+            .stChatInput > div > div > div > div > input,
+            .stChatInput > div > div > div > div > textarea {
                 background: transparent !important;
                 border: none !important;
                 color: #f9fafb !important;
@@ -339,22 +342,24 @@ def get_dark_theme_css():
                 outline: none !important;
             }
             
-            .stChatInput > div > div > div > div:focus {
+            .stChatInput > div > div > div > div:focus,
+            .stChatInput input:focus,
+            .stChatInput textarea:focus,
+            .stChatInput > div > div > div > div > input:focus,
+            .stChatInput > div > div > div > div > textarea:focus {
                 background: transparent !important;
                 border: none !important;
                 box-shadow: none !important;
                 outline: none !important;
+                color: #f9fafb !important;
             }
             
-            /* Maximum mobile readability in dark mode - seamless blend */
+            /* Maximum mobile readability in dark mode */
             .stChatMessage {
-                background-color: transparent !important;
-                border: none !important;
-                padding: 20px 0px !important;
+                padding: 20px !important;
                 margin: 16px 0 !important;
                 font-size: 16px !important;
                 color: #ffffff !important;
-                box-shadow: none !important;
             }
             
             .stMarkdown {
@@ -393,8 +398,35 @@ def get_dark_theme_css():
     setTimeout(forceDarkMode, 500);
     setTimeout(forceDarkMode, 1000);
     
+    // Function to remove chat input styling
+    function removeChatInputStyling() {
+        const chatInputs = document.querySelectorAll('.stChatInput input, .stChatInput textarea, [data-testid="stChatInput"] input, [data-testid="stChatInput"] textarea');
+        chatInputs.forEach(input => {
+            input.style.setProperty('background', 'transparent', 'important');
+            input.style.setProperty('border', 'none', 'important');
+            input.style.setProperty('box-shadow', 'none', 'important');
+            input.style.setProperty('outline', 'none', 'important');
+            input.style.setProperty('border-radius', '0', 'important');
+        });
+        
+        const chatContainers = document.querySelectorAll('.stChatInputContainer, [data-testid="stChatInputContainer"]');
+        chatContainers.forEach(container => {
+            container.style.setProperty('background', 'transparent', 'important');
+            container.style.setProperty('border', 'none', 'important');
+            container.style.setProperty('box-shadow', 'none', 'important');
+        });
+    }
+    
+    // Run multiple times to catch dynamic content
+    setTimeout(removeChatInputStyling, 100);
+    setTimeout(removeChatInputStyling, 500);
+    setTimeout(removeChatInputStyling, 1000);
+    
     // Watch for changes
-    new MutationObserver(forceDarkMode).observe(document.body, {
+    new MutationObserver(() => {
+        forceDarkMode();
+        removeChatInputStyling();
+    }).observe(document.body, {
         childList: true, 
         subtree: true, 
         attributes: true, 
@@ -445,11 +477,8 @@ def get_responsive_theme_css():
         }
         
         .stChatMessage {
-            background-color: transparent !important;
-            border: none !important;
-            padding: 16px 0px !important;
+            padding: 16px 20px !important;
             margin: 12px 0 !important;
-            box-shadow: none !important;
         }
         
         /* Mobile viewport optimization */
@@ -512,15 +541,12 @@ def get_responsive_theme_css():
                 padding: 0.75rem !important;
             }
             
-            /* Mobile chat message improvements - seamless blend */
+            /* Mobile chat message improvements */
             .stChatMessage {
-                background-color: transparent !important;
-                border: none !important;
                 margin: 16px 0 !important;
-                padding: 18px 0px !important;
+                padding: 18px 20px !important;
                 font-size: 16px !important;
                 line-height: 1.7 !important;
-                box-shadow: none !important;
             }
             
             /* Mobile chat input improvements - seamless blend */
@@ -703,7 +729,9 @@ def get_responsive_theme_css():
         }
         
         /* Seamless chat input - blends with background */
-        .stChatInputContainer {
+        .stChatInputContainer,
+        .stChatInputContainer > div,
+        .stChatInputContainer > div > div {
             background: transparent !important;
             border: none !important;
             border-radius: 0 !important;
@@ -714,7 +742,11 @@ def get_responsive_theme_css():
         }
         
         /* Style the actual input field - seamless background blend */
-        .stChatInput > div > div > div > div {
+        .stChatInput > div > div > div > div,
+        .stChatInput input,
+        .stChatInput textarea,
+        .stChatInput > div > div > div > div > input,
+        .stChatInput > div > div > div > div > textarea {
             background: transparent !important;
             border: none !important;
             border-radius: 0 !important;
@@ -722,13 +754,19 @@ def get_responsive_theme_css():
             font-size: 16px !important;
             box-shadow: none !important;
             outline: none !important;
+            color: #1f2937 !important;
         }
         
-        .stChatInput > div > div > div > div:focus {
+        .stChatInput > div > div > div > div:focus,
+        .stChatInput input:focus,
+        .stChatInput textarea:focus,
+        .stChatInput > div > div > div > div > input:focus,
+        .stChatInput > div > div > div > div > textarea:focus {
             background: transparent !important;
             border: none !important;
             box-shadow: none !important;
             outline: none !important;
+            color: #1f2937 !important;
         }
         
         /* Accessibility improvements */
@@ -864,29 +902,26 @@ def get_responsive_theme_css():
             color: #d97706 !important;
         }
         
-        /* Chat messages - Seamless background blend */
+        /* Chat messages - Enhanced readability */
         .stChatMessage {
-            background-color: transparent !important;
-            border: none !important;
-            border-radius: 0 !important;
+            background-color: #f8fafc !important;
+            border: 1px solid #e5e7eb !important;
+            border-radius: 12px !important;
             color: #1f2937 !important;
             margin: 16px 0 !important;
-            padding: 20px 0px !important;
+            padding: 20px 24px !important;
             font-size: 16px !important;
             line-height: 1.7 !important;
-            box-shadow: none !important;
         }
         
         .stChatMessage[data-testid="chat-message-user"] {
-            background-color: transparent !important;
-            border: none !important;
-            color: #1f2937 !important;
+            background-color: #eff6ff !important;
+            border-color: #bfdbfe !important;
         }
         
         .stChatMessage[data-testid="chat-message-assistant"] {
-            background-color: transparent !important;
-            border: none !important;
-            color: #1f2937 !important;
+            background-color: #f0fdf4 !important;
+            border-color: #bbf7d0 !important;
         }
         
         /* Toggle switches */
