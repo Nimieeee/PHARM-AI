@@ -6,6 +6,7 @@ import streamlit as st
 import sys
 import os
 import logging
+import time
 from datetime import datetime
 import functools
 from pathlib import Path
@@ -40,6 +41,16 @@ def main():
     initialize_session_state()
     apply_theme()
     initialize_auth_session()
+    
+    # Safety check: Reset processing flag if it's been stuck for too long
+    if st.session_state.get('processing_input', False):
+        if 'processing_start_time' not in st.session_state:
+            st.session_state.processing_start_time = time.time()
+        elif time.time() - st.session_state.processing_start_time > 30:  # 30 seconds timeout
+            st.session_state.processing_input = False
+            if 'processing_start_time' in st.session_state:
+                del st.session_state.processing_start_time
+            st.warning("⚠️ Processing timeout - input has been re-enabled.")
     
     # Add mobile-specific enhancements and theme-aware styling
     st.markdown("""
@@ -1089,7 +1100,16 @@ def render_bottom_input_area():
     
     # Custom chat input that matches page styling
     if st.session_state.get('processing_input', False):
-        st.info("🤔 Generating response... Please wait.")
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.info("🤔 Generating response... Please wait.")
+        with col2:
+            if st.button("🔄 Reset", help="Reset if stuck"):
+                st.session_state.processing_input = False
+                if 'processing_start_time' in st.session_state:
+                    del st.session_state.processing_start_time
+                st.rerun()
+        
         # Show disabled input during processing
         st.text_input(
             "Message", 
@@ -1256,6 +1276,7 @@ def process_chat_input(prompt):
         return
     
     st.session_state.processing_input = True
+    st.session_state.processing_start_time = time.time()
     
     try:
         # Ensure we have a conversation ID
@@ -1344,9 +1365,14 @@ def process_chat_input(prompt):
                 "timestamp": datetime.now().isoformat()
             })
     
+    except Exception as e:
+        logger.error(f"Error in process_chat_input: {e}")
+        st.error(f"❌ Error processing your message: {str(e)}")
     finally:
         # Always reset processing flag
         st.session_state.processing_input = False
+        if 'processing_start_time' in st.session_state:
+            del st.session_state.processing_start_time
         
         # Force rerun to display the response
         st.rerun()
