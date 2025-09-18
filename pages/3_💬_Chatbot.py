@@ -996,22 +996,45 @@ def render_bottom_input_area():
     # Document upload area
     render_document_upload()
     
-    # Chat input with processing state check
+    # Custom chat input that matches page styling
     if st.session_state.get('processing_input', False):
         st.info("🤔 Generating response... Please wait.")
-        # Disable input during processing
-        st.chat_input("Generating response...", disabled=True)
+        # Show disabled input during processing
+        st.text_input(
+            "Message", 
+            value="Generating response...", 
+            disabled=True,
+            label_visibility="collapsed",
+            placeholder="Generating response..."
+        )
     else:
-        prompt = st.chat_input("Ask me anything about pharmacology...")
+        # Create columns for input and send button
+        col1, col2 = st.columns([6, 1])
+        
+        with col1:
+            prompt = st.text_input(
+                "Message",
+                placeholder="Ask me anything about pharmacology...",
+                label_visibility="collapsed",
+                key="chat_input_field"
+            )
+        
+        with col2:
+            send_button = st.button("➤", use_container_width=True, type="primary")
         
         # Handle example prompts
         if st.session_state.get('example_prompt'):
             prompt = st.session_state.example_prompt
             st.session_state.example_prompt = None
         
-        # Process chat input
-        if prompt and not st.session_state.get('processing_input', False):
-            process_chat_input(prompt)
+        # Process input when button is clicked or Enter is pressed
+        if (prompt and send_button) or (prompt and prompt != st.session_state.get('last_input', '')):
+            if not st.session_state.get('processing_input', False):
+                st.session_state.last_input = prompt
+                process_chat_input(prompt)
+                # Clear the input after processing
+                st.session_state.chat_input_field = ""
+                st.rerun()
 
 def render_document_upload():
     """Render enhanced document upload area."""

@@ -109,26 +109,57 @@ def get_recent_conversations():
 def render_homepage():
     """Render the main homepage with authentication-aware content."""
     
-    # Custom CSS for beautiful homepage
-    st.markdown("""
+    # Get current theme for styling
+    is_dark_mode = st.session_state.get('dark_mode', True)
+    
+    # Theme-aware colors
+    if is_dark_mode:
+        card_bg = "#1e293b"
+        card_border = "#475569"
+        card_shadow = "rgba(0,0,0,0.3)"
+        text_color = "#f8fafc"
+        welcome_text_color = "#e2e8f0"
+    else:
+        card_bg = "#ffffff"
+        card_border = "#667eea"
+        card_shadow = "rgba(0,0,0,0.1)"
+        text_color = "#1f2937"
+        welcome_text_color = "#555555"
+    
+    # Custom CSS for beautiful homepage with theme support
+    st.markdown(f"""
     <style>
-    .main-header {
+    .main-header {{
         text-align: center;
         padding: 2rem 0;
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         border-radius: 10px;
         margin-bottom: 2rem;
         color: white;
-    }
-    .feature-card {
-        background: white;
+    }}
+    .feature-card {{
+        background: {card_bg};
+        color: {text_color};
         padding: 1.5rem;
         border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        box-shadow: 0 2px 10px {card_shadow};
         margin: 1rem 0;
-        border-left: 4px solid #667eea;
-    }
-    .auth-button {
+        border-left: 4px solid {card_border};
+        transition: all 0.3s ease;
+    }}
+    .feature-card:hover {{
+        transform: translateY(-2px);
+        box-shadow: 0 4px 20px {card_shadow};
+    }}
+    .feature-card h4 {{
+        color: {text_color};
+        margin-bottom: 0.5rem;
+    }}
+    .feature-card p {{
+        color: {text_color};
+        opacity: 0.8;
+    }}
+    .auth-button {{
         background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
         padding: 0.75rem 2rem;
@@ -141,17 +172,23 @@ def render_homepage():
         text-decoration: none;
         display: inline-block;
         transition: transform 0.2s;
-    }
-    .auth-button:hover {
+    }}
+    .auth-button:hover {{
         transform: translateY(-2px);
         box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-    }
-    .welcome-text {
+    }}
+    .welcome-text {{
         font-size: 1.2rem;
         text-align: center;
         margin: 2rem 0;
-        color: #555;
-    }
+        color: {welcome_text_color};
+    }}
+    .welcome-text h2 {{
+        color: {text_color};
+    }}
+    .welcome-text p {{
+        color: {welcome_text_color};
+    }}
     </style>
     """, unsafe_allow_html=True)
     

@@ -44,10 +44,31 @@ def main():
                 st.switch_page("app.py")
         return
     
-    # Custom CSS for sign in page
-    st.markdown("""
+    # Get current theme for styling
+    is_dark_mode = st.session_state.get('dark_mode', True)
+    
+    # Theme-aware colors
+    if is_dark_mode:
+        header_color = "#f8fafc"
+        tab_list_bg = "#1e293b"
+        tab_inactive_bg = "#334155"
+        tab_inactive_color = "#94a3b8"
+        tab_inactive_border = "#475569"
+        tab_hover_bg = "#475569"
+        tab_hover_color = "#e2e8f0"
+    else:
+        header_color = "#333333"
+        tab_list_bg = "#f8fafc"
+        tab_inactive_bg = "#ffffff"
+        tab_inactive_color = "#6b7280"
+        tab_inactive_border = "#e5e7eb"
+        tab_hover_bg = "#f9fafb"
+        tab_hover_color = "#374151"
+    
+    # Custom CSS for sign in page with theme support
+    st.markdown(f"""
     <style>
-    .auth-container {
+    .auth-container {{
         max-width: 500px;
         margin: 0 auto;
         padding: 16px;
@@ -55,24 +76,31 @@ def main():
         border-radius: 0;
         box-shadow: none;
         margin-top: 0;
-    }
-    .auth-header {
+    }}
+    .auth-header {{
         text-align: center;
         margin-bottom: 2rem;
-        color: #333;
+        color: {header_color};
         padding: 16px;
-    }
+    }}
+    .auth-header h1 {{
+        color: {header_color};
+    }}
+    .auth-header p {{
+        color: {header_color};
+        opacity: 0.8;
+    }}
     
-    /* Better tab styling */
-    .stTabs [data-baseweb="tab-list"] {
+    /* Theme-aware tab styling */
+    .stTabs [data-baseweb="tab-list"] {{
         gap: 8px !important;
         padding: 8px !important;
-        background-color: #f8fafc !important;
+        background-color: {tab_list_bg} !important;
         border-radius: 12px !important;
         margin-bottom: 24px !important;
-    }
+    }}
     
-    .stTabs [data-baseweb="tab"] {
+    .stTabs [data-baseweb="tab"] {{
         padding: 16px 24px !important;
         border-radius: 8px !important;
         font-weight: 500 !important;
@@ -81,25 +109,26 @@ def main():
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-    }
+        transition: all 0.2s ease !important;
+    }}
     
-    .stTabs [aria-selected="true"] {
+    .stTabs [aria-selected="true"] {{
         background-color: #6366f1 !important;
         color: white !important;
         font-weight: 600 !important;
         box-shadow: 0 2px 4px rgba(99, 102, 241, 0.2) !important;
-    }
+    }}
     
-    .stTabs [aria-selected="false"] {
-        background-color: white !important;
-        color: #6b7280 !important;
-        border: 1px solid #e5e7eb !important;
-    }
+    .stTabs [aria-selected="false"] {{
+        background-color: {tab_inactive_bg} !important;
+        color: {tab_inactive_color} !important;
+        border: 1px solid {tab_inactive_border} !important;
+    }}
     
-    .stTabs [aria-selected="false"]:hover {
-        background-color: #f9fafb !important;
-        color: #374151 !important;
-    }
+    .stTabs [aria-selected="false"]:hover {{
+        background-color: {tab_hover_bg} !important;
+        color: {tab_hover_color} !important;
+    }}
     </style>
     """, unsafe_allow_html=True)
     

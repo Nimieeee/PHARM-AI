@@ -328,50 +328,20 @@ def get_dark_theme_css():
                 padding: 16px 0 !important;
             }
             
-            /* Dark mode aggressive chat input styling - remove all frames */
-            .stChatInput,
-            .stChatInput > div,
-            .stChatInput > div > div,
-            .stChatInput > div > div > div,
-            .stChatInput > div > div > div > div,
-            .stChatInput input,
-            .stChatInput textarea,
-            .stChatInput > div > div > div > div > input,
-            .stChatInput > div > div > div > div > textarea,
-            [data-testid="stChatInput"],
-            [data-testid="stChatInput"] input,
-            [data-testid="stChatInput"] textarea,
-            [data-testid="stChatInput"] > div,
-            [data-testid="stChatInput"] > div > div,
-            [data-testid="stChatInput"] > div > div > div,
-            [data-testid="stChatInput"] > div > div > div > div {
-                background: transparent !important;
-                background-color: transparent !important;
-                border: none !important;
-                color: #f9fafb !important;
-                border-radius: 0 !important;
-                box-shadow: none !important;
-                outline: none !important;
+            /* Dark mode text input styling - matches page elements */
+            .stTextInput > div > div > input {
+                background-color: #1e293b !important;
+                color: #ffffff !important;
+                border: 1px solid #475569 !important;
+                border-radius: 8px !important;
+                padding: 12px 16px !important;
+                font-size: 16px !important;
             }
             
-            .stChatInput:focus,
-            .stChatInput > div:focus,
-            .stChatInput > div > div:focus,
-            .stChatInput > div > div > div:focus,
-            .stChatInput > div > div > div > div:focus,
-            .stChatInput input:focus,
-            .stChatInput textarea:focus,
-            .stChatInput > div > div > div > div > input:focus,
-            .stChatInput > div > div > div > div > textarea:focus,
-            [data-testid="stChatInput"]:focus,
-            [data-testid="stChatInput"] input:focus,
-            [data-testid="stChatInput"] textarea:focus {
-                background: transparent !important;
-                background-color: transparent !important;
-                border: none !important;
-                box-shadow: none !important;
-                outline: none !important;
-                color: #f9fafb !important;
+            .stTextInput > div > div > input:focus {
+                border-color: #6366f1 !important;
+                box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3) !important;
+                background-color: #334155 !important;
             }
             
             /* Maximum mobile readability in dark mode */
@@ -418,53 +388,8 @@ def get_dark_theme_css():
     setTimeout(forceDarkMode, 500);
     setTimeout(forceDarkMode, 1000);
     
-    // Aggressive function to remove all chat input styling
-    function removeChatInputStyling() {
-        // Target all possible chat input selectors
-        const selectors = [
-            '.stChatInput', '.stChatInput input', '.stChatInput textarea',
-            '.stChatInput > div', '.stChatInput > div > div', '.stChatInput > div > div > div', '.stChatInput > div > div > div > div',
-            '[data-testid="stChatInput"]', '[data-testid="stChatInput"] input', '[data-testid="stChatInput"] textarea',
-            '[data-testid="stChatInput"] > div', '[data-testid="stChatInput"] > div > div',
-            '.stChatInputContainer', '[data-testid="stChatInputContainer"]',
-            'input[placeholder*="pharmacology"]', 'textarea[placeholder*="pharmacology"]'
-        ];
-        
-        selectors.forEach(selector => {
-            const elements = document.querySelectorAll(selector);
-            elements.forEach(element => {
-                element.style.setProperty('background', 'transparent', 'important');
-                element.style.setProperty('background-color', 'transparent', 'important');
-                element.style.setProperty('border', 'none', 'important');
-                element.style.setProperty('box-shadow', 'none', 'important');
-                element.style.setProperty('outline', 'none', 'important');
-                element.style.setProperty('border-radius', '0', 'important');
-                
-                // Remove any background images or gradients
-                element.style.setProperty('background-image', 'none', 'important');
-                element.style.setProperty('background-gradient', 'none', 'important');
-            });
-        });
-    }
-    
-    // Run multiple times to catch dynamic content
-    setTimeout(removeChatInputStyling, 50);
-    setTimeout(removeChatInputStyling, 100);
-    setTimeout(removeChatInputStyling, 200);
-    setTimeout(removeChatInputStyling, 500);
-    setTimeout(removeChatInputStyling, 1000);
-    setTimeout(removeChatInputStyling, 2000);
-    
-    // Also run on page interactions
-    document.addEventListener('click', removeChatInputStyling);
-    document.addEventListener('focus', removeChatInputStyling, true);
-    document.addEventListener('input', removeChatInputStyling);
-    
     // Watch for changes
-    new MutationObserver(() => {
-        forceDarkMode();
-        removeChatInputStyling();
-    }).observe(document.body, {
+    new MutationObserver(forceDarkMode).observe(document.body, {
         childList: true, 
         subtree: true, 
         attributes: true, 
@@ -766,84 +691,19 @@ def get_responsive_theme_css():
             outline-offset: 2px !important;
         }
         
-        /* Nuclear option - remove all possible chat input styling */
-        .stChatInputContainer,
-        .stChatInputContainer > div,
-        .stChatInputContainer > div > div,
-        [data-testid="stChatInputContainer"],
-        [data-testid="stChatInputContainer"] > div,
-        [data-testid="stChatInputContainer"] > div > div,
-        div[class*="chatInput"],
-        div[class*="ChatInput"],
-        div[data-testid*="chatInput"],
-        div[data-testid*="ChatInput"] {
-            background: transparent !important;
-            background-color: transparent !important;
-            border: none !important;
-            border-radius: 0 !important;
-            padding: 16px 0 !important;
-            margin: 0 !important;
-            box-shadow: none !important;
-            position: relative !important;
-        }
-        
-        /* Override any inline styles */
-        .stChatInputContainer[style],
-        .stChatInput[style],
-        [data-testid="stChatInputContainer"][style],
-        [data-testid="stChatInput"][style] {
-            background: transparent !important;
-            background-color: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-        }
-        
-        /* Aggressive chat input styling - remove all frames */
-        .stChatInput,
-        .stChatInput > div,
-        .stChatInput > div > div,
-        .stChatInput > div > div > div,
-        .stChatInput > div > div > div > div,
-        .stChatInput input,
-        .stChatInput textarea,
-        .stChatInput > div > div > div > div > input,
-        .stChatInput > div > div > div > div > textarea,
-        [data-testid="stChatInput"],
-        [data-testid="stChatInput"] input,
-        [data-testid="stChatInput"] textarea,
-        [data-testid="stChatInput"] > div,
-        [data-testid="stChatInput"] > div > div,
-        [data-testid="stChatInput"] > div > div > div,
-        [data-testid="stChatInput"] > div > div > div > div {
-            background: transparent !important;
-            background-color: transparent !important;
-            border: none !important;
-            border-radius: 0 !important;
-            padding: 16px 20px !important;
+        /* Custom chat input styling - matches page elements */
+        .stTextInput > div > div > input {
+            background-color: #ffffff !important;
+            color: #1a202c !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
             font-size: 16px !important;
-            box-shadow: none !important;
-            outline: none !important;
-            color: #1f2937 !important;
+            padding: 12px 16px !important;
         }
         
-        .stChatInput:focus,
-        .stChatInput > div:focus,
-        .stChatInput > div > div:focus,
-        .stChatInput > div > div > div:focus,
-        .stChatInput > div > div > div > div:focus,
-        .stChatInput input:focus,
-        .stChatInput textarea:focus,
-        .stChatInput > div > div > div > div > input:focus,
-        .stChatInput > div > div > div > div > textarea:focus,
-        [data-testid="stChatInput"]:focus,
-        [data-testid="stChatInput"] input:focus,
-        [data-testid="stChatInput"] textarea:focus {
-            background: transparent !important;
-            background-color: transparent !important;
-            border: none !important;
-            box-shadow: none !important;
-            outline: none !important;
-            color: #1f2937 !important;
+        .stTextInput > div > div > input:focus {
+            border-color: #667eea !important;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1) !important;
         }
         
         /* Accessibility improvements */
