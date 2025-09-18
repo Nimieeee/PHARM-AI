@@ -846,16 +846,11 @@ def render_main_chat_area():
         # Display chat messages with enhanced features
         render_chat_messages()
         
-        # Show processing indicator or streaming response if generating response
+        # Show processing indicator if generating response
         if st.session_state.get('processing_input', False):
             with st.chat_message("assistant"):
-                if st.session_state.get('streaming_response'):
-                    # Show streaming response in progress
-                    st.markdown(st.session_state.streaming_response + "▋")
-                else:
-                    # Show thinking indicator
-                    st.markdown("🤔 Thinking...")
-                    st.caption("Generating response...")
+                st.markdown("🤔 Thinking...")
+                st.caption("Generating response...")
     
     # Fixed bottom input area
     render_bottom_input_area()
@@ -1327,66 +1322,65 @@ def generate_streaming_response(prompt):
                 {"role": "user", "content": prompt}
             ]
         
-        # Initialize streaming response in session state
-        st.session_state.streaming_response = ""
-        full_response = ""
-        
-        # Add auto-scroll JavaScript
-        scroll_script = """
-        <script>
-        function autoScrollToBottom() {
-            // Scroll to bottom of the page
-            window.scrollTo({
-                top: document.body.scrollHeight,
-                behavior: 'smooth'
-            });
+        # Create a container for the streaming response in the correct location
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            full_response = ""
             
-            // Also try to scroll the main content area
-            const mainContent = document.querySelector('.main');
-            if (mainContent) {
-                mainContent.scrollTo({
-                    top: mainContent.scrollHeight,
+            # Add auto-scroll JavaScript
+            scroll_script = """
+            <script>
+            function autoScrollToBottom() {
+                // Scroll to bottom of the page
+                window.scrollTo({
+                    top: document.body.scrollHeight,
                     behavior: 'smooth'
                 });
+                
+                // Also try to scroll the main content area
+                const mainContent = document.querySelector('.main');
+                if (mainContent) {
+                    mainContent.scrollTo({
+                        top: mainContent.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
             }
-        }
-        
-        // Auto-scroll every 100ms during streaming
-        const scrollInterval = setInterval(autoScrollToBottom, 100);
-        
-        // Stop auto-scrolling after 30 seconds (safety measure)
-        setTimeout(() => {
-            clearInterval(scrollInterval);
-        }, 30000);
-        </script>
-        """
-        
-        # Inject the scroll script
-        st.markdown(scroll_script, unsafe_allow_html=True)
-        
-        # Stream the response and update session state
-        for chunk in chat_completion_stream(model, api_messages):
-            full_response += chunk
-            st.session_state.streaming_response = full_response
-            st.rerun()  # Refresh to show updated streaming response
-        
-        # Clear streaming response from session state
-        if 'streaming_response' in st.session_state:
-            del st.session_state.streaming_response
-        
-        # Final scroll to ensure everything is visible
-        final_scroll = """
-        <script>
-        // Final scroll after streaming is complete
-        setTimeout(() => {
-            window.scrollTo({
-                top: document.body.scrollHeight,
-                behavior: 'smooth'
-            });
-        }, 200);
-        </script>
-        """
-        st.markdown(final_scroll, unsafe_allow_html=True)
+            
+            // Auto-scroll every 200ms during streaming (less frequent to avoid issues)
+            const scrollInterval = setInterval(autoScrollToBottom, 200);
+            
+            // Stop auto-scrolling after 30 seconds (safety measure)
+            setTimeout(() => {
+                clearInterval(scrollInterval);
+            }, 30000);
+            </script>
+            """
+            
+            # Inject the scroll script
+            st.markdown(scroll_script, unsafe_allow_html=True)
+            
+            # Stream the response
+            for chunk in chat_completion_stream(model, api_messages):
+                full_response += chunk
+                response_placeholder.markdown(full_response + "▋")  # Show cursor
+            
+            # Remove cursor and show final response
+            response_placeholder.markdown(full_response)
+            
+            # Final scroll to ensure everything is visible
+            final_scroll = """
+            <script>
+            // Final scroll after streaming is complete
+            setTimeout(() => {
+                window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                });
+            }, 200);
+            </script>
+            """
+            st.markdown(final_scroll, unsafe_allow_html=True)
         
         return full_response
         
