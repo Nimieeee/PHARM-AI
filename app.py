@@ -28,9 +28,7 @@ def main():
     initialize_auth_session()
     
     # Add mobile optimizations
-    from utils.theme import render_theme_toggle, add_mobile_meta_tags
-    add_mobile_meta_tags()
-    render_theme_toggle()
+    from utils.theme import add_mobile_meta_tags
     
     # Apply theme
     apply_theme()
