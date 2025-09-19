@@ -52,7 +52,9 @@ def get_dark_theme_css():
             color: #ffffff !important;
             border: 1px solid #475569 !important;
             border-radius: 8px !important;
-            padding: 16px 24px !important;
+            padding: 12px 16px !important;
+            min-height: 48px !important;
+            height: 48px !important;
         }
         
         .stButton > button:hover {
