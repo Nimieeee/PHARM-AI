@@ -24,17 +24,35 @@ except ImportError:
 def get_api_keys():
     """Get API keys from Streamlit secrets or environment variables (fallback)."""
     import streamlit as st
+    import logging
+    
+    logger = logging.getLogger(__name__)
     
     # Try Streamlit secrets first, fallback to environment variables
     try:
-        groq_key = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY"))
-        openrouter_key = st.secrets.get("OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY"))
-        mistral_key = st.secrets.get("MISTRAL_API_KEY", os.environ.get("MISTRAL_API_KEY"))
-    except Exception:
+        logger.info("Attempting to get API keys from Streamlit secrets...")
+        
+        # Check if secrets are available
+        if hasattr(st, 'secrets'):
+            logger.info("st.secrets is available")
+            groq_key = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY"))
+            openrouter_key = st.secrets.get("OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY"))
+            mistral_key = st.secrets.get("MISTRAL_API_KEY", os.environ.get("MISTRAL_API_KEY"))
+            
+            logger.info(f"Keys from secrets - Mistral: {'Found' if mistral_key else 'Missing'}, Groq: {'Found' if groq_key else 'Missing'}, OpenRouter: {'Found' if openrouter_key else 'Missing'}")
+        else:
+            logger.warning("st.secrets not available, using environment variables")
+            groq_key = os.environ.get("GROQ_API_KEY")
+            openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+            mistral_key = os.environ.get("MISTRAL_API_KEY")
+            
+    except Exception as e:
+        logger.error(f"Error accessing secrets: {e}")
         # Fallback to environment variables if secrets not available
         groq_key = os.environ.get("GROQ_API_KEY")
         openrouter_key = os.environ.get("OPENROUTER_API_KEY")
         mistral_key = os.environ.get("MISTRAL_API_KEY")
+        logger.info("Using environment variables as fallback")
     
     return groq_key, openrouter_key, mistral_key
 
@@ -58,7 +76,7 @@ def get_model_configs():
             "base_url": "https://api.mistral.ai/v1", 
             "description": "Premium Mode",
             "use_native_groq": False,
-            "max_tokens": 4096,
+            "max_tokens": 8000,
             "temperature": 0.3
         }
     }

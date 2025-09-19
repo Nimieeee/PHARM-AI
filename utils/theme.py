@@ -336,12 +336,23 @@ def get_dark_theme_css():
                 border-radius: 8px !important;
                 padding: 12px 16px !important;
                 font-size: 16px !important;
+                min-height: 48px !important;
             }
             
             .stTextInput > div > div > input:focus {
                 border-color: #6366f1 !important;
                 box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3) !important;
                 background-color: #334155 !important;
+            }
+            
+            /* Dark mode send button styling to match input height */
+            .stButton > button {
+                min-height: 48px !important;
+                height: 48px !important;
+                padding: 12px 16px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
             }
             
             /* Maximum mobile readability in dark mode */
@@ -699,11 +710,22 @@ def get_responsive_theme_css():
             border-radius: 8px !important;
             font-size: 16px !important;
             padding: 12px 16px !important;
+            min-height: 48px !important;
         }
         
         .stTextInput > div > div > input:focus {
             border-color: #667eea !important;
             box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1) !important;
+        }
+        
+        /* Send button styling to match input height */
+        .stButton > button {
+            min-height: 48px !important;
+            height: 48px !important;
+            padding: 12px 16px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
         }
         
         /* Accessibility improvements */
@@ -1008,7 +1030,25 @@ def apply_theme():
         st.markdown(get_responsive_theme_css(), unsafe_allow_html=True)
 
 def render_theme_toggle():
-    """Render simple and reliable theme toggle."""
+    """Render simple and reliable theme toggle for main page."""
+    # Simple toggle between dark and light (dark mode is default)
+    light_mode = st.toggle(
+        "☀️ Light Mode",
+        value=st.session_state.get('dark_mode', True) == False,
+        help="Toggle to light theme (dark mode is default)"
+    )
+    
+    # Update session state - dark mode is default (True), light mode sets it to False
+    dark_mode = not light_mode
+    if dark_mode != st.session_state.get('dark_mode', True):
+        st.session_state.dark_mode = dark_mode
+        # Remove old theme preference
+        if 'theme_preference' in st.session_state:
+            del st.session_state.theme_preference
+        st.rerun()
+
+def render_sidebar_theme_toggle():
+    """Render theme toggle for sidebar (legacy)."""
     with st.sidebar:
         st.markdown("### 🎨 Theme")
         

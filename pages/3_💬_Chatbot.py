@@ -312,26 +312,9 @@ def load_user_conversations():
 def render_enhanced_sidebar():
     """Render enhanced sidebar with conversation management."""
     with st.sidebar:
-        # Theme toggle at the top for easy access
-        from utils.theme import render_theme_toggle, add_mobile_meta_tags
+        # Add mobile optimizations
+        from utils.theme import add_mobile_meta_tags
         add_mobile_meta_tags()
-        render_theme_toggle()
-        
-        # Performance settings right after theme toggle
-        st.markdown("### ⚙️ Performance Settings")
-        
-        # Model selection - Toggle between fast and premium
-        use_premium_model = st.toggle(
-            "💎 Premium Mode", 
-            value=st.session_state.get('selected_model_mode', 'fast') == 'premium',
-            help="Toggle between ⚡ Fast Mode (default) and 💎 Premium Mode for higher quality responses"
-        )
-        st.session_state.selected_model_mode = "premium" if use_premium_model else "fast"
-        
-        # Set streaming as default (always enabled, 6 tokens per second)
-        st.session_state.use_streaming = True
-        
-        st.markdown("---")
         
         st.markdown("### 💊 PharmGPT")
         st.markdown(f"**Welcome, {st.session_state.username}!**")
@@ -368,10 +351,69 @@ def render_enhanced_sidebar():
             if fresh_conversations:
                 secure_update_conversations(fresh_conversations)
         
-
-        
         # Conversation list
         render_conversation_list()
+        
+        st.markdown("---")
+        
+        # Performance settings
+        st.markdown("### ⚙️ Performance Settings")
+        
+        # Model selection - Toggle between fast and premium
+        use_premium_model = st.toggle(
+            "💎 Premium Mode", 
+            value=st.session_state.get('selected_model_mode', 'fast') == 'premium',
+            help="Toggle between ⚡ Fast Mode (default) and 💎 Premium Mode for higher quality responses"
+        )
+        st.session_state.selected_model_mode = "premium" if use_premium_model else "fast"
+        
+        # Set streaming as default (always enabled, 6 tokens per second)
+        st.session_state.use_streaming = True
+        
+        # Debug: Show API key status with detailed info
+        with st.expander("🔍 Debug Info", expanded=False):
+            try:
+                from openai_client import get_available_model_modes, get_api_keys
+                
+                # Check raw API keys first
+                groq_key, openrouter_key, mistral_key = get_api_keys()
+                st.write("**API Key Status:**")
+                st.write(f"- Mistral Key: {'✅ Found' if mistral_key else '❌ Missing'}")
+                st.write(f"- Groq Key: {'✅ Found' if groq_key else '❌ Missing'}")
+                st.write(f"- OpenRouter Key: {'✅ Found' if openrouter_key else '❌ Missing'}")
+                
+                # Show partial key for verification (last 4 chars)
+                if mistral_key:
+                    st.write(f"- Mistral Key ends with: ...{mistral_key[-4:]}")
+                
+                # Check available modes
+                available_modes = get_available_model_modes()
+                if available_modes:
+                    st.success(f"✅ {len(available_modes)} models available")
+                    st.write(f"Available modes: {list(available_modes.keys())}")
+                else:
+                    st.error("❌ No models available")
+                    
+                # Test API connection
+                if st.button("🧪 Test API Connection"):
+                    if mistral_key:
+                        try:
+                            from openai_client import chat_completion_fast
+                            test_response = chat_completion_fast("mistral-small-latest", [
+                                {"role": "user", "content": "Say 'API test successful'"}
+                            ])
+                            st.success(f"✅ API Test: {test_response}")
+                        except Exception as api_error:
+                            st.error(f"❌ API Test Failed: {str(api_error)}")
+                    else:
+                        st.error("❌ No Mistral API key to test")
+                    
+            except Exception as e:
+                st.error(f"❌ Debug Error: {str(e)}")
+                import traceback
+                st.code(traceback.format_exc())
+        
+
         
         # Current conversation info
         render_conversation_info()
@@ -910,6 +952,12 @@ def save_document_to_conversation_multipage(uploaded_file, content):
 def render_main_chat_area():
     """Render the main chat area with enhanced features."""
     
+    # Theme toggle in top right corner
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col3:
+        from utils.theme import render_theme_toggle
+        render_theme_toggle()
+    
     # Chat header with conversation title
     render_chat_header()
     
@@ -928,11 +976,17 @@ def render_main_chat_area():
         # Display chat messages with enhanced features
         render_chat_messages()
         
-        # Show processing indicator if generating response
+        # Show processing indicator or simulated streaming if generating response
         if st.session_state.get('processing_input', False):
             with st.chat_message("assistant"):
-                st.markdown("🤔 Thinking...")
-                st.caption("Generating response...")
+                if st.session_state.get('streaming_text') and st.session_state.get('streaming_position', 0) > 0:
+                    # Show simulated streaming
+                    current_text = st.session_state.streaming_text[:st.session_state.streaming_position]
+                    st.markdown(current_text + "▋")
+                else:
+                    # Show thinking indicator
+                    st.markdown("🤔 Thinking...")
+                    st.caption("Generating response...")
     
     # Fixed bottom input area
     render_bottom_input_area()
@@ -1380,21 +1434,29 @@ def process_chat_input(prompt):
 def generate_streaming_response(prompt):
     """Generate streaming AI response for real-time display."""
     try:
+        logger.info("Starting response generation...")
+        
         # Import AI functions
         from openai_client import chat_completion_stream, get_available_model_modes
         from prompts import pharmacology_system_prompt, pharmacology_fast_prompt
         
         # Get available models
         available_modes = get_available_model_modes()
+        logger.info(f"Available modes: {list(available_modes.keys()) if available_modes else 'None'}")
+        
         if not available_modes:
-            return "❌ No AI models available. Please check your API keys."
+            error_msg = "❌ No AI models available. Please check your API keys in .streamlit/secrets.toml"
+            logger.error(error_msg)
+            return error_msg
         
         # Use selected model mode
         selected_mode = st.session_state.get('selected_model_mode', 'fast')  # Default to fast for speed
         if selected_mode not in available_modes:
             selected_mode = list(available_modes.keys())[0]
+            logger.info(f"Selected mode not available, using: {selected_mode}")
         
         model = available_modes[selected_mode]["model"]
+        logger.info(f"Using model: {model}")
         
         # Get document context (cached for speed)
         conversation_id = st.session_state.get('current_conversation_id', 'default')
@@ -1408,23 +1470,128 @@ def generate_streaming_response(prompt):
             from prompts import get_rag_enhanced_prompt
             enhanced_system_prompt = get_rag_enhanced_prompt(prompt, document_context)
             api_messages = [{"role": "system", "content": enhanced_system_prompt}]
+            logger.info("Using RAG-enhanced prompt")
         else:
             base_prompt = pharmacology_fast_prompt if use_fast_prompt else pharmacology_system_prompt
             api_messages = [
                 {"role": "system", "content": base_prompt},
                 {"role": "user", "content": prompt}
             ]
+            logger.info(f"Using {'fast' if use_fast_prompt else 'standard'} prompt")
         
-        # Use fast completion instead of streaming to avoid UI conflicts
+        # Use fast completion then simulate streaming for best UX
         from openai_client import chat_completion_fast
+        logger.info("Calling chat_completion_fast...")
         full_response = chat_completion_fast(model, api_messages)
         
+        if not full_response:
+            logger.error("Empty response from API")
+            return "❌ Received empty response from AI model. Please try again."
+        
         logger.info(f"Generated response: {len(full_response)} characters")
+        
+        # Simulate streaming display for better UX
+        simulate_streaming_display(full_response)
+        
         return full_response
         
     except Exception as e:
+        import traceback
+        error_details = traceback.format_exc()
         logger.error(f"Error in streaming response: {e}")
-        return f"Sorry, I encountered an error: {str(e)}"
+        logger.error(f"Full traceback: {error_details}")
+        return f"Sorry, I encountered an error: {str(e)}\n\nPlease check that your API keys are properly configured in .streamlit/secrets.toml"
+
+def simulate_streaming_display(full_response):
+    """Simulate streaming display of a complete response for better UX."""
+    try:
+        import time
+        
+        # Set up streaming state
+        st.session_state.streaming_text = full_response
+        st.session_state.streaming_position = 0
+        
+        # Calculate streaming parameters
+        total_chars = len(full_response)
+        # Target: ~6 tokens per second, roughly 4-5 chars per token
+        chars_per_second = 25  # ~6 tokens/second * 4 chars/token
+        chunk_size = max(1, chars_per_second // 10)  # 10 updates per second
+        delay = 0.1  # 100ms between updates
+        
+        logger.info(f"Starting simulated streaming: {total_chars} chars, {chunk_size} chars per chunk")
+        
+        # Add auto-scroll JavaScript
+        scroll_script = """
+        <script>
+        function autoScrollToBottom() {
+            const targets = [
+                document.documentElement,
+                document.body,
+                document.querySelector('.main'),
+                document.querySelector('[data-testid="stAppViewContainer"]')
+            ];
+            
+            targets.forEach(target => {
+                if (target) {
+                    target.scrollTo({
+                        top: target.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+            
+            window.scrollTo({
+                top: Math.max(
+                    document.body.scrollHeight,
+                    document.documentElement.scrollHeight
+                ),
+                behavior: 'smooth'
+            });
+        }
+        
+        // Auto-scroll during streaming
+        const scrollInterval = setInterval(autoScrollToBottom, 200);
+        
+        // Stop after 30 seconds
+        setTimeout(() => {
+            clearInterval(scrollInterval);
+        }, 30000);
+        </script>
+        """
+        st.markdown(scroll_script, unsafe_allow_html=True)
+        
+        # Stream the text in chunks
+        while st.session_state.streaming_position < total_chars:
+            # Calculate next position
+            next_pos = min(
+                st.session_state.streaming_position + chunk_size,
+                total_chars
+            )
+            
+            # Update position
+            st.session_state.streaming_position = next_pos
+            
+            # Rerun to show updated text
+            st.rerun()
+            
+            # Small delay for streaming effect
+            time.sleep(delay)
+        
+        # Clean up streaming state
+        if 'streaming_text' in st.session_state:
+            del st.session_state.streaming_text
+        if 'streaming_position' in st.session_state:
+            del st.session_state.streaming_position
+            
+        logger.info("Simulated streaming completed")
+        
+    except Exception as e:
+        logger.error(f"Error in simulated streaming: {e}")
+        # Clean up on error
+        if 'streaming_text' in st.session_state:
+            del st.session_state.streaming_text
+        if 'streaming_position' in st.session_state:
+            del st.session_state.streaming_position
 
 def generate_enhanced_response(prompt):
     """Generate enhanced AI response with document context (fast mode)."""
