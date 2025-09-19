@@ -974,11 +974,7 @@ def save_document_to_conversation_multipage(uploaded_file, content):
 def render_main_chat_area():
     """Render the main chat area with enhanced features."""
     
-    # Theme toggle in top right corner
-    col1, col2, col3 = st.columns([2, 1, 1])
-    with col3:
-        from utils.theme import render_theme_toggle
-        render_theme_toggle()
+    
     
     # Chat header with conversation title
     render_chat_header()
@@ -1024,7 +1020,7 @@ def render_chat_header():
             title = conversations.get(conv_id, {}).get('title', 'Untitled Chat')
             st.title(f"💊 {title}")
         else:
-            st.title("💊 PharmGPT Chat")
+            st.title("💊 PharmGPT")
     
     with col2:
         # Model indicator
