@@ -90,22 +90,30 @@ def main():
             scroll-margin-bottom: 20px !important;
         }
         
-        /* Horizontal scrollable tables */
+        /* Horizontal scrollable tables - show full content */
+        .stMarkdown table {
+            display: table !important;
+            width: 100% !important;
+            overflow-x: auto !important;
+            border-collapse: collapse !important;
+            margin: 1rem 0 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 0 0 1px #e5e7eb !important;
+        }
+        
+        /* Table wrapper for horizontal scrolling */
         .stMarkdown table {
             display: block !important;
             overflow-x: auto !important;
             white-space: nowrap !important;
-            max-width: 100% !important;
-            border-collapse: collapse !important;
-            margin: 1rem 0 !important;
         }
         
         .stMarkdown table thead,
         .stMarkdown table tbody,
         .stMarkdown table tr {
             display: table !important;
-            width: 100% !important;
-            table-layout: fixed !important;
+            width: max-content !important;
+            table-layout: auto !important;
         }
         
         .stMarkdown table th,
@@ -113,10 +121,9 @@ def main():
             padding: 8px 12px !important;
             border: 1px solid #e5e7eb !important;
             text-align: left !important;
-            min-width: 120px !important;
             white-space: nowrap !important;
-            overflow: hidden !important;
-            text-overflow: ellipsis !important;
+            min-width: auto !important;
+            width: auto !important;
         }
         
         .stMarkdown table th {
@@ -143,24 +150,6 @@ def main():
             }
         }
         
-        /* Table container with scroll indicators */
-        .stMarkdown table {
-            box-shadow: 0 0 0 1px #e5e7eb !important;
-            border-radius: 8px !important;
-        }
-        
-        /* Scroll hint for tables */
-        .stMarkdown table::after {
-            content: "← Scroll horizontally to see more →" !important;
-            display: block !important;
-            text-align: center !important;
-            font-size: 12px !important;
-            color: #6b7280 !important;
-            padding: 8px !important;
-            background-color: #f9fafb !important;
-            border-top: 1px solid #e5e7eb !important;
-        }
-        
         /* Mobile chat optimizations */
         @media (max-width: 768px) {
             /* Hide sidebar toggle on mobile for cleaner look */
@@ -183,6 +172,8 @@ def main():
             /* Add bottom padding to prevent content hiding behind fixed input */
             .main .block-container {
                 padding-bottom: 80px !important;
+                padding-left: 1rem !important;
+                padding-right: 1rem !important;
             }
             
             /* Mobile-friendly message display */
@@ -200,6 +191,14 @@ def main():
             .welcome-tag {
                 padding: 0.4rem 0.8rem !important;
                 font-size: 14px !important;
+            }
+            
+            /* Ensure full width usage on mobile */
+            .element-container {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 0 !important;
+                margin: 0 !important;
             }
         }
         
@@ -1117,8 +1116,8 @@ def render_bottom_input_area():
             placeholder="Generating response..."
         )
     else:
-        # Create columns for input and send button
-        col1, col2 = st.columns([5, 1])
+        # Create columns for input and send button - more space for input on mobile
+        col1, col2 = st.columns([8, 1])
         
         with col1:
             prompt = st.text_input(

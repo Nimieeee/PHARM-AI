@@ -587,25 +587,78 @@ def get_responsive_theme_css():
                 font-size: 16px !important;
             }
             
-            /* Ensure proper column behavior on mobile */
-            @media (max-width: 480px) {
-                .element-container {
+            /* Aggressive mobile column fixes */
+            @media (max-width: 768px) {
+                /* Force proper column behavior */
+                .stColumns {
+                    display: flex !important;
+                    gap: 0.5rem !important;
                     width: 100% !important;
-                    max-width: 100% !important;
                 }
                 
                 .stColumns > div {
-                    padding: 0 0.25rem !important;
+                    padding: 0 !important;
+                    margin: 0 !important;
                 }
                 
                 .stColumns > div:first-child {
-                    flex: 1 1 auto !important;
+                    flex: 1 1 0% !important;
                     min-width: 0 !important;
+                    overflow: hidden !important;
                 }
                 
                 .stColumns > div:last-child {
                     flex: 0 0 auto !important;
                     width: 60px !important;
+                    min-width: 60px !important;
+                }
+                
+                /* Force input to use full available width */
+                .stTextInput {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                }
+                
+                .stTextInput > div {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                }
+                
+                .stTextInput > div > div {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                }
+                
+                .stTextInput > div > div > input {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    box-sizing: border-box !important;
+                }
+                
+                /* Force button to fit in allocated space */
+                .stButton {
+                    width: 100% !important;
+                }
+                
+                .stButton > button {
+                    width: 100% !important;
+                    max-width: 60px !important;
+                    padding: 12px 4px !important;
+                    font-size: 16px !important;
+                }
+            }
+            
+            /* Extra small screens */
+            @media (max-width: 480px) {
+                .stColumns > div:last-child {
+                    width: 50px !important;
+                    min-width: 50px !important;
+                }
+                
+                .stButton > button {
+                    max-width: 50px !important;
+                    padding: 12px 2px !important;
+                    font-size: 14px !important;
                 }
             }
             
