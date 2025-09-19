@@ -119,7 +119,9 @@ def get_dark_theme_css():
             color: #ffffff !important;
             border: 1px solid #475569 !important;
             border-radius: 8px !important;
-            padding: 16px !important;
+            font-size: 16px !important;
+            padding: 12px 16px !important;
+            min-height: 48px !important;
         }
         
         .stTextInput > div > div > input:focus {
@@ -837,19 +839,16 @@ def get_responsive_theme_css():
             outline-offset: 2px !important;
         }
         
-        /* Custom chat input styling - matches page elements */
+        /* Custom chat input styling - theme aware */
         .stTextInput > div > div > input {
-            background-color: #ffffff !important;
-            color: #1a202c !important;
-            border: 1px solid #d1d5db !important;
             border-radius: 8px !important;
             font-size: 16px !important;
             padding: 12px 16px !important;
             min-height: 48px !important;
+            transition: all 0.2s ease !important;
         }
         
         .stTextInput > div > div > input:focus {
-            border-color: #667eea !important;
             box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.1) !important;
         }
         
@@ -926,7 +925,9 @@ def get_responsive_theme_css():
             color: #1a202c !important;
             border: 1px solid #d1d5db !important;
             border-radius: 8px !important;
-            font-size: 14px !important;
+            font-size: 16px !important;
+            padding: 12px 16px !important;
+            min-height: 48px !important;
         }
         
         .stTextInput > div > div > input:focus {
