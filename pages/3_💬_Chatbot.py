@@ -206,29 +206,49 @@ def main():
                 display: none !important;
             }
             
-            /* Optimize chat input for mobile - seamless blend */
-            .stChatInputContainer {
-                position: fixed !important;
-                bottom: 0 !important;
-                left: 0 !important;
-                right: 0 !important;
-                background: transparent !important;
-                border: none !important;
-                padding: 0.5rem !important;
-                z-index: 1000 !important;
+            /* Fix mobile input container */
+            .main .block-container {
+                padding-bottom: 120px !important;
+                padding-left: 0.5rem !important;
+                padding-right: 0.5rem !important;
+                max-width: 100% !important;
             }
             
-            /* Add bottom padding to prevent content hiding behind fixed input */
-            .main .block-container {
-                padding-bottom: 80px !important;
-                padding-left: 1rem !important;
-                padding-right: 1rem !important;
+            /* Mobile text input styling - prevent cutoff */
+            .stTextInput > div > div > input {
+                width: 100% !important;
+                min-width: 0 !important;
+                box-sizing: border-box !important;
+                padding: 0.75rem !important;
+                font-size: 16px !important;
+                border-radius: 8px !important;
+            }
+            
+            /* Mobile column adjustments */
+            .element-container .row-widget {
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            /* Ensure columns don't overflow */
+            .element-container .col {
+                min-width: 0 !important;
+                flex-shrink: 1 !important;
+            }
+            
+            /* Mobile button styling */
+            .stButton > button {
+                width: 100% !important;
+                min-width: 40px !important;
+                padding: 0.75rem 0.5rem !important;
+                font-size: 18px !important;
             }
             
             /* Mobile-friendly message display */
             .stChatMessage {
                 word-wrap: break-word !important;
                 overflow-wrap: break-word !important;
+                margin: 0.5rem 0 !important;
             }
             
             /* Mobile welcome card adjustments */
@@ -242,12 +262,16 @@ def main():
                 font-size: 14px !important;
             }
             
-            /* Ensure full width usage on mobile */
-            .element-container {
-                width: 100% !important;
-                max-width: 100% !important;
+            /* Prevent horizontal overflow */
+            .stApp {
+                overflow-x: hidden !important;
+            }
+            
+            /* Mobile viewport fix */
+            .main {
                 padding: 0 !important;
-                margin: 0 !important;
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
             }
         }
         
@@ -1116,6 +1140,7 @@ def render_bottom_input_area():
     # Enhanced CSS for seamless input blending
     st.markdown("""
     <style>
+    /* Desktop input styling */
     .stChatInput {
         position: sticky;
         bottom: 0;
@@ -1125,9 +1150,11 @@ def render_bottom_input_area():
         z-index: 999;
         margin-top: 2rem;
     }
+    
     .main .block-container {
         padding-bottom: 120px;
     }
+    
     .upload-area {
         background: #f8fafc;
         border: 2px dashed #d1d5db;
@@ -1135,6 +1162,56 @@ def render_bottom_input_area():
         padding: 1rem;
         text-align: center;
         margin-bottom: 1rem;
+    }
+    
+    /* Mobile input area fixes */
+    @media (max-width: 768px) {
+        /* Input container */
+        .stTextInput {
+            width: 100% !important;
+            margin: 0 !important;
+        }
+        
+        /* Input field itself */
+        .stTextInput > div > div {
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        
+        .stTextInput > div > div > input {
+            width: 100% !important;
+            max-width: 100% !important;
+            box-sizing: border-box !important;
+            padding: 12px !important;
+            font-size: 16px !important;
+            border: 1px solid #d1d5db !important;
+            border-radius: 8px !important;
+            background: white !important;
+        }
+        
+        /* Column layout fixes */
+        .row-widget.stHorizontal {
+            width: 100% !important;
+            gap: 8px !important;
+        }
+        
+        .row-widget.stHorizontal > div {
+            min-width: 0 !important;
+            flex: 1 !important;
+        }
+        
+        /* Send button column */
+        .row-widget.stHorizontal > div:last-child {
+            flex: 0 0 50px !important;
+            max-width: 50px !important;
+        }
+        
+        /* Bottom padding for mobile */
+        .main .block-container {
+            padding-bottom: 140px !important;
+            padding-left: 0.5rem !important;
+            padding-right: 0.5rem !important;
+        }
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1165,8 +1242,8 @@ def render_bottom_input_area():
             placeholder="Generating response..."
         )
     else:
-        # Create columns for input and send button - more space for input on mobile
-        col1, col2 = st.columns([8, 1])
+        # Create columns for input and send button - optimized for mobile
+        col1, col2 = st.columns([5, 1])
         
         with col1:
             prompt = st.text_input(
@@ -1457,7 +1534,7 @@ def generate_streaming_response(prompt):
         # Choose prompt based on performance settings
         use_fast_prompt = selected_mode == 'fast'
         
-        # Simplified prompt construction for speed
+        # Build conversation context with history
         if document_context and is_useful_document_context(document_context):
             from prompts import get_rag_enhanced_prompt
             enhanced_system_prompt = get_rag_enhanced_prompt(prompt, document_context)
@@ -1465,11 +1542,23 @@ def generate_streaming_response(prompt):
             logger.info("Using RAG-enhanced prompt")
         else:
             base_prompt = pharmacology_fast_prompt if use_fast_prompt else pharmacology_system_prompt
-            api_messages = [
-                {"role": "system", "content": base_prompt},
-                {"role": "user", "content": prompt}
-            ]
+            api_messages = [{"role": "system", "content": base_prompt}]
             logger.info(f"Using {'fast' if use_fast_prompt else 'standard'} prompt")
+        
+        # Add conversation history (limit to last 20 messages to stay within context window)
+        chat_history = st.session_state.get('chat_messages', [])
+        if chat_history:
+            # Take last 20 messages to preserve context while staying within limits
+            recent_messages = chat_history[-20:]
+            for msg in recent_messages:
+                api_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+            logger.info(f"Added {len(recent_messages)} messages from conversation history")
+        
+        # Add current user message
+        api_messages.append({"role": "user", "content": prompt})
         
         # Use real streaming for the best user experience
         from openai_client import chat_completion_stream
@@ -1560,22 +1649,30 @@ def generate_enhanced_response(prompt):
         # Choose prompt based on performance settings
         use_fast_prompt = selected_mode == 'fast'
         
-        # Use RAG-enhanced prompt if we have document context
+        # Build conversation context with history
         if document_context and is_useful_document_context(document_context):
             from prompts import get_rag_enhanced_prompt
             enhanced_system_prompt = get_rag_enhanced_prompt(prompt, document_context)
-            
-            # For RAG-enhanced prompt, we use it as the system message
-            api_messages = [
-                {"role": "system", "content": enhanced_system_prompt}
-            ]
+            api_messages = [{"role": "system", "content": enhanced_system_prompt}]
         else:
             # Use appropriate prompt based on speed settings
             base_prompt = pharmacology_fast_prompt if use_fast_prompt else pharmacology_system_prompt
-            api_messages = [
-                {"role": "system", "content": base_prompt},
-                {"role": "user", "content": prompt}
-            ]
+            api_messages = [{"role": "system", "content": base_prompt}]
+        
+        # Add conversation history (limit to last 20 messages to stay within context window)
+        chat_history = st.session_state.get('chat_messages', [])
+        if chat_history:
+            # Take last 20 messages to preserve context while staying within limits
+            recent_messages = chat_history[-20:]
+            for msg in recent_messages:
+                api_messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"]
+                })
+            logger.info(f"Added {len(recent_messages)} messages from conversation history")
+        
+        # Add current user message
+        api_messages.append({"role": "user", "content": prompt})
         
         logger.info(f"Sending to model: {model}")
         logger.info(f"System prompt length: {len(enhanced_system_prompt)}")

@@ -76,7 +76,7 @@ def get_model_configs():
             "base_url": "https://api.mistral.ai/v1", 
             "description": "Premium Mode",
             "use_native_groq": False,
-            "max_tokens": 8000,
+            "max_tokens": 8500,
             "temperature": 0.3
         }
     }
@@ -108,7 +108,7 @@ def get_optimal_max_tokens(model: str, base_url: str) -> int:
     if "mistral-small" in model:
         return 3072  # Fast responses
     elif "mistral-medium" in model:
-        return 4096  # Quality responses
+        return 8500  # Premium quality responses
     else:
         return 3072  # Default fast
 
