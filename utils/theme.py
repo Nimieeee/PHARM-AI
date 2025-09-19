@@ -512,7 +512,34 @@ def get_responsive_theme_css():
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea {
                 font-size: 16px !important; /* Prevents zoom on iOS */
-                padding: 0.75rem !important;
+                padding: 12px 16px !important;
+                min-height: 48px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Mobile button improvements */
+            .stButton > button {
+                min-height: 48px !important;
+                height: 48px !important;
+                width: 100% !important;
+                padding: 12px 8px !important;
+                font-size: 18px !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+            }
+            
+            /* Mobile column adjustments */
+            @media (max-width: 480px) {
+                .stColumns {
+                    gap: 0.5rem !important;
+                }
+                
+                .stColumn {
+                    min-width: 0 !important;
+                    flex-shrink: 0 !important;
+                }
             }
             
             /* Mobile chat message improvements */
@@ -543,16 +570,43 @@ def get_responsive_theme_css():
             /* Mobile form improvements - 16px base */
             .stTextInput > div > div > input,
             .stTextArea > div > div > textarea {
-                padding: 16px !important;
+                padding: 12px 16px !important;
                 font-size: 16px !important;
-                min-height: 48px !important; /* Better touch targets */
+                min-height: 48px !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                box-sizing: border-box !important;
             }
             
             /* Mobile button improvements - 16px base */
             .stButton > button {
-                padding: 16px 24px !important;
+                padding: 12px 8px !important;
                 margin: 8px 0 !important;
-                min-height: 48px !important; /* Better touch targets */
+                min-height: 48px !important;
+                width: 100% !important;
+                font-size: 16px !important;
+            }
+            
+            /* Ensure proper column behavior on mobile */
+            @media (max-width: 480px) {
+                .element-container {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                }
+                
+                .stColumns > div {
+                    padding: 0 0.25rem !important;
+                }
+                
+                .stColumns > div:first-child {
+                    flex: 1 1 auto !important;
+                    min-width: 0 !important;
+                }
+                
+                .stColumns > div:last-child {
+                    flex: 0 0 auto !important;
+                    width: 60px !important;
+                }
             }
             
             /* Mobile sidebar improvements */

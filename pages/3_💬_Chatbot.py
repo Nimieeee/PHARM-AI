@@ -329,9 +329,16 @@ def render_enhanced_sidebar():
                 logout_current_user()
                 st.switch_page("app.py")
         
-        # Contact Support button
-        if st.button("📞 Contact Support", use_container_width=True):
-            st.switch_page("pages/4_📞_Contact_Support.py")
+        # Performance toggle right after logout
+        use_premium_model = st.toggle(
+            "💎 Premium Mode", 
+            value=st.session_state.get('selected_model_mode', 'fast') == 'premium',
+            help="Toggle between ⚡ Fast Mode (default) and 💎 Premium Mode for higher quality responses"
+        )
+        st.session_state.selected_model_mode = "premium" if use_premium_model else "fast"
+        
+        # Set streaming as default (always enabled, 6 tokens per second)
+        st.session_state.use_streaming = True
         
         # Admin Panel access (only for admin user)
         if st.session_state.get('username') == 'admin':
@@ -354,64 +361,7 @@ def render_enhanced_sidebar():
         # Conversation list
         render_conversation_list()
         
-        st.markdown("---")
-        
-        # Performance settings
-        st.markdown("### ⚙️ Performance Settings")
-        
-        # Model selection - Toggle between fast and premium
-        use_premium_model = st.toggle(
-            "💎 Premium Mode", 
-            value=st.session_state.get('selected_model_mode', 'fast') == 'premium',
-            help="Toggle between ⚡ Fast Mode (default) and 💎 Premium Mode for higher quality responses"
-        )
-        st.session_state.selected_model_mode = "premium" if use_premium_model else "fast"
-        
-        # Set streaming as default (always enabled, 6 tokens per second)
-        st.session_state.use_streaming = True
-        
-        # Debug: Show API key status with detailed info
-        with st.expander("🔍 Debug Info", expanded=False):
-            try:
-                from openai_client import get_available_model_modes, get_api_keys
-                
-                # Check raw API keys first
-                groq_key, openrouter_key, mistral_key = get_api_keys()
-                st.write("**API Key Status:**")
-                st.write(f"- Mistral Key: {'✅ Found' if mistral_key else '❌ Missing'}")
-                st.write(f"- Groq Key: {'✅ Found' if groq_key else '❌ Missing'}")
-                st.write(f"- OpenRouter Key: {'✅ Found' if openrouter_key else '❌ Missing'}")
-                
-                # Show partial key for verification (last 4 chars)
-                if mistral_key:
-                    st.write(f"- Mistral Key ends with: ...{mistral_key[-4:]}")
-                
-                # Check available modes
-                available_modes = get_available_model_modes()
-                if available_modes:
-                    st.success(f"✅ {len(available_modes)} models available")
-                    st.write(f"Available modes: {list(available_modes.keys())}")
-                else:
-                    st.error("❌ No models available")
-                    
-                # Test API connection
-                if st.button("🧪 Test API Connection"):
-                    if mistral_key:
-                        try:
-                            from openai_client import chat_completion_fast
-                            test_response = chat_completion_fast("mistral-small-latest", [
-                                {"role": "user", "content": "Say 'API test successful'"}
-                            ])
-                            st.success(f"✅ API Test: {test_response}")
-                        except Exception as api_error:
-                            st.error(f"❌ API Test Failed: {str(api_error)}")
-                    else:
-                        st.error("❌ No Mistral API key to test")
-                    
-            except Exception as e:
-                st.error(f"❌ Debug Error: {str(e)}")
-                import traceback
-                st.code(traceback.format_exc())
+
         
 
         
@@ -976,17 +926,11 @@ def render_main_chat_area():
         # Display chat messages with enhanced features
         render_chat_messages()
         
-        # Show processing indicator or simulated streaming if generating response
+        # Show processing indicator if generating response
         if st.session_state.get('processing_input', False):
             with st.chat_message("assistant"):
-                if st.session_state.get('streaming_text') and st.session_state.get('streaming_position', 0) > 0:
-                    # Show simulated streaming
-                    current_text = st.session_state.streaming_text[:st.session_state.streaming_position]
-                    st.markdown(current_text + "▋")
-                else:
-                    # Show thinking indicator
-                    st.markdown("🤔 Thinking...")
-                    st.caption("Generating response...")
+                st.markdown("🤔 Thinking...")
+                st.caption("Generating response...")
     
     # Fixed bottom input area
     render_bottom_input_area()
@@ -1174,7 +1118,7 @@ def render_bottom_input_area():
         )
     else:
         # Create columns for input and send button
-        col1, col2 = st.columns([6, 1])
+        col1, col2 = st.columns([5, 1])
         
         with col1:
             prompt = st.text_input(
@@ -1479,20 +1423,58 @@ def generate_streaming_response(prompt):
             ]
             logger.info(f"Using {'fast' if use_fast_prompt else 'standard'} prompt")
         
-        # Use fast completion then simulate streaming for best UX
-        from openai_client import chat_completion_fast
-        logger.info("Calling chat_completion_fast...")
-        full_response = chat_completion_fast(model, api_messages)
+        # Use real streaming for the best user experience
+        from openai_client import chat_completion_stream
+        logger.info("Starting real streaming response...")
+        
+        # Create streaming response with proper display
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            full_response = ""
+            
+            # Add auto-scroll JavaScript
+            scroll_script = """
+            <script>
+            function autoScrollToBottom() {
+                window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                });
+                
+                const mainContent = document.querySelector('.main');
+                if (mainContent) {
+                    mainContent.scrollTo({
+                        top: mainContent.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+            
+            const scrollInterval = setInterval(autoScrollToBottom, 200);
+            setTimeout(() => clearInterval(scrollInterval), 30000);
+            </script>
+            """
+            st.markdown(scroll_script, unsafe_allow_html=True)
+            
+            # Stream the response
+            try:
+                for chunk in chat_completion_stream(model, api_messages):
+                    full_response += chunk
+                    response_placeholder.markdown(full_response + "●")  # Show cursor
+                
+                # Remove cursor and show final response
+                response_placeholder.markdown(full_response)
+                
+            except Exception as stream_error:
+                logger.error(f"Streaming error: {stream_error}")
+                full_response = f"Sorry, I encountered an error during streaming: {str(stream_error)}"
+                response_placeholder.markdown(full_response)
         
         if not full_response:
-            logger.error("Empty response from API")
+            logger.error("Empty response from streaming")
             return "❌ Received empty response from AI model. Please try again."
         
-        logger.info(f"Generated response: {len(full_response)} characters")
-        
-        # Simulate streaming display for better UX
-        simulate_streaming_display(full_response)
-        
+        logger.info(f"Streaming completed: {len(full_response)} characters")
         return full_response
         
     except Exception as e:
@@ -1502,96 +1484,7 @@ def generate_streaming_response(prompt):
         logger.error(f"Full traceback: {error_details}")
         return f"Sorry, I encountered an error: {str(e)}\n\nPlease check that your API keys are properly configured in .streamlit/secrets.toml"
 
-def simulate_streaming_display(full_response):
-    """Simulate streaming display of a complete response for better UX."""
-    try:
-        import time
-        
-        # Set up streaming state
-        st.session_state.streaming_text = full_response
-        st.session_state.streaming_position = 0
-        
-        # Calculate streaming parameters
-        total_chars = len(full_response)
-        # Target: ~6 tokens per second, roughly 4-5 chars per token
-        chars_per_second = 25  # ~6 tokens/second * 4 chars/token
-        chunk_size = max(1, chars_per_second // 10)  # 10 updates per second
-        delay = 0.1  # 100ms between updates
-        
-        logger.info(f"Starting simulated streaming: {total_chars} chars, {chunk_size} chars per chunk")
-        
-        # Add auto-scroll JavaScript
-        scroll_script = """
-        <script>
-        function autoScrollToBottom() {
-            const targets = [
-                document.documentElement,
-                document.body,
-                document.querySelector('.main'),
-                document.querySelector('[data-testid="stAppViewContainer"]')
-            ];
-            
-            targets.forEach(target => {
-                if (target) {
-                    target.scrollTo({
-                        top: target.scrollHeight,
-                        behavior: 'smooth'
-                    });
-                }
-            });
-            
-            window.scrollTo({
-                top: Math.max(
-                    document.body.scrollHeight,
-                    document.documentElement.scrollHeight
-                ),
-                behavior: 'smooth'
-            });
-        }
-        
-        // Auto-scroll during streaming
-        const scrollInterval = setInterval(autoScrollToBottom, 200);
-        
-        // Stop after 30 seconds
-        setTimeout(() => {
-            clearInterval(scrollInterval);
-        }, 30000);
-        </script>
-        """
-        st.markdown(scroll_script, unsafe_allow_html=True)
-        
-        # Stream the text in chunks
-        while st.session_state.streaming_position < total_chars:
-            # Calculate next position
-            next_pos = min(
-                st.session_state.streaming_position + chunk_size,
-                total_chars
-            )
-            
-            # Update position
-            st.session_state.streaming_position = next_pos
-            
-            # Rerun to show updated text
-            st.rerun()
-            
-            # Small delay for streaming effect
-            time.sleep(delay)
-        
-        # Clean up streaming state
-        if 'streaming_text' in st.session_state:
-            del st.session_state.streaming_text
-        if 'streaming_position' in st.session_state:
-            del st.session_state.streaming_position
-            
-        logger.info("Simulated streaming completed")
-        
-    except Exception as e:
-        logger.error(f"Error in simulated streaming: {e}")
-        # Clean up on error
-        if 'streaming_text' in st.session_state:
-            del st.session_state.streaming_text
-        if 'streaming_position' in st.session_state:
-            del st.session_state.streaming_position
+
 
 def generate_enhanced_response(prompt):
     """Generate enhanced AI response with document context (fast mode)."""
