@@ -113,8 +113,10 @@ def get_dark_theme_css():
             background-color: #6d28d9 !important;
         }
         
-        /* Dark mode form elements - Maximum readability */
-        .stTextInput > div > div > input {
+        /* Dark mode form elements - Maximum readability with high specificity */
+        .stApp .stTextInput > div > div > input,
+        .stApp div[data-testid="stTextInput"] > div > div > input,
+        .stTextInput > div > div > input[type="text"] {
             background-color: #1e293b !important;
             color: #ffffff !important;
             border: 1px solid #475569 !important;
@@ -124,7 +126,9 @@ def get_dark_theme_css():
             min-height: 48px !important;
         }
         
-        .stTextInput > div > div > input:focus {
+        .stApp .stTextInput > div > div > input:focus,
+        .stApp div[data-testid="stTextInput"] > div > div > input:focus,
+        .stTextInput > div > div > input[type="text"]:focus {
             border-color: #6366f1 !important;
             box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3) !important;
             background-color: #334155 !important;
@@ -330,8 +334,10 @@ def get_dark_theme_css():
                 padding: 16px 0 !important;
             }
             
-            /* Dark mode text input styling - matches page elements */
-            .stTextInput > div > div > input {
+            /* Dark mode text input styling - matches page elements with high specificity */
+            .stApp .stTextInput > div > div > input,
+            .stApp div[data-testid="stTextInput"] > div > div > input,
+            .stTextInput > div > div > input[type="text"] {
                 background-color: #1e293b !important;
                 color: #ffffff !important;
                 border: 1px solid #475569 !important;
@@ -341,7 +347,9 @@ def get_dark_theme_css():
                 min-height: 48px !important;
             }
             
-            .stTextInput > div > div > input:focus {
+            .stApp .stTextInput > div > div > input:focus,
+            .stApp div[data-testid="stTextInput"] > div > div > input:focus,
+            .stTextInput > div > div > input[type="text"]:focus {
                 border-color: #6366f1 !important;
                 box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3) !important;
                 background-color: #334155 !important;
@@ -393,6 +401,13 @@ def get_dark_theme_css():
                 (computed.color === 'rgb(0, 0, 0)' || computed.color === 'black')) {
                 el.style.setProperty('color', '#ffffff', 'important');
             }
+        });
+        
+        // Specifically target input elements for dark theme
+        document.querySelectorAll('.stTextInput input, input[type="text"]').forEach(input => {
+            input.style.setProperty('background-color', '#1e293b', 'important');
+            input.style.setProperty('color', '#ffffff', 'important');
+            input.style.setProperty('border', '1px solid #475569', 'important');
         });
     }
     
