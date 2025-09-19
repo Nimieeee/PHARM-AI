@@ -719,23 +719,51 @@ def get_responsive_theme_css():
             height: auto !important;
         }
         
-        /* Mobile-optimized tables */
+        /* Enhanced table styling */
         .stDataFrame {
             overflow-x: auto !important;
             -webkit-overflow-scrolling: touch !important;
+        }
+        
+        .stDataFrame table {
+            width: 100% !important;
+            table-layout: auto !important;
+        }
+        
+        .stDataFrame th,
+        .stDataFrame td {
+            padding: 0.75rem 0.5rem !important;
+            white-space: normal !important;
+            word-wrap: break-word !important;
+            max-width: 300px !important;
+            vertical-align: top !important;
+        }
+        
+        /* Specific column width adjustments */
+        .stDataFrame th:first-child,
+        .stDataFrame td:first-child {
+            min-width: 120px !important;
+            max-width: 150px !important;
+        }
+        
+        .stDataFrame th:nth-child(2),
+        .stDataFrame td:nth-child(2) {
+            min-width: 100px !important;
+            max-width: 120px !important;
         }
         
         @media (max-width: 768px) {
             /* Mobile table optimizations */
             .stDataFrame table {
                 font-size: 12px !important;
-                min-width: 100% !important;
+                min-width: 600px !important;
             }
             
             .stDataFrame th,
             .stDataFrame td {
                 padding: 0.5rem 0.25rem !important;
-                white-space: nowrap !important;
+                font-size: 11px !important;
+                line-height: 1.3 !important;
             }
             
             /* Stack table cells on very small screens */

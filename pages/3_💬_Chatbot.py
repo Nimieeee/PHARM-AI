@@ -90,40 +90,51 @@ def main():
             scroll-margin-bottom: 20px !important;
         }
         
-        /* Horizontal scrollable tables - show full content */
+        /* Improved table styling - show full content with horizontal scroll */
         .stMarkdown table {
-            display: table !important;
             width: 100% !important;
-            overflow-x: auto !important;
             border-collapse: collapse !important;
             margin: 1rem 0 !important;
             border-radius: 8px !important;
-            box-shadow: 0 0 0 1px #e5e7eb !important;
+            overflow: hidden !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
         }
         
-        /* Table wrapper for horizontal scrolling */
-        .stMarkdown table {
-            display: block !important;
+        /* Table container for horizontal scrolling */
+        .stMarkdown {
             overflow-x: auto !important;
-            white-space: nowrap !important;
-        }
-        
-        .stMarkdown table thead,
-        .stMarkdown table tbody,
-        .stMarkdown table tr {
-            display: table !important;
-            width: max-content !important;
-            table-layout: auto !important;
+            -webkit-overflow-scrolling: touch !important;
         }
         
         .stMarkdown table th,
         .stMarkdown table td {
-            padding: 8px 12px !important;
+            padding: 12px 16px !important;
             border: 1px solid #e5e7eb !important;
             text-align: left !important;
-            white-space: nowrap !important;
-            min-width: auto !important;
-            width: auto !important;
+            vertical-align: top !important;
+            word-wrap: break-word !important;
+            white-space: normal !important;
+            overflow-wrap: break-word !important;
+            hyphens: auto !important;
+        }
+        
+        /* Specific column sizing for better readability */
+        .stMarkdown table th:first-child,
+        .stMarkdown table td:first-child {
+            min-width: 140px !important;
+            max-width: 180px !important;
+        }
+        
+        .stMarkdown table th:nth-child(2),
+        .stMarkdown table td:nth-child(2) {
+            min-width: 120px !important;
+            max-width: 150px !important;
+        }
+        
+        .stMarkdown table th:nth-child(n+3),
+        .stMarkdown table td:nth-child(n+3) {
+            min-width: 200px !important;
+            max-width: 400px !important;
         }
         
         .stMarkdown table th {
@@ -131,10 +142,15 @@ def main():
             font-weight: 600 !important;
             position: sticky !important;
             top: 0 !important;
+            z-index: 10 !important;
         }
         
         /* Dark mode table styling */
         @media (prefers-color-scheme: dark) {
+            .stMarkdown table {
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+            }
+            
             .stMarkdown table th,
             .stMarkdown table td {
                 border-color: #475569 !important;
@@ -147,6 +163,39 @@ def main():
             
             .stMarkdown table td {
                 color: #f8fafc !important;
+            }
+        }
+        
+        /* Mobile table optimizations */
+        @media (max-width: 768px) {
+            .stMarkdown table {
+                font-size: 13px !important;
+                min-width: 800px !important;
+            }
+            
+            .stMarkdown table th,
+            .stMarkdown table td {
+                padding: 8px 10px !important;
+                font-size: 12px !important;
+                line-height: 1.4 !important;
+            }
+            
+            .stMarkdown table th:first-child,
+            .stMarkdown table td:first-child {
+                min-width: 100px !important;
+                max-width: 120px !important;
+            }
+            
+            .stMarkdown table th:nth-child(2),
+            .stMarkdown table td:nth-child(2) {
+                min-width: 80px !important;
+                max-width: 100px !important;
+            }
+            
+            .stMarkdown table th:nth-child(n+3),
+            .stMarkdown table td:nth-child(n+3) {
+                min-width: 150px !important;
+                max-width: 250px !important;
             }
         }
         
