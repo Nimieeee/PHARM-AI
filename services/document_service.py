@@ -30,7 +30,6 @@ def get_supabase_error():
 def get_error_handler():
     """Get ErrorHandler with lazy import."""
     try:
-        # Use generic Exception since ErrorHandler doesn't exist
         return Exception
     except ImportError:
         return None
