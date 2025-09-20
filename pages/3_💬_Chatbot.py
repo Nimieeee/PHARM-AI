@@ -996,9 +996,8 @@ def render_main_chat_area():
         
         # Show processing indicator if generating response
         if st.session_state.get('processing_input', False):
-            with st.chat_message("assistant"):
-                st.markdown("🤔 Thinking...")
-                st.caption("Generating response...")
+            st.markdown("🤔 Thinking...")
+            st.caption("Generating response...")
     
     # Fixed bottom input area
     render_bottom_input_area()
@@ -1091,7 +1090,10 @@ def render_chat_messages():
         return
     
     for i, message in enumerate(st.session_state.chat_messages):
-        with st.chat_message(message["role"]):
+        if message["role"] == "user":
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+        else:
             st.markdown(message["content"])
             
             # Timestamps removed for cleaner mobile experience
@@ -1274,7 +1276,7 @@ def render_document_upload():
         max_files = 10 if is_admin else 3
         user_type = "Admin" if is_admin else "User"
         
-        st.info(f"📷 **Image OCR**: Only text content will be extracted from images for processing. Charts, graphs, and visual elements will not be analyzed.")
+        st.info("📷 **Image OCR**: Only text content will be extracted from images for processing. Charts, graphs, and visual elements will not be analyzed.")
         st.info(f"📊 **{user_type} Upload Limit**: You can upload up to {max_files} documents at a time.")
         
         uploaded_files = st.file_uploader(
@@ -1561,47 +1563,46 @@ def generate_streaming_response(prompt):
         logger.info("Starting real streaming response...")
         
         # Create streaming response with proper display
-        with st.chat_message("assistant"):
-            response_placeholder = st.empty()
-            full_response = ""
+        response_placeholder = st.empty()
+        full_response = ""
+        
+        # Add auto-scroll JavaScript
+        scroll_script = """
+        <script>
+        function autoScrollToBottom() {
+            window.scrollTo({
+                top: document.body.scrollHeight,
+                behavior: 'smooth'
+            });
             
-            # Add auto-scroll JavaScript
-            scroll_script = """
-            <script>
-            function autoScrollToBottom() {
-                window.scrollTo({
-                    top: document.body.scrollHeight,
+            const mainContent = document.querySelector('.main');
+            if (mainContent) {
+                mainContent.scrollTo({
+                    top: mainContent.scrollHeight,
                     behavior: 'smooth'
                 });
-                
-                const mainContent = document.querySelector('.main');
-                if (mainContent) {
-                    mainContent.scrollTo({
-                        top: mainContent.scrollHeight,
-                        behavior: 'smooth'
-                    });
-                }
             }
+        }
+        
+        const scrollInterval = setInterval(autoScrollToBottom, 200);
+        setTimeout(() => clearInterval(scrollInterval), 30000);
+        </script>
+        """
+        st.markdown(scroll_script, unsafe_allow_html=True)
+        
+        # Stream the response
+        try:
+            for chunk in chat_completion_stream(model, api_messages):
+                full_response += chunk
+                response_placeholder.markdown(full_response + "●")  # Show cursor
             
-            const scrollInterval = setInterval(autoScrollToBottom, 200);
-            setTimeout(() => clearInterval(scrollInterval), 30000);
-            </script>
-            """
-            st.markdown(scroll_script, unsafe_allow_html=True)
+            # Remove cursor and show final response
+            response_placeholder.markdown(full_response)
             
-            # Stream the response
-            try:
-                for chunk in chat_completion_stream(model, api_messages):
-                    full_response += chunk
-                    response_placeholder.markdown(full_response + "●")  # Show cursor
-                
-                # Remove cursor and show final response
-                response_placeholder.markdown(full_response)
-                
-            except Exception as stream_error:
-                logger.error(f"Streaming error: {stream_error}")
-                full_response = f"Sorry, I encountered an error during streaming: {str(stream_error)}"
-                response_placeholder.markdown(full_response)
+        except Exception as stream_error:
+            logger.error(f"Streaming error: {stream_error}")
+            full_response = f"Sorry, I encountered an error during streaming: {str(stream_error)}"
+            response_placeholder.markdown(full_response)
         
         if not full_response:
             logger.error("Empty response from streaming")
@@ -1616,7 +1617,6 @@ def generate_streaming_response(prompt):
         logger.error(f"Error in streaming response: {e}")
         logger.error(f"Full traceback: {error_details}")
         return f"Sorry, I encountered an error: {str(e)}\n\nPlease check that your API keys are properly configured in .streamlit/secrets.toml"
-
 
 
 def generate_enhanced_response(prompt):
@@ -1686,7 +1686,6 @@ def generate_enhanced_response(prompt):
         return f"Sorry, I encountered an error: {str(e)}"
 
 
-
 def is_useful_document_context(context):
     """Check if document context is useful and not just error messages."""
     if not context or len(context.strip()) < 50:
@@ -1721,11 +1720,11 @@ def clean_document_content(content):
     
     # Remove common error message patterns
     error_patterns = [
-        r"\[.*?OCR not available.*?\]",
-        r"\[.*?OCR failed.*?\]",
-        r"\[.*?Text extraction failed.*?\]",
-        r"\[.*?install pytesseract.*?\]",
-        r"\[.*?Processing failed.*?\]"
+        r"\['.*?OCR not available.*?']",
+        r"\['.*?OCR failed.*?']",
+        r"\['.*?Text extraction failed.*?']",
+        r"\['.*?install pytesseract.*?']",
+        r"\['.*?Processing failed.*?']"
     ]
     
     import re
