@@ -37,47 +37,38 @@ def get_api_keys():
             logger.info("st.secrets is available")
             groq_key = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY"))
             openrouter_key = st.secrets.get("OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY"))
-            mistral_key = st.secrets.get("MISTRAL_API_KEY", os.environ.get("MISTRAL_API_KEY"))
             
-            logger.info(f"Keys from secrets - Mistral: {'Found' if mistral_key else 'Missing'}, Groq: {'Found' if groq_key else 'Missing'}, OpenRouter: {'Found' if openrouter_key else 'Missing'}")
+            logger.info(f"Keys from secrets - Groq: {'Found' if groq_key else 'Missing'}, OpenRouter: {'Found' if openrouter_key else 'Missing'}")
         else:
             logger.warning("st.secrets not available, using environment variables")
             groq_key = os.environ.get("GROQ_API_KEY")
             openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-            mistral_key = os.environ.get("MISTRAL_API_KEY")
             
     except Exception as e:
         logger.error(f"Error accessing secrets: {e}")
         # Fallback to environment variables if secrets not available
         groq_key = os.environ.get("GROQ_API_KEY")
         openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-        mistral_key = os.environ.get("MISTRAL_API_KEY")
         logger.info("Using environment variables as fallback")
     
-    return groq_key, openrouter_key, mistral_key
+    return groq_key, openrouter_key
 
 def get_model_configs():
     """Get model configurations with API keys - 2 optimized modes."""
-    groq_key, openrouter_key, mistral_key = get_api_keys()
+    groq_key, openrouter_key = get_api_keys()
     
     return {
         "fast": {
-            "model": "mistral-small-latest",
-            "api_key": mistral_key,
-            "base_url": "https://api.mistral.ai/v1",
+            "model": "groq/gemma2-9b-it",
+            "api_key": groq_key,
+            "base_url": "https://api.groq.com/openai/v1",
             "description": "Fast Mode",
-            "use_native_groq": False,
-            "max_tokens": 3072,
-            "temperature": 0.3
         },
         "premium": {
-            "model": "mistral-medium-latest",
-            "api_key": mistral_key,
-            "base_url": "https://api.mistral.ai/v1", 
+            "model": "qwen/qwen2-32b-instruct",
+            "api_key": openrouter_key,
+            "base_url": "https://openrouter.ai/api/v1", 
             "description": "Premium Mode",
-            "use_native_groq": False,
-            "max_tokens": 8500,
-            "temperature": 0.3
         }
     }
 
@@ -96,24 +87,23 @@ def get_model_token_limits() -> Dict:
     """Get unified token limits for all models."""
     return {
         "unified": {
-            "max_tokens": 7500,
-            "context_window": 128000,
+            "max_tokens": 8192,
+            "context_window": 131072,
             "description": "Unified high-capacity output for all models"
         }
     }
 
-def get_optimal_max_tokens(model: str, base_url: str) -> int:
+def get_optimal_max_tokens(model: str) -> int:
     """Get optimized max_tokens for speed."""
-    # Optimized tokens for 2-mode system
-    if "mistral-small" in model:
-        return 3072  # Fast responses
-    elif "mistral-medium" in model:
-        return 8500  # Premium quality responses
+    if "gemma" in model:
+        return 8192
+    elif "qwen" in model:
+        return 8192
     else:
-        return 3072  # Default fast
+        return 8192
 
 def _get_client_for_model(model: str):
-    """Get appropriate client for specific model (OpenAI or native Groq)."""
+    """Get appropriate client for specific model."""
     model_configs = get_model_configs()
     
     for mode, config in model_configs.items():
@@ -121,14 +111,10 @@ def _get_client_for_model(model: str):
             if not config["api_key"]:
                 raise ValueError(f"API key not configured for {mode} mode")
             
-            # Use native Groq client for models that support advanced features
-            if config.get("use_native_groq", False):
-                return Groq(api_key=config["api_key"])
-            else:
-                return openai.OpenAI(
-                    api_key=config["api_key"],
-                    base_url=config["base_url"]
-                )
+            return openai.OpenAI(
+                api_key=config["api_key"],
+                base_url=config["base_url"]
+            )
     
     raise ValueError(f"Unknown model: {model}")
 
@@ -149,12 +135,12 @@ def chat_completion_fast(model: str, messages: List[Dict]) -> str:
             raise ValueError(f"Model config not found for: {model}")
         
         # Fast completion without streaming
-        max_tokens = get_optimal_max_tokens(model, model_config["base_url"])
+        max_tokens = get_optimal_max_tokens(model)
         
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            temperature=model_config.get("temperature", 0.3),
+            temperature=0.3,
             max_tokens=max_tokens,
             top_p=0.9,
             frequency_penalty=0.0,
@@ -163,7 +149,24 @@ def chat_completion_fast(model: str, messages: List[Dict]) -> str:
         )
         
         return response.choices[0].message.content
-        
+    except openai.RateLimitError as e:
+        logger.warning(f"Rate limit error for {model}: {e}. Attempting fallback.")
+        # Fallback logic
+        fallback_model = "qwen/qwen2-32b-instruct" if model == "groq/gemma2-9b-it" else "groq/gemma2-9b-it"
+        logger.info(f"Falling back to {fallback_model}")
+        try:
+            client = _get_client_for_model(fallback_model)
+            response = client.chat.completions.create(
+                model=fallback_model,
+                messages=messages,
+                temperature=0.5,
+                max_tokens=8192,
+                stream=False
+            )
+            return response.choices[0].message.content
+        except Exception as fallback_e:
+            logger.error(f"Fallback failed: {fallback_e}")
+            return f"Error: API service capacity exceeded for all available models. Please try again later."
     except Exception as e:
         logger.error(f"Error in fast completion: {e}")
         return f"Error generating response: {str(e)}"
@@ -184,36 +187,20 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
         if not model_config:
             raise ValueError(f"Model config not found for: {model}")
         
-        # Use native Groq client with advanced features for supported models
-        if model_config.get("use_native_groq", False):
-            logger.info(f"Starting advanced Groq stream with reasoning and tools for model: {model}")
-            
-            stream = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.5,
-                max_completion_tokens=65536,
-                top_p=1,
-                reasoning_effort="medium",
-                stream=True,
-                stop=None,
-                tools=[{"type": "browser_search"}]
-            )
-        else:
-            # Optimized streaming for speed
-            max_tokens = get_optimal_max_tokens(model, model_config["base_url"])
-            logger.info(f"Starting optimized stream with {max_tokens} tokens for model: {model}")
-            
-            stream = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=True,
-                temperature=model_config.get("temperature", 0.3),  # Lower temp for faster, focused responses
-                max_tokens=max_tokens,
-                top_p=0.9,  # Slightly more focused
-                frequency_penalty=0.0,
-                presence_penalty=0.0
-            )
+        # Optimized streaming for speed
+        max_tokens = get_optimal_max_tokens(model)
+        logger.info(f"Starting optimized stream with {max_tokens} tokens for model: {model}")
+        
+        stream = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            stream=True,
+            temperature=0.3,
+            max_tokens=max_tokens,
+            top_p=0.9,
+            frequency_penalty=0.0,
+            presence_penalty=0.0
+        )
         
         # Controlled streaming at ~6 tokens per second
         buffer = ""
@@ -255,6 +242,17 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                 finish_reason = chunk.choices[0].finish_reason
                 logger.info(f"Stream completed: {finish_reason} (total words: ~{word_count})")
                 
+    except openai.RateLimitError as e:
+        logger.warning(f"Rate limit error for {model}: {e}. Attempting fallback.")
+        # Fallback logic
+        fallback_model = "qwen/qwen2-32b-instruct" if model == "groq/gemma2-9b-it" else "groq/gemma2-9b-it"
+        logger.info(f"Falling back to {fallback_model}")
+        try:
+            yield from chat_completion_stream(fallback_model, messages)
+        except Exception as fallback_e:
+            logger.error(f"Fallback failed: {fallback_e}")
+            yield f"Error: API service capacity exceeded for all available models. Please try again later."
+
     except Exception as e:
         logger.error(f"Streaming error: {str(e)}")
         yield f"Error: {str(e)}"
@@ -275,34 +273,29 @@ def chat_completion(model: str, messages: List[Dict]) -> str:
         if not model_config:
             raise ValueError(f"Model config not found for: {model}")
         
-        # Use native Groq client with advanced features for supported models
-        if model_config.get("use_native_groq", False):
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.5,
-                max_completion_tokens=65536,
-                top_p=1,
-                reasoning_effort="medium",
-                stream=False,
-                stop=None,
-                tools=[{"type": "browser_search"}]
-            )
-        else:
-            # Standard OpenAI-compatible completion
-            max_tokens = 7500
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=0.5,
-                max_tokens=max_tokens,
-                top_p=0.95,
-                frequency_penalty=0.0,
-                presence_penalty=0.0
-            )
+        # Standard OpenAI-compatible completion
+        max_tokens = 8192
+        response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            temperature=0.5,
+            max_tokens=max_tokens,
+            top_p=0.95,
+            frequency_penalty=0.0,
+            presence_penalty=0.0
+        )
         
         return response.choices[0].message.content
-        
+    except openai.RateLimitError as e:
+        logger.warning(f"Rate limit error for {model}: {e}. Attempting fallback.")
+        # Fallback logic
+        fallback_model = "qwen/qwen2-32b-instruct" if model == "groq/gemma2-9b-it" else "groq/gemma2-9b-it"
+        logger.info(f"Falling back to {fallback_.model}")
+        try:
+            return chat_completion(fallback_model, messages)
+        except Exception as fallback_e:
+            logger.error(f"Fallback failed: {fallback_e}")
+            return f"Error: API service capacity exceeded for all available models. Please try again later."
     except Exception as e:
         logger.error(f"Chat completion error: {str(e)}")
         return f"Error: {str(e)}"
