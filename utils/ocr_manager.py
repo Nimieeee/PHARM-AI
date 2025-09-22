@@ -7,7 +7,7 @@ Optimized for Streamlit Cloud deployment
 import logging
 import tempfile
 import os
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -54,15 +54,15 @@ class OCRManager:
     def _extract_with_tesseract(self, image_path: str) -> str:
         """Extract text using Tesseract OCR with optimized settings."""
         import pytesseract
-        from PIL import Image
+        from PIL import Image, ImageEnhance, ImageFilter
         
         # Open and process image
         image = Image.open(image_path)
         
-        # Convert to RGB if necessary
-        if image.mode != 'RGB':
-            image = image.convert('RGB')
-        
+        # Preprocessing
+        image = image.convert('L')  # Grayscale
+        image = ImageEnhance.Contrast(image).enhance(2) # Increase contrast
+
         # Try different OCR configurations for better results
         configs = [
             '--psm 6',  # Uniform block of text
