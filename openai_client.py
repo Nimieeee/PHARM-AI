@@ -195,11 +195,13 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
             model=model,
             messages=messages,
             stream=True,
-            temperature=0.3,
+            temperature=model_config.get("temperature", 0.3),  # Lower temp for faster, focused responses
             max_tokens=max_tokens,
-            top_p=0.9,
+            top_p=0.9,  # Slightly more focused
             frequency_penalty=0.0,
-            presence_penalty=0.0
+            presence_penalty=0.0,
+            reasoning_effort="none", # Added reasoning_effort
+            stop=None # Added stop
         )
         
         # Controlled streaming at ~6 tokens per second
