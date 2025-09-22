@@ -13,9 +13,9 @@ import json
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 try:
-    from langchain_huggingface import HuggingFaceEmbeddings as SentenceTransformerEmbeddings
+    from langchain_mistralai.embeddings import MistralAIEmbeddings
 except ImportError:
-    from langchain_community.embeddings import SentenceTransformerEmbeddings
+    from langchain_community.embeddings import MistralAIEmbeddings
 from langchain.docstore.document import Document as LangChainDocument
 
 # Configure logging
@@ -59,20 +59,13 @@ class RAGService:
             return
         
         try:
-            from langchain_huggingface import HuggingFaceEmbeddings
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name="all-MiniLM-L6-v2"
-            )
-            logger.info("Using new langchain-huggingface embeddings")
-        except ImportError:
-            # Fallback to old import for compatibility (with warning suppression)
-            import warnings
-            warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
-            from langchain_community.embeddings import HuggingFaceEmbeddings
-            self.embeddings = HuggingFaceEmbeddings(
-                model_name="all-MiniLM-L6-v2"
-            )
-            logger.warning("Using deprecated langchain embeddings - consider upgrading to langchain-huggingface")
+            from openai_client import get_api_keys
+            _, _, mistral_key = get_api_keys()
+            self.embeddings = MistralAIEmbeddings(mistral_api_key=mistral_key)
+            logger.info("Using MistralAI embeddings")
+        except Exception as e:
+            logger.error(f"Failed to initialize MistralAI embeddings: {e}")
+            # Fallback or error handling
         
         self._embeddings_initialized = True
     
