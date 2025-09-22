@@ -5,9 +5,9 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit and Supabas
 ## ✨ Features
 
 - **🔐 Secure Authentication**: Enterprise-grade user authentication with Supabase.
-- **🤖 AI-Powered**: Uses state-of-the-art AI models for expert pharmacology responses.
+- **🤖 AI-Powered**: Uses Mistral AI models for expert pharmacology responses.
 - **💬 ChatGPT-Style Interface**: Modern conversation management with search and organization.
-- **📚 RAG System**: Upload documents and images for enhanced, context-aware responses.
+- **📚 RAG System with pgvector**: Upload documents and images for enhanced, context-aware responses using Supabase and pgvector.
 - **📱 Responsive Design**: Works perfectly on desktop and mobile devices.
 - **⚡ High Performance**: Optimized queries with connection pooling.
 - **🔒 Enterprise Security**: Row-level security and encrypted data storage.
@@ -17,7 +17,7 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit and Supabas
 ### Prerequisites
 - Python 3.8 or higher
 - Supabase account ([Get one here](https://supabase.com))
-- API keys for AI models (e.g., OpenAI, Groq, OpenRouter)
+- API keys for Mistral AI models
 
 ### Local Development
 
@@ -32,8 +32,9 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit and Supabas
    pip install -r requirements.txt
    ```
 
-3. **Set up Supabase**:
+3. **Set up Supabase & pgvector**:
    - Create a Supabase project at [supabase.com](https://supabase.com)
+   - Enable the `pgvector` extension in your Supabase project.
    - Go to SQL Editor and run the necessary schema to create your tables.
    - Get your project URL and anon key from Settings → API
 
@@ -42,7 +43,7 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit and Supabas
    ```toml
    SUPABASE_URL = "https://your-project.supabase.co"
    SUPABASE_ANON_KEY = "your_anon_key_here"
-   # Add other API keys for your chosen AI models
+   MISTRAL_API_KEY = "your_mistral_api_key_here"
    ```
 
 5. **Run the application**:
