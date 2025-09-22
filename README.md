@@ -2,6 +2,10 @@
 
 A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit and Supabase that provides educational information about drugs, mechanisms of action, interactions, and clinical pharmacology concepts.
 
+## 🚀 Live Demo
+
+[**https://ptt-ai.streamlit.app/**](https://ptt-ai.streamlit.app/)
+
 ## ✨ Features
 
 - **🔐 Secure Authentication**: Enterprise-grade user authentication with Supabase.
