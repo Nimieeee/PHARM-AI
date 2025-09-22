@@ -163,24 +163,7 @@ def chat_completion_fast(model: str, messages: List[Dict]) -> str:
         )
         
         return response.choices[0].message.content
-    except openai.RateLimitError as e:
-        logger.warning(f"Rate limit error for {model}: {e}. Attempting fallback.")
-        # Fallback logic
-        fallback_model = "mistral-small-latest" if model == "mistral-medium-latest" else "mistral-medium-latest"
-        logger.info(f"Falling back to {fallback_model}")
-        try:
-            client = _get_client_for_model(fallback_model)
-            response = client.chat.completions.create(
-                model=fallback_model,
-                messages=messages,
-                temperature=0.5,
-                max_tokens=3072,
-                stream=False
-            )
-            return response.choices[0].message.content
-        except Exception as fallback_e:
-            logger.error(f"Fallback failed: {fallback_e}")
-            return f"Error: API service capacity exceeded for all available models. Please try again later."
+        
     except Exception as e:
         logger.error(f"Error in fast completion: {e}")
         return f"Error generating response: {str(e)}"
@@ -201,20 +184,36 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
         if not model_config:
             raise ValueError(f"Model config not found for: {model}")
         
-        # Optimized streaming for speed
-        max_tokens = get_optimal_max_tokens(model, model_config["base_url"])
-        logger.info(f"Starting optimized stream with {max_tokens} tokens for model: {model}")
-        
-        stream = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
-            temperature=model_config.get("temperature", 0.3),  # Lower temp for faster, focused responses
-            max_tokens=max_tokens,
-            top_p=0.9,  # Slightly more focused
-            frequency_penalty=0.0,
-            presence_penalty=0.0
-        )
+        # Use native Groq client with advanced features for supported models
+        if model_config.get("use_native_groq", False):
+            logger.info(f"Starting advanced Groq stream with reasoning and tools for model: {model}")
+            
+            stream = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.5,
+                max_completion_tokens=65536,
+                top_p=1,
+                reasoning_effort="medium",
+                stream=True,
+                stop=None,
+                tools=[{"type": "browser_search"}]
+            )
+        else:
+            # Optimized streaming for speed
+            max_tokens = get_optimal_max_tokens(model, model_config["base_url"])
+            logger.info(f"Starting optimized stream with {max_tokens} tokens for model: {model}")
+            
+            stream = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+                temperature=model_config.get("temperature", 0.3),  # Lower temp for faster, focused responses
+                max_tokens=max_tokens,
+                top_p=0.9,  # Slightly more focused
+                frequency_penalty=0.0,
+                presence_penalty=0.0
+            )
         
         # Controlled streaming at ~6 tokens per second
         buffer = ""
@@ -256,17 +255,6 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
                 finish_reason = chunk.choices[0].finish_reason
                 logger.info(f"Stream completed: {finish_reason} (total words: ~{word_count})")
                 
-    except openai.RateLimitError as e:
-        logger.warning(f"Rate limit error for {model}: {e}. Attempting fallback.")
-        # Fallback logic
-        fallback_model = "mistral-small-latest" if model == "mistral-medium-latest" else "mistral-medium-latest"
-        logger.info(f"Falling back to {fallback_model}")
-        try:
-            yield from chat_completion_stream(fallback_model, messages)
-        except Exception as fallback_e:
-            logger.error(f"Fallback failed: {fallback_e}")
-            yield f"Error: API service capacity exceeded for all available models. Please try again later."
-
     except Exception as e:
         logger.error(f"Streaming error: {str(e)}")
         yield f"Error: {str(e)}"
@@ -287,29 +275,34 @@ def chat_completion(model: str, messages: List[Dict]) -> str:
         if not model_config:
             raise ValueError(f"Model config not found for: {model}")
         
-        # Standard OpenAI-compatible completion
-        max_tokens = 7500
-        response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            temperature=0.5,
-            max_tokens=max_tokens,
-            top_p=0.95,
-            frequency_penalty=0.0,
-            presence_penalty=0.0
-        )
+        # Use native Groq client with advanced features for supported models
+        if model_config.get("use_native_groq", False):
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.5,
+                max_completion_tokens=65536,
+                top_p=1,
+                reasoning_effort="medium",
+                stream=False,
+                stop=None,
+                tools=[{"type": "browser_search"}]
+            )
+        else:
+            # Standard OpenAI-compatible completion
+            max_tokens = 7500
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                temperature=0.5,
+                max_tokens=max_tokens,
+                top_p=0.95,
+                frequency_penalty=0.0,
+                presence_penalty=0.0
+            )
         
         return response.choices[0].message.content
-    except openai.RateLimitError as e:
-        logger.warning(f"Rate limit error for {model}: {e}. Attempting fallback.")
-        # Fallback logic
-        fallback_model = "mistral-small-latest" if model == "mistral-medium-latest" else "mistral-medium-latest"
-        logger.info(f"Falling back to {fallback_model}")
-        try:
-            return chat_completion(fallback_model, messages)
-        except Exception as fallback_e:
-            logger.error(f"Fallback failed: {fallback_e}")
-            return f"Error: API service capacity exceeded for all available models. Please try again later."
+        
     except Exception as e:
         logger.error(f"Chat completion error: {str(e)}")
         return f"Error: {str(e)}"
