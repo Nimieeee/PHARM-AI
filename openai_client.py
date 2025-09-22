@@ -65,7 +65,7 @@ def get_model_configs():
             "description": "Fast Mode",
         },
         "premium": {
-            "model": "qwen/qwen2-32b-instruct",
+            "model": "qwen/qwen3-32b",
             "api_key": openrouter_key,
             "base_url": "https://openrouter.ai/api/v1", 
             "description": "Premium Mode",
