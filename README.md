@@ -55,6 +55,16 @@ A beautiful, ChatGPT-style pharmacology chatbot built with Streamlit and Supabas
    streamlit run app.py
    ```
 
+### Streamlit Cloud Deployment
+
+For deployment on Streamlit Cloud, you need to include a `packages.txt` file in the root of your repository with the following content:
+
+```
+tesseract-ocr
+```
+
+This will ensure that Tesseract OCR is installed in the Streamlit Cloud environment.
+
 ## 🏗️ Project Structure
 
 ```
@@ -82,6 +92,7 @@ pharmgpt/
 │   ├── sidebar.py                # Sidebar components
 │   └── theme.py                  # UI theming
 ├── requirements.txt              # Python dependencies
+├── packages.txt                  # System-level dependencies for Streamlit Cloud
 └── README.md                     # This file
 ```
 
