@@ -59,7 +59,7 @@ def get_model_configs():
     
     return {
         "fast": {
-            "model": "groq/gemma2-9b-it",
+            "model": "gemma2-9b-it",
             "api_key": groq_key,
             "base_url": "https://api.groq.com/openai/v1",
             "description": "Fast Mode",
