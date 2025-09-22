@@ -27,16 +27,16 @@ class OCRManager:
             logger.info("✅ Tesseract OCR available")
             return True
         except ImportError:
-            logger.debug("Tesseract OCR not installed")
+            logger.warning("Tesseract OCR not installed. Please install it and add it to your PATH.")
             return False
-        except Exception:
-            logger.debug("Tesseract OCR not available")
+        except Exception as e:
+            logger.error(f"Tesseract OCR not available: {e}")
             return False
     
     def extract_text_from_image(self, image_path: str, image_info: str = "") -> str:
         """Extract text from image using Tesseract OCR."""
         if not self.tesseract_available:
-            return f"{image_info}OCR not available. Tesseract OCR is required for text extraction from images."
+            return f"{image_info}OCR not available. Tesseract OCR is not installed or not in the system's PATH. Please install it to enable OCR functionality."
         
         try:
             text = self._extract_with_tesseract(image_path)
@@ -66,8 +66,6 @@ class OCRManager:
         # Try different OCR configurations for better results
         configs = [
             '--psm 6',  # Uniform block of text
-            '--psm 8',  # Single word
-            '--psm 13', # Raw line. Treat the image as a single text line
             '--psm 3',  # Fully automatic page segmentation (default)
         ]
         
