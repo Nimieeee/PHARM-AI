@@ -37,25 +37,28 @@ def get_api_keys():
             logger.info("st.secrets is available")
             groq_key = st.secrets.get("GROQ_API_KEY", os.environ.get("GROQ_API_KEY"))
             openrouter_key = st.secrets.get("OPENROUTER_API_KEY", os.environ.get("OPENROUTER_API_KEY"))
+            mistral_key = st.secrets.get("MISTRAL_API_KEY", os.environ.get("MISTRAL_API_KEY"))
             
-            logger.info(f"Keys from secrets - Groq: {'Found' if groq_key else 'Missing'}, OpenRouter: {'Found' if openrouter_key else 'Missing'}")
+            logger.info(f"Keys from secrets - Mistral: {'Found' if mistral_key else 'Missing'}, Groq: {'Found' if groq_key else 'Missing'}, OpenRouter: {'Found' if openrouter_key else 'Missing'}")
         else:
             logger.warning("st.secrets not available, using environment variables")
             groq_key = os.environ.get("GROQ_API_KEY")
             openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+            mistral_key = os.environ.get("MISTRAL_API_KEY")
             
     except Exception as e:
         logger.error(f"Error accessing secrets: {e}")
         # Fallback to environment variables if secrets not available
         groq_key = os.environ.get("GROQ_API_KEY")
         openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+        mistral_key = os.environ.get("MISTRAL_API_KEY")
         logger.info("Using environment variables as fallback")
     
-    return groq_key, openrouter_key
+    return groq_key, openrouter_key, mistral_key
 
 def get_model_configs():
     """Get model configurations with API keys - 2 optimized modes."""
-    groq_key, openrouter_key = get_api_keys()
+    groq_key, openrouter_key, mistral_key = get_api_keys()
     
     return {
         "fast": {
