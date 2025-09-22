@@ -200,7 +200,6 @@ def chat_completion_stream(model: str, messages: List[Dict]) -> Iterator[str]:
             top_p=0.9,  # Slightly more focused
             frequency_penalty=0.0,
             presence_penalty=0.0,
-            reasoning_effort="none", # Added reasoning_effort
             stop=None # Added stop
         )
         
