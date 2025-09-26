@@ -155,7 +155,7 @@ class RAGService:
             for idx, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
                 try:
                     chunk_data = {
-                        'document_uuid': document_id,
+                        'document_id': document_id,  # Fixed: changed from 'document_uuid' to 'document_id'
                         'conversation_id': conversation_id,
                         'user_uuid': user_uuid,
                         'chunk_index': start_index + idx,
@@ -330,13 +330,13 @@ class RAGService:
             # Group chunks by document
             documents = {}
             for chunk in result.data:
-                doc_uuid = chunk['document_uuid']
-                if doc_uuid not in documents:
-                    documents[doc_uuid] = {
+                doc_id = chunk['document_id']  # Fixed: changed from 'document_uuid' to 'document_id'
+                if doc_id not in documents:
+                    documents[doc_id] = {
                         'chunks': [],
                         'metadata': chunk.get('metadata', {})
                     }
-                documents[doc_uuid]['chunks'].append(chunk)
+                documents[doc_id]['chunks'].append(chunk)
             
             # Build complete document context
             context_parts = []
@@ -415,7 +415,7 @@ class RAGService:
             similar_chunks = []
             
             for chunk in high_sim_chunks + med_sim_chunks:
-                chunk_id = f"{chunk['document_uuid']}_{chunk['chunk_index']}"
+                chunk_id = f"{chunk['document_id']}_{chunk['chunk_index']}"  # Fixed: changed from 'document_uuid' to 'document_id'
                 if chunk_id not in seen_chunks:
                     seen_chunks.add(chunk_id)
                     similar_chunks.append(chunk)
@@ -466,7 +466,7 @@ class RAGService:
                 'document_chunks',
                 'delete',
                 eq={
-                    'document_uuid': document_id,
+                    'document_id': document_id,  # Fixed: changed from 'document_uuid' to 'document_id'
                     'user_uuid': user_uuid
                 }
             )
@@ -499,15 +499,16 @@ class RAGService:
             # Group chunks by document
             documents = {}
             for chunk in result.data:
-                doc_id = chunk['document_uuid']
+                doc_id = chunk['document_id']  # Fixed: changed from 'document_uuid' to 'document_id'
                 if doc_id not in documents:
                     documents[doc_id] = {
                         'chunk_count': 0,
                         'total_content_length': 0,
                         'created_at': chunk['created_at']
                     }
-                
+
                 documents[doc_id]['chunk_count'] += 1
+                documents[doc_id]['total_content_length'] += len(chunk['content'])
                 documents[doc_id]['total_content_length'] += len(chunk['content'])
             
             return {
@@ -519,8 +520,97 @@ class RAGService:
             logger.error(f"Error getting conversation documents summary: {e}")
             return {'total_chunks': 0, 'documents': {}}
 
+    async def search_documents(
+        self,
+        query: str,
+        user_uuid: str,
+        limit: int = 10,
+        similarity_threshold: float = 0.5
+    ) -> List[Dict]:
+        """Search documents across all user's conversations."""
+        try:
+            logger.info(f"Searching documents for user {user_uuid}: '{query[:50]}...'")
+
+            # Ensure embeddings are initialized
+            self._initialize_embeddings()
+
+            # Generate embedding for the query using the embeddings object (may be CPU-bound)
+            loop = asyncio.get_event_loop()
+            query_embedding = await loop.run_in_executor(
+                None,
+                self.embeddings.embed_query,
+                query
+            )
+
+            # Call the DB RPC to search document chunks for this user
+            result = await self.db.execute_rpc(
+                'search_document_chunks',
+                {
+                    'query_embedding': query_embedding,
+                    'match_threshold': similarity_threshold,
+                    'match_count': limit,
+                    'filter_user_uuid': user_uuid
+                }
+            )
+
+            if result.data:
+                logger.info(f"Found {len(result.data)} matching documents")
+                return result.data
+            else:
+                logger.info("No matching documents found")
+                return []
+
+        except Exception as e:
+            logger.error(f"Error searching documents: {e}")
+            return []
+
 # Global RAG service instance
 rag_service = RAGService()
+
+# Add the missing search_documents function for testing
+async def search_documents(
+    query: str,
+    user_uuid: str,
+    limit: int = 10,
+    similarity_threshold: float = 0.5
+) -> List[Dict]:
+    """Search documents across all user's conversations (for testing and general search)."""
+    try:
+        logger.info(f"Searching documents for user {user_uuid}: '{query[:50]}...'")
+
+        # Initialize embeddings if not already done
+        rag_service._initialize_embeddings()
+
+        # Generate embedding for query
+        import asyncio
+        loop = asyncio.get_event_loop()
+        query_embedding = await loop.run_in_executor(
+            None,
+            rag_service.embeddings.embed_query,
+            query
+        )
+
+        # Search using the database function with user filter
+        result = await rag_service.db.execute_rpc(
+            'search_document_chunks',
+            {
+                'query_embedding': query_embedding,
+                'match_threshold': similarity_threshold,
+                'match_count': limit,
+                'filter_user_uuid': user_uuid
+            }
+        )
+
+        if result.data:
+            logger.info(f"Found {len(result.data)} matching documents")
+            return result.data
+        else:
+            logger.info("No matching documents found")
+            return []
+
+    except Exception as e:
+        logger.error(f"Error searching documents: {e}")
+        return []
 
 # Async wrapper functions for easier use
 async def process_document_for_rag(

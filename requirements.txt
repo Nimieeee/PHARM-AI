@@ -1,41 +1,81 @@
+# PharmGPT v2.0 - Clean Architecture Requirements
 # Core Streamlit and web framework
 streamlit>=1.28.0
+streamlit-authenticator>=0.2.3
 
-# AI and OpenAI-compatible APIs
-openai>=1.0.0
-groq>=0.4.0
+# Database and API clients
+supabase>=2.0.0
+postgrest>=0.16.0
 
-# LangChain for advanced RAG
+# AI and ML libraries
 langchain>=0.1.0
-langchain-openai>=0.0.5
-langchain-community>=0.0.20
 langchain-mistralai>=0.1.0
+langchain-openai>=0.1.0
+openai>=1.0.0
 
-# Supabase pgvector integration
-vecs>=0.4.0
-pgvector>=0.2.0
-
-# Essential Document Processing (lightweight versions)
+# Document processing
 PyPDF2>=3.0.0
-python-docx>=0.8.11  # For document processing only
+python-docx>=0.8.11
 docx2txt>=0.8
 python-pptx>=0.6.21
+
+# Data processing
 pandas>=2.0.0
+numpy>=1.24.0
 
-# Image processing and OCR
-pytesseract>=0.3.10  # OCR text extraction from images (Tesseract pre-installed on Streamlit Cloud)
+# Image processing
 Pillow>=10.0.0
-pdf2image>=1.16.0  # Convert PDF pages to images for OCR
 
-# SQLite upgrade for ChromaDB compatibility on Streamlit Cloud
-pysqlite3-binary>=0.5.0; sys_platform == "linux"
-
-# Minimal utilities
-requests>=2.31.0
+# Utilities
 python-dotenv>=1.0.0
+asyncio-throttle>=1.0.0
+tenacity>=8.2.0
 
-# Performance monitoring (optional)
-psutil>=5.9.0
+# HTTP and networking
+httpx>=0.25.0
+requests>=2.31.0
 
-# Database - Supabase (required)
-supabase[async]>=2.0.0
+# Date and time
+python-dateutil>=2.8.2
+
+# Logging and monitoring
+structlog>=23.1.0
+
+# Development and testing (optional)
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.7.0
+flake8>=6.0.0
+
+# Additional utilities
+uuid>=1.30
+hashlib2>=1.0.0
+mimetypes-extra>=1.0.0
+
+# Vector and embedding support
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.4
+
+# Security and cryptography
+cryptography>=41.0.0
+bcrypt>=4.0.0
+
+# Configuration management
+pydantic>=2.3.0
+pydantic-settings>=2.0.0
+
+# File handling
+chardet>=5.2.0
+magic>=0.4.27
+
+# Optional: For enhanced document processing
+textract>=1.6.0
+unstructured>=0.10.0
+
+# Optional: For advanced text processing  
+spacy>=3.6.0
+nltk>=3.8.0
+
+# Optional: For monitoring and observability
+sentry-sdk>=1.32.0
+prometheus-client>=0.17.0
